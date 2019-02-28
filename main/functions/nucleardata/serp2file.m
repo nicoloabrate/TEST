@@ -7,8 +7,8 @@ function mat_name = serp2file(fname,NG,mat_id,T)
 
 NG = abs(NG);
 path = pwd;
-run([pwd,'/TEST_data_library/',num2str(NG),'G/serpent_output/',fname,'_res.m'])
-cd([pwd,'/TEST_data_library/',num2str(NG),'G/XS'])
+run([pwd,filesep,'auxiliary',filesep,'data_library',filesep,num2str(NG),'G/serpent_output/',fname,'_res.m'])
+cd([pwd,filesep,'auxiliary',filesep,'data_library',filesep,num2str(NG),'G/XS'])
 
 S = 0;
 if sum(INF_CHIT(mat_id,1:2:end)) > 1
