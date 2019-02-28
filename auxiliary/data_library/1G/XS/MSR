@@ -1,0 +1,21 @@
+% MSR XS at 300 [K] 
+% -- Total XS 
+3.71100000e-01 
+% -- Transport XS 
+3.71195248e-01
+% -- Diffusion coefficient 
+8.98000000e-01
+% -- Absorption XS 
+2.40400000e-03
+% -- Capture XS 
+8.85199999e-04
+% -- Fission XS 
+1.51880000e-03
+% -- Removal XS 
+2.40400000e-03
+% -- Spectrum emission 
+1.00000000e+00
+% -- Fission production XS (nuSf) 
+3.79700000e-03
+% -- Scattering matrix 
+0.00000000e+00

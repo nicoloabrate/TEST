@@ -1,0 +1,23 @@
+% C5G7 XS at 300 [K] 
+% -- Total XS 
+5.48269000e-01 1.54728000e+00 
+% -- Transport XS 
+2.46126000e-01 1.04737000e+00 
+% -- Diffusion coefficient 
+1.35432000e+00 3.18257000e-01 
+% -- Absorption XS 
+1.01894000e-02 1.48553000e-01 
+% -- Capture XS 
+7.39945000e-03 5.80082000e-02 
+% -- Fission XS 
+2.78992000e-03 9.05446000e-02 
+% -- Removal XS 
+2.34235000e-02 1.49378000e-01 
+% -- Spectrum emission 
+1.00000000e+00 0.00000000e+00 
+% -- Fission production XS (nuSf) 
+7.56024000e-03 2.34757000e-01 
+% -- Scattering matrix 
+5.24845000e-01 8.20127000e-04 
+1.32331000e-02 1.39790000e+00 
+
