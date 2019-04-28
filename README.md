@@ -6,10 +6,10 @@ Watch out: currently, TEST can solve only multi-group P1 (i.e. diffusion) equati
 ## Basic features
 
 1. Multi-layer geometries;
-2. Multi-group capabilities;
+2. Multi-group treatment of energy variable;
 3. Full compatibility with Serpent-2 output files (_res.m);
 4. Criticality calculation and higher-order harmonics;
-5. Perturbative chain calculations;
+5. Perturbative chain calculations (GPT);
 6. Variable density in different layers (beta version);
 
 
