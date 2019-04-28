@@ -37,9 +37,11 @@ f_shape = adens_shape(N_reg,t_reg,f_def,geom_type);
 % Define each material region assigning a set of material properties and a material id. 
 T = 300;            % Evaluation temperature for XS 
 %  Core 1st layer
-mat_core  = 'UO2';
+mat_core  = 'C5G7';
 mat_id    = 1;
-core_data = readnucdata(mat_core,NG,mat_id,T);
+% core_data = readnucdata(mat_core,NG,mat_id,T);
+core_data = serp2file(mat_core,NG,mat_id,T);
+core_data = serp2struct(mat_core,mat_id,NG);
 
 %  Core 2nd layer
 mat_refl  = 'H2O';

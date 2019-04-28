@@ -17,6 +17,10 @@
 1.00000000e+00 0.00000000e+00 
 % -- Fission production XS (nuSf) 
 7.56024000e-03 2.34757000e-01 
+% -- average number of neutron emitted per fission (nubar) 
+2.70984114e+00 2.59272226e+00 
+% -- energy release per fission (Ef) 
+2.04876000e+02 2.04876000e+02 
 % -- Scattering matrix 
 5.24845000e-01 8.20127000e-04 
 1.32331000e-02 1.39790000e+00 
