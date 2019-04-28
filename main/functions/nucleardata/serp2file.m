@@ -20,6 +20,16 @@ if sum(INF_CHIT(mat_id,1:2:end)) > 1
     end
 end
 
+clear NUBAR
+NUBAR = INF_NSF(mat_id,1:2:end)./INF_FISS(mat_id,1:2:end); 
+
+if length(FISSE(mat_id,1:2:end))<NG
+    EF = NaN*ones(NG,1);
+    for ii = 1:NG
+       EF(ii) = FISSE(mat_id,1:2:end); 
+    end
+end
+
 data = struct('DIFFCOEF',INF_DIFFCOEF(mat_id,1:2:end),...
               'XS_TOT',INF_TOT(mat_id,1:2:end),...
               'XS_TRANSPXS',INF_TRANSPXS(mat_id,1:2:end),...
@@ -29,7 +39,9 @@ data = struct('DIFFCOEF',INF_DIFFCOEF(mat_id,1:2:end),...
               'XS_REM',INF_REMXS(mat_id,1:2:end),...
               'XS_S0',reshape(INF_S0(mat_id,1:2:end), NG, NG),...
               'XS_NSF',INF_NSF(mat_id,1:2:end),...
-              'CHIT',INF_CHIT(mat_id,1:2:end));
+              'CHIT',INF_CHIT(mat_id,1:2:end),...
+              'NUBAR',NUBAR(mat_id,:),...
+              'EF',EF(mat_id,:));
 
 mat_name = deblank(GC_UNIVERSE_NAME(mat_id,:));
 % Write to a file
@@ -61,6 +73,12 @@ fprintf(fid,'%1.8e ',INF_CHIT(mat_id,1:2:end)');
 fprintf(fid,'\n');
 fprintf(fid,'%% -- Fission production XS (nuSf) \n');
 fprintf(fid,'%1.8e ',INF_NSF(mat_id,1:2:end)');
+fprintf(fid,'\n');
+fprintf(fid,'%% -- average number of neutron emitted per fission (nubar) \n');
+fprintf(fid,'%1.8e ',NUBAR');
+fprintf(fid,'\n');
+fprintf(fid,'%% -- energy release per fission (Ef) \n');
+fprintf(fid,'%1.8e ',EF');
 fprintf(fid,'\n');
 fprintf(fid,'%% -- Scattering matrix \n');
 XS_S0 = reshape(INF_S0(mat_id,1:2:end)',NG,NG);

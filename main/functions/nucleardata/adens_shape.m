@@ -41,7 +41,7 @@ switch geom_type
             f_shape{ii}  = eval(sprintf('@(x) (%s)*(%f)/(%f)',f_def{ii},V(ii),f_int(ii)));
             
             if f_int(ii)<=0
-                error('The atomic density function needs to have a positive integral. \r\n')
+                error('The atomic density function needs to have a positive integral.')
             end
             
         end
