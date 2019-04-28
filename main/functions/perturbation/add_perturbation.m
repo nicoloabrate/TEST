@@ -16,12 +16,10 @@ for ii = 1:N_pert
     if XS(ii) == 1
         % Evaluate XS correction
         XS_corr = delta(ii)*1e-2*input_data.XS_FISS(NG_in(ii));
-        % Evaluate unperturbed nubar
-        NUBAR = input_data.XS_NSF(NG_in(ii))/input_data.XS_FISS(NG_in(ii));
         % Perturb fission XS
         input_data.XS_FISS(NG_in(ii)) = (1+delta(ii)*1e-2)*input_data.XS_FISS(NG_in(ii));
         % Correct nuSf XS
-        input_data.XS_NSF(NG_in(ii))  = NUBAR*input_data.XS_FISS(NG_in(ii));
+        input_data.XS_NSF(NG_in(ii))  = input_data.NUBAR(NG_in(ii))*input_data.XS_FISS(NG_in(ii));
         NG = NG_in(ii);
         
     elseif XS(ii) == 2
@@ -32,7 +30,8 @@ for ii = 1:N_pert
         
     elseif XS(ii) == 3
         
-        input_data.XS_NSF(NG_in(ii)) = (1+delta(ii)*1e-2)*input_data.XS_NSF(NG_in(ii));
+        input_data.NUBAR(NG_in(ii))  = (1+delta(ii)*1e-2)*input_data.NUBAR(NG_in(ii));
+        input_data.XS_NSF(NG_in(ii)) = input_data.NUBAR(NG_in(ii))*input_data.XS_FISS(NG_in(ii));
         NG = NG_in(ii);
         
     elseif XS(ii) == 4

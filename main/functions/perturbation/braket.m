@@ -3,9 +3,9 @@ function I = braket(psi,phi,brakopt)
 % space. The argument 'brakopt' contains the spatial grid and the
 % information needed to perform the integral.
 
-prod = psi.*phi;       % Element-wise product
-NG   = brakopt.NG;     % Number of energy-groups
-Nt   = brakopt.Nt;     % Number of spatial points in the grid
+prod = psi.*phi;               % Element-wise product
+NG   = brakopt.NG;             % Number of energy-groups
+Nt   = brakopt.Nt;             % Number of spatial points in the grid
 multi_grid = zeros(Nt*NG,1);   % Integral initialization
 
 for g = 1:NG
