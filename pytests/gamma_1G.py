@@ -8,9 +8,9 @@ file: .py
 description:
 """
 import time as t
-from test.geometry import Slab
-import test.NeutronTransportEquation as NTE
-import test.eigenproblems.gamma as gamma
+from TEST.geometry import Slab
+import TEST.NeutronTransportEquation as NTE
+import TEST.eigenproblems.gamma as gamma
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.linalg import norm

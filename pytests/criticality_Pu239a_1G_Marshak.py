@@ -20,12 +20,12 @@ import numpy as np
 nev = 1
 M = 100
 G = 1
-N = 1
+N = 11
 bc = 'Marshak'
 H = 0.77032  # 0.76378
 
 
-matname = ['Modak']
+matname = ['Pu239a1L']
 xlayers = [-H, H]
 # define geometry and mesh
 slab = Slab(M, xlayers, matname, [bc], G)

@@ -23,9 +23,9 @@ import numpy as np
 from numpy.linalg import norm
 
 nev = 1
-M = 100
+M = 50
 G = 1
-N = 31
+N = 11
 bc = 'Mark'
 H = 0.77032  # 0.76378  #
 
@@ -40,13 +40,13 @@ PN = NTE.PN(slab, N, fmt='csc', allope=True)
 print('Elapsed time PN: %f' % (t.time()-start))
 
 k = kappa(slab, PN, nev=nev, algo='eigs', verbosity=True)
-g = gamma(slab, PN, nev=nev, algo='eig', verbosity=True)
-d = delta(slab, PN, nev=nev, algo='eig', verbosity=True)
-a = alphaprompt(slab, PN, nev=nev, algo='eig', verbosity=True)
+g = gamma(slab, PN, nev=nev+1, algo='eig', verbosity=True)
+# d = delta(slab, PN, nev=nev, algo='eig', verbosity=True)
+a = alphaprompt(slab, PN, nev=nev+5, algo='eigs', verbosity=True)
 
 kv = np.real(k.eigvect[0:slab.NT, 0])
 gv = np.real(g.eigvect[0:slab.NT, 0])
-dv = np.real(d.eigvect[0:slab.NT, 0])
+# dv = np.real(d.eigvect[0:slab.NT, 0])
 av = np.real(a.eigvect[0:slab.NT, 0])
 
 
@@ -55,9 +55,9 @@ fig = plt.figure()
 plt.plot(slab.mesh, kv)
 plt.plot(slab.mesh, gv, linestyle='dashed')
 plt.plot(slab.mesh, av, linestyle='dotted')
-plt.plot(slab.mesh, dv, linestyle='dotted')
+# plt.plot(slab.mesh, dv, linestyle='dotted')
 plt.legend(('$ \kappa -mode$', '$ \gamma -mode$', r'$ \alpha -mode$', '$\delta -mode$'))
 plt.xlabel('x [cm]')
 plt.ylabel('$\phi_0 $ [a.u.]')
-plt.title(r'$ \alpha$=%.5e, $\kappa$=%.5f, $\gamma$=%.5f, $\delta$=%.5f' % (a.eigvals[0], k.eigvals[0], g.eigvals[0], d.eigvals[0]))
-plt.savefig('critical_modes_%s.pdf' % bc)
+plt.title(r'$ \alpha$=%.5e, $\kappa$=%.5f, $\gamma$=%.5f' % (a.eigvals[0], k.eigvals[0], g.eigvals[0]))
+# plt.savefig('critical_modes_%s.pdf' % bc, bbox_inches = 'tight')

@@ -15,10 +15,10 @@ from .EigenProblem import eigenproblem
 class alphaprompt(eigenproblem):
 
     def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=None,
-                 normalization=None, which='SM', generalized=False):
+                 normalization=None, which='LM', generalized=False):
 
         super(alphaprompt, self).__init__(nte, 'alphaprompt')
-        nev = min(nev + 30, nte.L.shape[0]-5)
+        nev = min(nev + 10, nte.L.shape[0]-5)
         # compute maximum velocity and normalise equation
         vmax = -1/(np.min(-nte.T))
 
@@ -26,15 +26,15 @@ class alphaprompt(eigenproblem):
         if generalized is False:
 
             # invert time operator (velocity reciprocal)
-            invT = inv(nte.T)
+            invT = inv(nte.T)/vmax
 
             if nev == 0:  # kappa infinite
-                B = nte.S+nte.Fp-nte.R  # no leakage, infinite medium
+                B = nte.S+nte.F-nte.R  # no leakage, infinite medium
                 nev = 1
             else:
-                B = nte.S+nte.Fp-nte.R-nte.L  # destruction operator
+                B = nte.S+nte.F-nte.R-nte.L  # destruction operator
 
-            B = np.dot(invT, B)/vmax
+            B = np.dot(invT, B)
             T = None
 
         else:
@@ -125,6 +125,10 @@ class alphaprompt(eigenproblem):
         # force sign consistency
         signs = np.sign(eigvect[1, :])  # sign of 2nd row to avoid BCs
         eigvect = np.conj(signs)*eigvect
+
+        # normalize eigenvectors
+        for iv, v in enumerate(eigvect.T):
+            eigvect[:, iv] = v/np.linalg.norm(v)
 
         # FIXME call balance function
 

@@ -19,6 +19,8 @@ from numpy.linalg import norm
 Modak_benchmark = [-2.53782e-2, -1.03353e-1, -2.38123e-1,
                    -4.47714e-1]
 
+# FIXME: add S8 with 100 meshes and S16 with 50 meshes to have better comparison
+
 nev = 5
 M = 50
 G = 1
@@ -34,13 +36,5 @@ start = t.time()
 PN = NTE.PN(slab, N, fmt='csc', steady=False, prompt=True)
 print('Elapsed time PN: %f' % (t.time()-start))
 
-# a1 = alphaprompt(slab, PN, nev=nev, verbosity=True)
-# v1 = np.real(a1.eigvect[0:slab.NT, 0])
-
-a2 = alphaprompt(slab, PN, nev=nev, algo='eigs', verbosity=True)
-v2 = np.real(a2.eigvect[0:slab.NT, 0])
-
-print('PETSc')
-print((Modak_benchmark-(a1.eigvals[0:len(Modak_benchmark)])))
-print('EIGS')
-print((Modak_benchmark-(a2.eigvals[0:len(Modak_benchmark)])))
+a = alphaprompt(slab, PN, nev=nev, algo='eigs', verbosity=True)
+v = np.real(a.eigvect[0:slab.NT, 0])

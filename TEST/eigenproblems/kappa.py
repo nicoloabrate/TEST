@@ -84,6 +84,10 @@ class kappa(eigenproblem):
         signs = np.sign(eigvect[1, :])  # sign of 2nd row to avoid BCs
         eigvect = np.conj(signs)*eigvect
 
+        # normalize eigenvectors
+        for iv, v in enumerate(eigvect.T):
+            eigvect[:, iv] = v/np.linalg.norm(v)
+
         # FIXME call balance function
 
         self.eigvals = eigvals

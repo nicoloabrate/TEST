@@ -15,7 +15,7 @@ from .EigenProblem import eigenproblem
 class gamma(eigenproblem):
 
     def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=None,
-                 normalization=None, which='LM'):
+                 normalization=None):
 
         super(gamma, self).__init__(nte, 'gamma')
 
@@ -83,6 +83,10 @@ class gamma(eigenproblem):
         # force sign consistency
         signs = np.sign(eigvect[1, :])  # sign of 2nd row to avoid BCs
         eigvect = np.conj(signs)*eigvect
+
+        # normalize eigenvectors
+        for iv, v in enumerate(eigvect.T):
+            eigvect[:, iv] = v/np.linalg.norm(v)
 
         # FIXME call balance function
 
