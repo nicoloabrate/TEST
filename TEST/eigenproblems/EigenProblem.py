@@ -31,7 +31,7 @@ class eigenproblem():
         self.BC = nte.BC
         self.problem = which
 
-    def petsc(L, nev, what, P=None, which='LM', verbosity=False):
+    def petsc(L, nev, what, P=None, which='LM', verbosity=False, sigma=0):
 
         # BUG: set to 0 explicitly diagonal terms that does not appear (and thus are null)
         if L.format != 'csr':
@@ -60,34 +60,25 @@ class eigenproblem():
         if what == 'alpha':
 
             if which in ['SM', 'SR']:
-                # create spectral transformation
-                pc = PETSc.PC().create()
-                pc.setType(pc.Type.BJACOBI)
-
-                ksp = PETSc.KSP().create()
-                ksp.setType(ksp.Type.PREONLY)
-                ksp.setPC(pc)
-
-                F = SLEPc.ST().create()
-                F.setType(F.Type.SINVERT)
-                F.setKSP(ksp)
-                F.setShift(0.2)
-
                 # E settings
                 E = SLEPc.EPS().create()
-                E.setST(F)
 
                 if P is not None:
                     E.setOperators(P, L)
                     E.setDimensions(nev=nev)
-                    E.setWhichEigenpairs(E.Which.LARGEST_MAGNITUDE)
                     E.setProblemType(SLEPc.EPS.ProblemType.GNHEP)
 
                 else:
                     E.setOperators(L)
                     E.setDimensions(nev=nev)
-                    E.setWhichEigenpairs(E.Which.LARGEST_MAGNITUDE)
                     E.setProblemType(SLEPc.EPS.ProblemType.NHEP)
+
+                E.setWhichEigenpairs(E.Which.TARGET_MAGNITUDE)
+                if sigma is not None:
+                    E.setTarget(sigma)
+
+                st = E.getST()
+                st.setType('sinvert')
 
             else:
 

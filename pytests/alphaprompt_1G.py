@@ -21,7 +21,7 @@ Modak_benchmark = [-2.53782e-2, -1.03353e-1, -2.38123e-1,
 
 # FIXME: add S8 with 100 meshes and S16 with 50 meshes to have better comparison
 
-nev = 5
+nev = 1
 M = 50
 G = 1
 N = 15

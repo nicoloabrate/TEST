@@ -15,10 +15,10 @@ from .EigenProblem import eigenproblem
 class alphaprompt(eigenproblem):
 
     def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=None,
-                 normalization=None, which='LM', generalized=False):
+                 normalization=None, which='SM', generalized=False):
 
         super(alphaprompt, self).__init__(nte, 'alphaprompt')
-        nev = min(nev + 10, nte.L.shape[0]-5)
+        # nev = min(nev + 10, nte.L.shape[0]-5)
         # compute maximum velocity and normalise equation
         vmax = -1/(np.min(-nte.T))
 
