@@ -40,11 +40,11 @@ class alphaprompt(eigenproblem):
         else:
 
             if nev == 0:  # kappa infinite
-                B = nte.S+nte.Fp-nte.R  # no leakage, infinite medium
+                B = nte.S+nte.F-nte.R  # no leakage, infinite medium
                 nev = 1
 
             else:
-                B = nte.S+nte.Fp-nte.R-nte.L  # destruction operator
+                B = nte.S+nte.F-nte.R-nte.L  # destruction operator
 
             B = B/vmax
             T = nte.T/vmax  # multiplication operator

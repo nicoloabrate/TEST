@@ -48,7 +48,8 @@ class PN():
 
                 if prompt is True:
                     self.F = PNslab.fission(geom, N, fmt=fmt)
+                else:
+                    self.Fd = PNslab.delfiss(geom, N, fmt=fmt)
+                    self.Fp = PNslab.promptfiss(geom, N, fmt=fmt)
 
-                self.Fd = PNslab.delfiss(geom, N, fmt=fmt)
-                self.Fp = PNslab.promptfiss(geom, N, fmt=fmt)
                 self.state = 'transient'
