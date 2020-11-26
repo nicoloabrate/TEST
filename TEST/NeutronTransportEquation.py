@@ -15,6 +15,10 @@ class PN():
     def __init__(self, geom, N, L=None, prod=None, steady=True, Q=None,
                  BC=True, fmt='csr', prompt=False, allope=False):
 
+         # force flag consistency
+        if prompt is True and steady is True:
+            steady = False
+
         self.nS = geom.NT
         self.nA = N
         self.nE = geom.G
