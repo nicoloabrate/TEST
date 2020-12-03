@@ -196,24 +196,28 @@ class eigenproblem():
     def getfundamental(self):
         if self.problem in ['kappa', 'gamma']:
             idx = 0
-        elif self.problem  == 'delta':
+        elif self.problem == 'delta':
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
             # FIXME patch to find delta
             reals = reals[reals > 0]
             reals = reals[reals < 10]
-            minreal = np.where(reals == reals.max())
-            idx = np.where(self.eigvals == reals[minreal])[0]
+            try:
+                minreal = np.where(reals == reals.max())
+                idx = np.where(self.eigvals == reals[minreal])[0][0]
+            except ValueError:
+                idx = np.where(self.eigvals[self.eigvals.imag == 0])[0][0]
         else:
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
             reals_abs = abs(self.eigvals[self.eigvals.imag == 0])
             minreal = np.where(reals_abs == reals_abs.min())
-            idx = np.where(self.eigvals == reals[minreal])[0]
+            idx = np.where(self.eigvals == reals[minreal])[0][0]
 
-        return self.eigvals[idx], self.eigvect[:, idx]
+        eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
+        return eigenvalue, eigenvector
 
-    def get(self, geom, moment, group, mode):
+    def get(self, geom, moment, group, mode, normalise=True):
         """
         Get spatial flux distribution for group, moment and spatial mode.
 
@@ -251,6 +255,10 @@ class eigenproblem():
             _, vect = eigenproblem.getfundamental(self)
         else:
             vect = self.eigvect[:, mode]
+
+        if moment == 0 and normalise is True:
+            # normalise total flux
+            vect[0:nE*NT] = vect[0:nE*NT]/np.linalg.norm(vect[0:nE*NT+1])
 
         yr = np.real(vect[iS:iE])
         yi = np.imag(vect[iS:iE])

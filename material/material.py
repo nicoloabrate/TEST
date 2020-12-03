@@ -183,6 +183,26 @@ class Material():
                     # single-line data (scattering matrix)
                     selfdic[key] = np.asarray(data)
 
+        # construct missing data, if any
+        if 'Nsf' not in selfdic.keys():
+            selfdic['Nsf'] = selfdic['Nubar']*selfdic['Fiss']
+        if 'Abs' not in selfdic.keys():
+            selfdic['Abs'] = selfdic['Fiss']+selfdic['Capt']
+        if 'Tot' not in selfdic.keys():
+            # evaluate total scattering XS
+            totscatt = np.zeros((selfdic['Fiss'].shape))
+            order = 0
+            for keys in selfdic.keys():
+                if key.startswith('S'):
+                    try:
+                        totscatt = totscatt+np.sum(selfdic['S%d' % order],
+                                                   axis=0)
+                        order = order+1
+                    except KeyError:
+                        pass
+
+            selfdic['Tot'] = selfdic['Abs']+totscatt
+
     def getxs(self, key, pos1=None, pos2=None):
         """
         Get material data for a certain energy group.
