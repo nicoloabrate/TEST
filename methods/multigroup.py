@@ -192,7 +192,7 @@ def scattering(obj, N, prod=True, meshtype='mesh', fmt='csr'):
 
         for arr_gro in range(0, obj.G):  # arrival
 
-            s = fd.zero(obj, sm[dep_gro, arr_gro, :], meshtype)
+            s = fd.zero(obj, sm[arr_gro, dep_gro, :], meshtype)
 
             if dep_gro == 0 and arr_gro == 0:
                 m = s.shape[1]

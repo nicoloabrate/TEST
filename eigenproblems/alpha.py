@@ -19,14 +19,12 @@ class alphaprompt(eigenproblem):
 
         super(alphaprompt, self).__init__(nte, 'alphaprompt')
         # nev = min(nev + 10, nte.L.shape[0]-5)
-        # compute maximum velocity and normalise equation
-        vmax = -1/(np.min(-nte.T))
 
         # define alpha prompt eigenproblem operators
         if generalized is False:
 
             # invert time operator (velocity reciprocal)
-            invT = inv(nte.T)/vmax
+            invT = inv(nte.T)
 
             if nev == 0:  # kappa infinite
                 B = nte.S+nte.F-nte.R  # no leakage, infinite medium
@@ -39,15 +37,14 @@ class alphaprompt(eigenproblem):
 
         else:
 
-            if nev == 0:  # kappa infinite
+            if nev == 0:  # alpha infinite
                 B = nte.S+nte.F-nte.R  # no leakage, infinite medium
                 nev = 1
 
             else:
                 B = nte.S+nte.F-nte.R-nte.L  # destruction operator
 
-            B = B/vmax
-            T = nte.T/vmax  # multiplication operator
+            T = nte.T
 
         if algo == 'PETSc':
 
