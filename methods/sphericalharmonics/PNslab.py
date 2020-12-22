@@ -9,10 +9,11 @@ import os
 import numpy as np
 import warnings
 from TEST.methods import multigroup as mg
+from TEST.methods import finitedifference as fd
 from scipy.integrate import quad
-from scipy.sparse import block_diag, bmat
-from scipy.special import eval_legendre, roots_legendre, lpmv
-from sympy import Symbol, legendre, Integral, integrate
+from scipy.sparse import diags, block_diag, bmat
+from scipy.special import eval_legendre, roots_legendre
+from sympy import Symbol, legendre, integrate
 
 
 warnings.simplefilter('ignore')
@@ -242,7 +243,7 @@ def promptfiss(slab, N, fmt='csr'):
             appM(mg.promptfiss(slab, meshtype, fmt=fmt))
         # FIXME: the must be a cleaner way to do this
         else:
-            appM(0*mg.fission(slab, meshtype, fmt=fmt))
+            appM(0*mg.promptfiss(slab, meshtype, fmt=fmt))
 
     M = block_diag((M), format=fmt)
     return M
@@ -264,23 +265,9 @@ def delfiss(slab, N, fmt='csr'):
     None.
 
     """
-    M = []
-    appM = M.append
+    meshtype = 'mesh'  # evaluate on standard mesh if even
+    M = mg.delfiss(slab, meshtype, fmt=fmt)
 
-    for moment in range(0, N+1):
-
-        if moment % 2 == 0:
-            meshtype = 'mesh'  # evaluate on standard mesh if even
-        else:
-            meshtype = 'stag_mesh'  # evaluate on staggered mesh if odd
-
-        if moment == 0:
-            appM(mg.delfiss(slab, meshtype, fmt=fmt))
-        # FIXME: the must be a cleaner way to do this
-        else:
-            appM(0*mg.delfiss(slab, meshtype, fmt=fmt))
-
-    M = block_diag((M), format=fmt)
     return M
 
 

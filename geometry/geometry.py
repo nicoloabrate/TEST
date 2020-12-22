@@ -58,6 +58,14 @@ class Slab:
                 datapath = datapath.joinpath('%s' % uniName)
 
             self.regions[uniName] = Material(uniName, G, datapath=None)
+
+            # consistency check precursor families
+            if iLay == 0:
+                self.NPF = self.regions[uniName].NPF
+            else:
+                if self.NPF != self.regions[uniName].NPF:
+                    raise OSError('Number of precursor families in %s not' +
+                                  ' consistent with other regions' % uniName)
             minmfp.append(1/np.max(self.regions[uniName].Tot))
 
         # assign mesh, ghost mesh and N
@@ -180,7 +188,7 @@ class Slab:
             elif key == 'beta' or key == 'lambda':
 
                 for ireg, reg in self.regionmap.items():
-                    NPF = self.regions[reg].NP
+                    NPF = self.regions[reg].NPF
 
                 vals = np.full((NPF, self.nLayers), None)
                 # loop over regions

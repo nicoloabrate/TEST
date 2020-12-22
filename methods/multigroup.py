@@ -7,7 +7,7 @@ Description: Class for multi-energy group operators.
 """
 import numpy as np
 from TEST.methods import finitedifference as fd
-from scipy.sparse import diags, block_diag, bmat
+from scipy.sparse import diags, block_diag, bmat, vstack
 
 
 def time(obj, meshtype='mesh', fmt='csr'):
@@ -73,9 +73,9 @@ def removal(obj, meshtype='mesh', fmt='csr'):
         if gro == 0:
             m = r.shape[1]
             n = m
-
+        # move along columns
         AMGapp(diags(r, [0], (m, n), format=fmt))
-
+    # move along rows
     AMG = block_diag((AMG))
     return AMG
 
@@ -197,9 +197,9 @@ def scattering(obj, N, prod=True, meshtype='mesh', fmt='csr'):
             if dep_gro == 0 and arr_gro == 0:
                 m = s.shape[1]
                 n = m
-
+            # move along columns
             Mapp(diags(s, [0], (m, n), format=fmt))
-
+        # move along rows
         MGapp(M)
 
     MG = bmat((MG))
@@ -242,9 +242,9 @@ def fission(obj, meshtype='mesh', fmt='csr'):
             if emi_gro == 0 and dep_gro == 0:
                 m = f.shape[1]
                 n = m
-
+            # move along columns
             Mapp(diags(f, [0], (m, n), format=fmt))
-
+        # move along rows
         MGapp(M)
 
     MG = bmat((MG))
@@ -288,9 +288,9 @@ def promptfiss(obj, meshtype='mesh', fmt='csr'):
             if emi_gro == 0 and dep_gro == 0:
                 m = f.shape[1]
                 n = m
-
+            # move along columns
             Mapp(diags(f, [0], (m, n), format=fmt))
-
+        # move along rows
         MGapp(M)
 
     MG = bmat((MG))
@@ -314,15 +314,18 @@ def delfiss(obj, meshtype='mesh', fmt='csr'):
     None.
 
     """
-    MG = []
-    MGapp = MG.append
+    MPF = []
+    MPFapp = MPF.append
     fxs = obj.getxs('Fiss')
     nub = obj.getxs('Nubar')
     chi = obj.getxs('Chid')
     beta = obj.getxs('beta')
     NPF = beta.shape[0]
 
-    for family in range(0, NPF):
+    for family in range(0, NPF):  # precursors
+
+        MG = []
+        MGapp = MG.append
 
         for emi_gro in range(0, obj.G):  # emission
 
@@ -337,10 +340,13 @@ def delfiss(obj, meshtype='mesh', fmt='csr'):
                 if emi_gro == 0 and dep_gro == 0:
                     m = f.shape[1]
                     n = m
-
+                # move along columns
                 Mapp(diags(f, [0], (m, n), format=fmt))
-
+            # move along rows
             MGapp(M)
 
-    MG = bmat((MG))
-    return MG
+        MG = bmat((MG))
+        MPFapp(MG)
+
+    MPF = vstack((MPF))
+    return MPF

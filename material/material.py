@@ -102,7 +102,7 @@ class Material():
             except FileNotFoundError:
                 raise OSError('Material file for %s does not exist!' % uniName)
 
-        self.NP = (self.beta).size
+        self.NPF = (self.beta).size
 
     def _readtxt(self, fname, nE):
         """
@@ -205,11 +205,11 @@ class Material():
 
     def getxs(self, key, pos1=None, pos2=None):
         """
-        Get material data for a certain energy group.
+        Get material data (for a certain energy group, if needed).
 
         Parameters
         ----------
-        key : string
+        key : str
             User selected nuclear data.
         pos1 : int, optional
             Departure energy group for scattering matrix. If not provided,
@@ -223,7 +223,7 @@ class Material():
         Returns
         -------
         vals : numpy.ndarray
-            1-D ``numpy.ndarray`` with G (groups) rows.
+            1-D ``numpy.ndarray`` with G/NPF (groups) rows.
 
         """
         if pos1 is None and pos2 is None:

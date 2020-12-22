@@ -21,6 +21,7 @@ import scipy.linalg as scilinalg
 from numpy.linalg import norm
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
+from matplotlib.patches import ConnectionPatch
 
 
 class eigenproblem():
@@ -153,37 +154,96 @@ class eigenproblem():
         ax.xaxis.set_major_formatter(FormatStrFormatter('%g'))
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
 
-    def plotspectrum(self, loglog=False, ax=None, gaussplane=True):
-        ax = ax or plt.gca()
-        if gaussplane is True:
-            plt.scatter(self.eigvals[1:].real, self.eigvals[1:].imag,
-                        marker='o', color='red')
-            # plot fundamental
-            val, vect = eigenproblem.getfundamental(self)
-            plt.scatter(val.real, val.imag, marker='*',
-                        s=100, color='blue')
+    def plotspectrum(self, loglog=False, gaussplane=True, geom=None):
+
+        fig = plt.figure()
+        if self.problem == 'alphadelayed' and geom is not None:
+            sub1 = fig.add_subplot(2, 1, 1)
+            sub2 = fig.add_subplot(2, 1, 2)
+            lambdas = geom.getxs('lambda')
+            subplt = True
         else:
-            plt.scatter(np.arange(0, len(self.eigvals.real)-1),
-                        self.eigvals[1:].real, marker='o', color='red')
+            sub1 = fig.add_subplot(1, 1, 1)
+            subplt = False
+
+        if gaussplane is True:
+            sub1.scatter(self.eigvals.real, self.eigvals.imag,
+                         marker='o', color='red')
             # plot fundamental
             val, vect = eigenproblem.getfundamental(self)
-            plt.scatter(0, val, marker='*', s=100, color='blue')
+            sub1.scatter(val.real, val.imag, marker='*',
+                         s=100, color='blue')
+        else:
+            sub1.scatter(np.arange(0, len(self.eigvals.real)-1),
+                         self.eigvals.real, marker='o', color='red')
+            # plot fundamental
+            val, vect = eigenproblem.getfundamental(self)
+            sub1.scatter(0, val, marker='*', s=100, color='blue')
 
         if loglog is True:
-            plt.yscale('symlog')
-            plt.xscale('symlog')
+            sub1.yscale('symlog')
+            sub1.xscale('symlog')
 
         if self.problem == 'alphaprompt':
             label = 'alpha_p'
-        elif self.problem == 'alphaprompt':
+        elif self.problem == 'alphadelayed':
             label = 'alpha_d'
         else:
             label = self.problem
 
-        plt.xlabel('$Re(\%s)$' % label)
-        plt.ylabel('$Im(\%s)$' % label)
-        # ax.xaxis.set_major_formatter(FormatStrFormatter('%g'))
-        # ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
+        sub1.set_xlabel('$Re(\%s)$' % label)
+        sub1.set_ylabel('$Im(\%s)$' % label)
+        sub1.set_ylim([min(self.eigvals.imag)*1.1, max(self.eigvals.imag)*1.1])
+        sub1.ticklabel_format(axis='x', scilimits=[-5, 5])
+        sub1.ticklabel_format(axis='y', scilimits=[-5, 5])
+
+        if subplt is True:
+            minl, maxl = min(-lambdas[:, 0]), max(-lambdas[:, 0])
+            miny, maxy = min(self.eigvals.imag), max(self.eigvals.imag)
+            # plot blocked area
+            sub1.fill_between((minl*maxy/1E3, -minl*maxy/1E3), miny*1.1, maxy*1.1,
+                              facecolor='red', alpha=0.15)
+
+            choice = np.logical_and(np.greater(self.eigvals.real, minl),
+                                    np.less(self.eigvals.real, maxl))
+            delayed = np.extract(choice, self.eigvals.real)
+            sub2.scatter(delayed.real, delayed.imag,
+                         marker='o', color='red')
+            # plot fundamental
+            sub2.scatter(val.real, val.imag, marker='*',
+                         s=100, color='blue')
+            sub2.set_ylim([-1, 1])
+
+            if loglog is True:
+                sub2.set_yscale('symlog')
+                sub2.set_xscale('symlog')
+
+            for la in lambdas:
+                sub2.axvline(-la, color='k', linestyle='--', linewidth=0.5)
+
+            xlo1, xup1 = sub1.get_xlim()
+            ylo1, yup1 = sub1.get_ylim()
+            xlo2, xup2 = sub2.get_xlim()
+            ylo2, yup2 = sub2.get_ylim()
+            # connection patch for first axes
+            con1 = ConnectionPatch(xyA=(minl*maxy/1E3, ylo1), coordsA=sub1.transData,
+                                   xyB=(xlo2, yup2), coordsB=sub2.transData,
+                                   color='red', alpha=0.2)
+            # Add left side to the figure
+            fig.add_artist(con1)
+
+            # connection patch for first axes
+            con2 = ConnectionPatch(xyA=(-minl*maxy/1E3, ylo1), coordsA=sub1.transData,
+                                   xyB=(xup2, yup2), coordsB=sub2.transData,
+                                   color='red', alpha=0.2)
+            # Add right side to the figure
+            fig.add_artist(con2)
+
+            sub2.set_xlabel('$Re(\%s)$' % label)
+            sub2.set_ylabel('$Im(\%s)$' % label)
+            sub2.ticklabel_format(axis='x', scilimits=[-5, 5])
+            sub2.ticklabel_format(axis='y', scilimits=[-5, 5])
+            plt.tight_layout()
 
     def polarspectrum(self, ax=None):
         ax = ax or plt.gca()
