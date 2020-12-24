@@ -19,6 +19,7 @@ import scipy.sparse as scisparse
 import numpy as np
 import scipy.linalg as scilinalg
 from numpy.linalg import norm
+from copy import copy
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib.patches import ConnectionPatch
@@ -142,14 +143,15 @@ class eigenproblem():
         """Normalize eigenvectors according to a user-defined criterion."""
         print('under develop')
 
-    def plot(self, geom, moment, group, mode, ax=None, title=None, imag=False):
+    def plot(self, geom, moment, group, mode, ax=None, title=None, imag=False,
+             **kwargs):
         yr, yi = eigenproblem.get(self, geom, moment, group, mode)
         x = geom.mesh if len(yr) == geom.NT else geom.stag_mesh
         ax = ax or plt.gca()
         if imag is False:
-            plt.plot(x, yr)
+            plt.plot(x, yr, **kwargs)
         else:
-            plt.plot(x, yi)
+            plt.plot(x, yi, **kwargs)
         ax.locator_params(nbins=8)
         ax.xaxis.set_major_formatter(FormatStrFormatter('%g'))
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
@@ -164,20 +166,21 @@ class eigenproblem():
             subplt = True
         else:
             sub1 = fig.add_subplot(1, 1, 1)
+            lambdas = None
             subplt = False
 
         if gaussplane is True:
             sub1.scatter(self.eigvals.real, self.eigvals.imag,
                          marker='o', color='red')
             # plot fundamental
-            val, vect = eigenproblem.getfundamental(self)
+            val, vect = eigenproblem.getfundamental(self, lambdas)
             sub1.scatter(val.real, val.imag, marker='*',
                          s=100, color='blue')
         else:
             sub1.scatter(np.arange(0, len(self.eigvals.real)-1),
                          self.eigvals.real, marker='o', color='red')
             # plot fundamental
-            val, vect = eigenproblem.getfundamental(self)
+            val, vect = eigenproblem.getfundamental(self, lambdas)
             sub1.scatter(0, val, marker='*', s=100, color='blue')
 
         if loglog is True:
@@ -200,18 +203,17 @@ class eigenproblem():
         if subplt is True:
             minl, maxl = min(-lambdas[:, 0]), max(-lambdas[:, 0])
             miny, maxy = min(self.eigvals.imag), max(self.eigvals.imag)
+            minx, maxx = min(self.eigvals.real), max(self.eigvals.real)
             # plot blocked area
-            sub1.fill_between((minl*maxy/1E3, -minl*maxy/1E3), miny*1.1, maxy*1.1,
+            sub1.fill_between((minl*maxx/10, -minl*maxx/10), miny*1.1, maxy*1.1,
                               facecolor='red', alpha=0.15)
 
-            choice = np.logical_and(np.greater(self.eigvals.real, minl),
-                                    np.less(self.eigvals.real, maxl))
+            choice = np.logical_and(np.greater_equal(self.eigvals.real, minl),
+                                    np.less_equal(self.eigvals.real, maxl))
             delayed = np.extract(choice, self.eigvals.real)
             sub2.scatter(delayed.real, delayed.imag,
                          marker='o', color='red')
             # plot fundamental
-            sub2.scatter(val.real, val.imag, marker='*',
-                         s=100, color='blue')
             sub2.set_ylim([-1, 1])
 
             if loglog is True:
@@ -226,14 +228,14 @@ class eigenproblem():
             xlo2, xup2 = sub2.get_xlim()
             ylo2, yup2 = sub2.get_ylim()
             # connection patch for first axes
-            con1 = ConnectionPatch(xyA=(minl*maxy/1E3, ylo1), coordsA=sub1.transData,
+            con1 = ConnectionPatch(xyA=(minl*maxx/10, ylo1), coordsA=sub1.transData,
                                    xyB=(xlo2, yup2), coordsB=sub2.transData,
                                    color='red', alpha=0.2)
             # Add left side to the figure
             fig.add_artist(con1)
 
             # connection patch for first axes
-            con2 = ConnectionPatch(xyA=(-minl*maxy/1E3, ylo1), coordsA=sub1.transData,
+            con2 = ConnectionPatch(xyA=(-minl*maxx/10, ylo1), coordsA=sub1.transData,
                                    xyB=(xup2, yup2), coordsB=sub2.transData,
                                    color='red', alpha=0.2)
             # Add right side to the figure
@@ -253,7 +255,7 @@ class eigenproblem():
         val, vect = eigenproblem.getfundamental(self)
         plt.polar(np.angle(val), abs(val), marker='*', color='blue')
 
-    def getfundamental(self):
+    def getfundamental(self, lambdas=None):
         if self.problem in ['kappa', 'gamma']:
             idx = 0
         elif self.problem == 'delta':
@@ -268,11 +270,29 @@ class eigenproblem():
             except ValueError:
                 idx = np.where(self.eigvals[self.eigvals.imag == 0])[0][0]
         else:
-            # select real eigenvalues
-            reals = self.eigvals[self.eigvals.imag == 0]
-            reals_abs = abs(self.eigvals[self.eigvals.imag == 0])
-            minreal = np.where(reals_abs == reals_abs.min())
-            idx = np.where(self.eigvals == reals[minreal])[0][0]
+            if self.problem == 'alphaprompt':
+                # select real eigenvalues
+                reals = self.eigvals[self.eigvals.imag == 0]
+                # all negative
+                if np.all(reals < 0):
+                    reals_abs = abs(self.eigvals[self.eigvals.imag == 0])
+                    whichreal = np.where(reals_abs == reals_abs.min())
+                else:
+                    reals_abs = self.eigvals[self.eigvals.imag == 0]
+                    whichreal = np.where(reals_abs == reals_abs.max())
+                # blended
+                idx = np.where(self.eigvals == reals[whichreal])[0][0]
+            elif lambdas is not None:
+                # select real eigenvalues
+                choice = np.logical_and(np.greater_equal(self.eigvals.real,
+                                                         min(-lambdas)),
+                                        np.less_equal(self.eigvals.real,
+                                                      max(-lambdas)))
+                prompt = np.extract(~choice, self.eigvals)
+                reals = prompt[prompt.imag == 0]
+                reals_abs = abs(prompt[prompt.imag == 0])
+                minreal = np.where(reals_abs == reals_abs.min())
+                idx = np.where(self.eigvals == reals[minreal])[0][0]
 
         eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
         return eigenvalue, eigenvector

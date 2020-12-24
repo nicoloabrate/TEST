@@ -178,7 +178,8 @@ class Material():
 
                     if matrix.shape == (G, G):
                         selfdic[key] = matrix.T
-
+                    elif matrix.shape == (G, ):
+                        selfdic[key] = matrix
                 else:
                     # single-line data (scattering matrix)
                     selfdic[key] = np.asarray(data)
