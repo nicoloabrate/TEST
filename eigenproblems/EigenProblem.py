@@ -37,6 +37,7 @@ class eigenproblem():
 
     def _petsc(L, nev, what, P=None, which='LM', verbosity=False, sigma=0):
 
+        start = t.time()
         # BUG: set to 0 explicitly diagonal terms that does not appear (and thus are null)
         if L.format != 'csr':
             L = L.tocsr()
@@ -117,12 +118,17 @@ class eigenproblem():
 
         E.setFromOptions()
 
+        end = t.time()
+
+        if verbosity is not None:
+            print("ELAPSED TIME (PETSc setup): %f [s]" % (end-start))
+
         start = t.time()
         E.solve()
         end = t.time()
 
         if verbosity is not None:
-            print("ELAPSED TIME: %f [s]" % (end-start))
+            print("ELAPSED TIME (PETSc solution): %f [s]" % (end-start))
 
         vr, vi = L.getVecs()
 
@@ -156,15 +162,17 @@ class eigenproblem():
         ax.xaxis.set_major_formatter(FormatStrFormatter('%g'))
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
 
-    def plotspectrum(self, loglog=False, gaussplane=True, geom=None):
+    def plotspectrum(self, loglog=False, gaussplane=True, geom=None,
+                     grid=True, ylims=None):
 
-        fig = plt.figure()
-        if self.problem == 'alphadelayed' and geom is not None:
-            sub1 = fig.add_subplot(2, 1, 1)
-            sub2 = fig.add_subplot(2, 1, 2)
+        if self.problem == 'omega' and geom is not None:
+            fig = plt.figure(figsize=(6.4*2, 4.8))
+            sub1 = fig.add_subplot(1, 2, 1)
+            sub2 = fig.add_subplot(1, 2, 2)
             lambdas = geom.getxs('lambda')
             subplt = True
         else:
+            fig = plt.figure()
             sub1 = fig.add_subplot(1, 1, 1)
             lambdas = None
             subplt = False
@@ -184,21 +192,26 @@ class eigenproblem():
             sub1.scatter(0, val, marker='*', s=100, color='blue')
 
         if loglog is True:
-            sub1.yscale('symlog')
-            sub1.xscale('symlog')
+            sub1.set_yscale('symlog')
+            sub1.set_xscale('symlog')
 
-        if self.problem == 'alphaprompt':
-            label = 'alpha_p'
-        elif self.problem == 'alphadelayed':
-            label = 'alpha_d'
+        if self.problem == 'alpha':
+            label = 'alpha'
+        elif self.problem == 'omega':
+            label = 'omega'
         else:
             label = self.problem
 
         sub1.set_xlabel('$Re(\%s)$' % label)
         sub1.set_ylabel('$Im(\%s)$' % label)
-        sub1.set_ylim([min(self.eigvals.imag)*1.1, max(self.eigvals.imag)*1.1])
+        if ylims is None:
+            sub1.set_ylim([min(self.eigvals.imag)*1.1, max(self.eigvals.imag)*1.1])
+        else:
+            sub1.set_ylim(ylims)
         sub1.ticklabel_format(axis='x', scilimits=[-5, 5])
         sub1.ticklabel_format(axis='y', scilimits=[-5, 5])
+        if grid is True:
+            sub1.grid(alpha=0.2)
 
         if subplt is True:
             minl, maxl = min(-lambdas[:, 0]), max(-lambdas[:, 0])
@@ -213,12 +226,13 @@ class eigenproblem():
             delayed = np.extract(choice, self.eigvals.real)
             sub2.scatter(delayed.real, delayed.imag,
                          marker='o', color='red')
+
+            # add fundamental
+            val, vect = eigenproblem.getfundamental(self, lambdas)
+            sub2.scatter(0, val, marker='*', s=100, color='blue')
+
             # plot fundamental
             sub2.set_ylim([-1, 1])
-
-            if loglog is True:
-                sub2.set_yscale('symlog')
-                sub2.set_xscale('symlog')
 
             for la in lambdas:
                 sub2.axvline(-la, color='k', linestyle='--', linewidth=0.5)
@@ -228,15 +242,15 @@ class eigenproblem():
             xlo2, xup2 = sub2.get_xlim()
             ylo2, yup2 = sub2.get_ylim()
             # connection patch for first axes
-            con1 = ConnectionPatch(xyA=(minl*maxx/10, ylo1), coordsA=sub1.transData,
+            con1 = ConnectionPatch(xyA=(minl*maxx/10, (ylo1+yup1)/2), coordsA=sub1.transData,
                                    xyB=(xlo2, yup2), coordsB=sub2.transData,
                                    color='red', alpha=0.2)
             # Add left side to the figure
             fig.add_artist(con1)
 
             # connection patch for first axes
-            con2 = ConnectionPatch(xyA=(-minl*maxx/10, ylo1), coordsA=sub1.transData,
-                                   xyB=(xup2, yup2), coordsB=sub2.transData,
+            con2 = ConnectionPatch(xyA=(-minl*maxx/10, (ylo1+yup1)/2), coordsA=sub1.transData,
+                                   xyB=(xlo2, ylo2), coordsB=sub2.transData,
                                    color='red', alpha=0.2)
             # Add right side to the figure
             fig.add_artist(con2)
@@ -245,6 +259,8 @@ class eigenproblem():
             sub2.set_ylabel('$Im(\%s)$' % label)
             sub2.ticklabel_format(axis='x', scilimits=[-5, 5])
             sub2.ticklabel_format(axis='y', scilimits=[-5, 5])
+            if grid is True:
+                sub2.grid(alpha=0.2)
             plt.tight_layout()
 
     def polarspectrum(self, ax=None):
@@ -270,7 +286,7 @@ class eigenproblem():
             except ValueError:
                 idx = np.where(self.eigvals[self.eigvals.imag == 0])[0][0]
         else:
-            if self.problem == 'alphaprompt':
+            if self.problem == 'alpha':
                 # select real eigenvalues
                 reals = self.eigvals[self.eigvals.imag == 0]
                 # all negative

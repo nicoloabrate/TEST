@@ -13,13 +13,12 @@ from scipy.sparse.linalg import eigs, inv
 from scipy.sparse import block_diag, bmat, csr_matrix, hstack, vstack
 from .EigenProblem import eigenproblem
 
-
-class alphaprompt(eigenproblem):
+class alpha(eigenproblem):
 
     def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=None,
                  normalization=None, which='SM', generalized=False):
 
-        super(alphaprompt, self).__init__(nte, 'alphaprompt')
+        super(alpha, self).__init__(nte, 'alpha')
         # nev = min(nev + 10, nte.L.shape[0]-5)
 
         # define alpha prompt eigenproblem operators
@@ -136,22 +135,22 @@ class alphaprompt(eigenproblem):
         self.eigvect = eigvect
 
 
-class alphadelayed(eigenproblem):
+class omega(eigenproblem):
 
     def __init__(self, geom, nte, npe, nev=1, algo='PETSc', verbosity=None,
                  normalization=None, which='SM'):
 
-        super(alphadelayed, self).__init__(nte, 'alphadelayed')
+        super(omega, self).__init__(nte, 'omega')
         # nev = min(nev + 10, nte.L.shape[0]-5)
 
-        T = alphadelayed.time(nte, npe)
-        Fp = alphadelayed.promptfiss(nte, npe)
-        Fd = alphadelayed.delayedfiss(nte, npe)
-        S = alphadelayed.scattering(nte, npe)
-        R = alphadelayed.removal(nte, npe)
-        L = alphadelayed.leakage(nte, npe)
-        E = alphadelayed.emission(nte, npe)
-        D = alphadelayed.decay(nte, npe)
+        T = omega.time(nte, npe)
+        Fp = omega.promptfiss(nte, npe)
+        Fd = omega.delayedfiss(nte, npe)
+        S = omega.scattering(nte, npe)
+        R = omega.removal(nte, npe)
+        L = omega.leakage(nte, npe)
+        E = omega.emission(nte, npe)
+        D = omega.decay(nte, npe)
 
         # define alpha delayed eigenproblem operators
         if nev == 0:  # alpha infinite S+Fp+Fd+E-(R+D)

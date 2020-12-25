@@ -3,7 +3,7 @@ Author: N. Abrate.
 
 File: gamma.py
 
-Description: gamma eigenvalue problem class.
+Description: collision eigenvalue problem class.
 """
 import time as t
 from scipy.sparse.linalg import eigs

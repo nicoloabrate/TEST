@@ -3,14 +3,13 @@ Author: N. Abrate.
 
 File: delta.py
 
-Description: delta eigenvalue problem class.
+Description: streaming eigenvalue problem class.
 """
 import time as t
 from scipy.sparse.linalg import eigs
 import numpy as np
 from scipy.linalg import eig
 from .EigenProblem import eigenproblem
-
 
 class delta(eigenproblem):
 
