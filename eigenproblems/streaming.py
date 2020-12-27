@@ -18,7 +18,7 @@ class delta(eigenproblem):
 
         super(delta, self).__init__(nte, 'delta')
 
-        # define kappa eigenproblem operators
+        # define eigenproblem operators
         L = nte.L  # leakage operator
         B = nte.F+nte.S-nte.R  # material operator
 
@@ -59,7 +59,8 @@ class delta(eigenproblem):
 
         elif algo == 'eig':
             start = t.time()
-            eigvals, eigvect = eig(B.todense(), L.todense())
+            eigvals, eigvect = eig(L.todense(), B.todense())
+            eigvals = 1/eigvals
             end = t.time()
 
         else:

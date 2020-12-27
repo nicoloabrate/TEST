@@ -138,7 +138,7 @@ class alpha(eigenproblem):
 class omega(eigenproblem):
 
     def __init__(self, geom, nte, npe, nev=1, algo='PETSc', verbosity=None,
-                 normalization=None, which='SM'):
+                 normalization=None, which='SM', shift=None):
 
         super(omega, self).__init__(nte, 'omega')
         # nev = min(nev + 10, nte.L.shape[0]-5)
@@ -164,9 +164,11 @@ class omega(eigenproblem):
 
             try:
                 start = t.time()
-                eigvals, eigvect = eigenproblem._petsc(B, nev, 'alpha', P=T,
+                eigvals, eigvect = eigenproblem._petsc(B, nev,
+                                                       'alpha', P=T,
                                                        which=which,
-                                                       verbosity=True)
+                                                       verbosity=True,
+                                                       sigma=shift)
                 end = t.time()
 
             except NameError:

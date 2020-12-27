@@ -145,6 +145,13 @@ class eigenproblem():
         eigvals = np.asarray(vals)
         return eigvals, eigvect
 
+    def issingular(A):
+        A = A.todense()
+        shapecheck = A.shape[0] == A.shape[1]
+        rankcheck = np.linalg.matrix_rank(A) == A.shape[0]
+        isinvertible = shapecheck and rankcheck
+        return ~isinvertible
+
     def normalize(eigvect, which=None):
         """Normalize eigenvectors according to a user-defined criterion."""
         print('under develop')
@@ -163,7 +170,7 @@ class eigenproblem():
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
 
     def plotspectrum(self, loglog=False, gaussplane=True, geom=None,
-                     grid=True, ylims=None):
+                     grid=True, ylims=None, threshold=None):
 
         if self.problem == 'omega' and geom is not None:
             fig = plt.figure(figsize=(6.4*2, 4.8))
@@ -177,23 +184,24 @@ class eigenproblem():
             lambdas = None
             subplt = False
 
+        val, vect = eigenproblem.getfundamental(self, lambdas)
+        evals = np.delete(self.eigvals, np.where(self.eigvals == val))
+
+        show = np.nan if threshold is not None and abs(val) > threshold else 1
+
+        if threshold is not None:
+            evals = evals[abs(evals) < threshold]
+
         if gaussplane is True:
-            sub1.scatter(self.eigvals.real, self.eigvals.imag,
+            sub1.scatter(evals.real, evals.imag, marker='o', color='red')
+            # plot fundamental
+            sub1.scatter(show*val.real, show*val.imag, marker='*', s=100,
+                         color='blue')
+        else:
+            sub1.scatter(np.arange(0, len(evals.real)-1), evals.real,
                          marker='o', color='red')
             # plot fundamental
-            val, vect = eigenproblem.getfundamental(self, lambdas)
-            sub1.scatter(val.real, val.imag, marker='*',
-                         s=100, color='blue')
-        else:
-            sub1.scatter(np.arange(0, len(self.eigvals.real)-1),
-                         self.eigvals.real, marker='o', color='red')
-            # plot fundamental
-            val, vect = eigenproblem.getfundamental(self, lambdas)
-            sub1.scatter(0, val, marker='*', s=100, color='blue')
-
-        if loglog is True:
-            sub1.set_yscale('symlog')
-            sub1.set_xscale('symlog')
+            sub1.scatter(0, show*val, marker='*', s=100, color='blue')
 
         if self.problem == 'alpha':
             label = 'alpha'
@@ -208,8 +216,14 @@ class eigenproblem():
             sub1.set_ylim([min(self.eigvals.imag)*1.1, max(self.eigvals.imag)*1.1])
         else:
             sub1.set_ylim(ylims)
-        sub1.ticklabel_format(axis='x', scilimits=[-5, 5])
-        sub1.ticklabel_format(axis='y', scilimits=[-5, 5])
+
+        if loglog is True:
+            sub1.set_yscale('symlog')
+            sub1.set_xscale('symlog')
+        else:
+            sub1.ticklabel_format(axis='x', scilimits=[-5, 5])
+            sub1.ticklabel_format(axis='y', scilimits=[-5, 5])
+
         if grid is True:
             sub1.grid(alpha=0.2)
 
@@ -277,14 +291,23 @@ class eigenproblem():
         elif self.problem == 'delta':
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
-            # FIXME patch to find delta
-            reals = reals[reals > 0]
-            reals = reals[reals < 10]
-            try:
+            # FIXME clean spurious big eigenvalues (temporary patch)
+            reals = reals[abs(reals) < 1E3]
+
+            if np.all(reals <= 0):
+                reals = reals[reals != 0]
+                fund = min(reals)
+                idx = np.where(self.eigvals == fund)[0][0]
+            elif np.all(reals > 0):
+                fund = min(reals)
+                idx = np.where(self.eigvals == fund)[0][0]
+            else:
+                # FIXME patch to find delta
+                reals = reals[reals > 0]
+                reals = reals[reals < 10]
                 minreal = np.where(reals == reals.max())
                 idx = np.where(self.eigvals == reals[minreal])[0][0]
-            except ValueError:
-                idx = np.where(self.eigvals[self.eigvals.imag == 0])[0][0]
+
         else:
             if self.problem == 'alpha':
                 # select real eigenvalues
@@ -347,8 +370,10 @@ class eigenproblem():
             iS = group*(Neven*nE*NT)
         iE = iS+(NT-1)+iseven
 
+        lambdas = geom.getxs('lambda') if self.problem == 'omega' else None
+
         if mode == 0:
-            _, vect = eigenproblem.getfundamental(self)
+            _, vect = eigenproblem.getfundamental(self, lambdas)
         else:
             vect = self.eigvect[:, mode]
 

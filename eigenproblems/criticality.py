@@ -11,7 +11,6 @@ import numpy as np
 from scipy.linalg import eig
 from .EigenProblem import eigenproblem
 
-
 class kappa(eigenproblem):
 
     def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=None,
