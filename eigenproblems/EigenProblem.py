@@ -170,18 +170,21 @@ class eigenproblem():
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
 
     def plotspectrum(self, loglog=False, gaussplane=True, geom=None,
-                     grid=True, ylims=None, threshold=None):
+                     grid=True, ylims=None, threshold=None, subplt=False):
 
         if self.problem == 'omega' and geom is not None:
+            lambdas = geom.getxs('lambda')
+            subplt = False if subplt is False else True
+        else:
+            lambdas = None
+
+        if subplt is True:
             fig = plt.figure(figsize=(6.4*2, 4.8))
             sub1 = fig.add_subplot(1, 2, 1)
             sub2 = fig.add_subplot(1, 2, 2)
-            lambdas = geom.getxs('lambda')
-            subplt = True
         else:
             fig = plt.figure()
             sub1 = fig.add_subplot(1, 1, 1)
-            lambdas = None
             subplt = False
 
         val, vect = eigenproblem.getfundamental(self, lambdas)
