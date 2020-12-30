@@ -15,7 +15,7 @@ from .EigenProblem import eigenproblem
 
 class alpha(eigenproblem):
 
-    def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=None,
+    def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=False,
                  normalization=None, which='SM', generalized=False):
 
         super(alpha, self).__init__(nte, 'alpha')
@@ -53,7 +53,7 @@ class alpha(eigenproblem):
                 start = t.time()
                 eigvals, eigvect = eigenproblem._petsc(B, nev, 'alpha', P=T,
                                                        which=which,
-                                                       verbosity=True)
+                                                       verbosity=verbosity)
                 end = t.time()
 
             except NameError:
@@ -111,7 +111,7 @@ class alpha(eigenproblem):
         else:
             raise OSError('%s algorithm is unavailable!' % algo)
 
-        if verbosity is not None and algo != 'PETSc':
+        if verbosity is True and algo != 'PETSc':
             print("ELAPSED TIME: %f [s]" % (end-start))
 
         self.algo = algo
@@ -137,7 +137,7 @@ class alpha(eigenproblem):
 
 class omega(eigenproblem):
 
-    def __init__(self, geom, nte, npe, nev=1, algo='PETSc', verbosity=None,
+    def __init__(self, geom, nte, npe, nev=1, algo='PETSc', verbosity=False,
                  normalization=None, which='SM', shift=None):
 
         super(omega, self).__init__(nte, 'omega')
@@ -167,7 +167,7 @@ class omega(eigenproblem):
                 eigvals, eigvect = eigenproblem._petsc(B, nev,
                                                        'alpha', P=T,
                                                        which=which,
-                                                       verbosity=True,
+                                                       verbosity=verbosity,
                                                        sigma=shift)
                 end = t.time()
 
@@ -226,7 +226,7 @@ class omega(eigenproblem):
         else:
             raise OSError('%s algorithm is unavailable!' % algo)
 
-        if verbosity is not None and algo != 'PETSc':
+        if verbosity is True and algo != 'PETSc':
             print("ELAPSED TIME: %f [s]" % (end-start))
 
         self.algo = algo

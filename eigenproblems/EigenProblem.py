@@ -120,14 +120,14 @@ class eigenproblem():
 
         end = t.time()
 
-        if verbosity is not None:
+        if verbosity is True:
             print("ELAPSED TIME (PETSc setup): %f [s]" % (end-start))
 
         start = t.time()
         E.solve()
         end = t.time()
 
-        if verbosity is not None:
+        if verbosity is True:
             print("ELAPSED TIME (PETSc solution): %f [s]" % (end-start))
 
         vr, vi = L.getVecs()

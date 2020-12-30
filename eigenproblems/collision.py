@@ -14,7 +14,7 @@ from .EigenProblem import eigenproblem
 
 class gamma(eigenproblem):
 
-    def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=None,
+    def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=False,
                  normalization=None):
 
         super(gamma, self).__init__(nte, 'gamma')
@@ -70,7 +70,7 @@ class gamma(eigenproblem):
         else:
             raise OSError('%s algorithm is unavailable!' % algo)
 
-        if verbosity is not None and algo != 'PETSc':
+        if verbosity is True and algo != 'PETSc':
             print("ELAPSED TIME: %f [s]" % (end-start))
 
         self.algo = algo

@@ -13,7 +13,7 @@ from .EigenProblem import eigenproblem
 
 class delta(eigenproblem):
 
-    def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=None,
+    def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=False,
                  normalization=None):
 
         super(delta, self).__init__(nte, 'delta')
@@ -66,7 +66,7 @@ class delta(eigenproblem):
         else:
             raise OSError('%s algorithm is unavailable!' % algo)
 
-        if verbosity is not None and algo != 'PETSc':
+        if verbosity is True and algo != 'PETSc':
             print("ELAPSED TIME: %f [s]" % (end-start))
 
         self.algo = algo
