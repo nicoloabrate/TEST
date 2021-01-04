@@ -77,6 +77,7 @@ class NPE():
         APF = []
         APFapp = APF.append
         lambdas = geom.getxs('lambda')
+        # chid = geom.getxs('Chid')  chid[g, :]*
 
         for g in range(0, geom.G):  # emission group
 
@@ -84,7 +85,8 @@ class NPE():
             Mapp = M.append
 
             for family in range(0, geom.NPF):  # precursor family
-                e = fd.zero(geom, lambdas[family, :], 'mesh')
+                # *2 for integration over all directions (emission isotropic)
+                e = fd.zero(geom, 2*lambdas[family, :], 'mesh')
                 if g == 0 and family == 0:
                     m = e.shape[1]
                     n = m

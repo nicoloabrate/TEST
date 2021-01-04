@@ -13,6 +13,7 @@ from scipy.sparse.linalg import eigs, inv
 from scipy.sparse import block_diag, bmat, csr_matrix, hstack, vstack
 from .EigenProblem import eigenproblem
 
+
 class alpha(eigenproblem):
 
     def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=False,

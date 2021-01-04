@@ -156,15 +156,19 @@ class eigenproblem():
         """Normalize eigenvectors according to a user-defined criterion."""
         print('under develop')
 
-    def plot(self, geom, moment, group, mode, ax=None, title=None, imag=False,
-             **kwargs):
-        yr, yi = eigenproblem.get(self, geom, moment, group, mode)
+    def plot(self, geom, group, moment=0, mode=0, family=0, precursors=False,
+             ax=None, title=None, imag=False, **kwargs):
+
+        yr, yi = eigenproblem.get(self, geom, group, moment=moment, mode=mode,
+                                  family=family, precursors=precursors)
         x = geom.mesh if len(yr) == geom.NT else geom.stag_mesh
         ax = ax or plt.gca()
+
         if imag is False:
             plt.plot(x, yr, **kwargs)
         else:
             plt.plot(x, yi, **kwargs)
+
         ax.locator_params(nbins=8)
         ax.xaxis.set_major_formatter(FormatStrFormatter('%g'))
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
@@ -213,8 +217,13 @@ class eigenproblem():
         else:
             label = self.problem
 
-        sub1.set_xlabel('$Re(\%s)$' % label)
-        sub1.set_ylabel('$Im(\%s)$' % label)
+        if self.problem == 'alpha' or self.problem == 'omega':
+            sub1.set_xlabel('$Re(\%s) ~[s^{-1}]$' % label)
+            sub1.set_ylabel('$Im(\%s) ~[s^{-1}]$' % label)
+        else:
+            sub1.set_xlabel('$Re(\%s)$' % label)
+            sub1.set_ylabel('$Im(\%s)$' % label)
+
         if ylims is None:
             sub1.set_ylim([min(self.eigvals.imag)*1.1, max(self.eigvals.imag)*1.1])
         else:
@@ -339,7 +348,8 @@ class eigenproblem():
         eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
         return eigenvalue, eigenvector
 
-    def get(self, geom, moment, group, mode, normalise=True):
+    def get(self, geom, group, moment=0, mode=0, family=0, normalise=True,
+            precursors=False):
         """
         Get spatial flux distribution for group, moment and spatial mode.
 
@@ -362,27 +372,39 @@ class eigenproblem():
             Imaginary part of the flux mode.
 
         """
+        if precursors and self.problem == 'omega':
+            moment = self.nA+1
+            family = family-1
+            iF = self.nS*family
+        else:
+            iF = 0
+
         Neven = sum(np.arange(0, moment) % 2 == 0)
         Nodd = moment-Neven
-        NT = geom.NT
+
+        nS = self.nS
         nE = self.nE
+
         iseven = 0 if moment % 2 else 1
         if Nodd >= 0:
-            iS = Neven*(nE*NT)+Nodd*(nE*(NT-1))+(group-1)*((NT-1)+iseven)
+            iS = Neven*(nE*nS)+Nodd*(nE*(nS-1))+(group-1)*((nS-1)+iseven)
         else:
-            iS = group*(Neven*nE*NT)
-        iE = iS+(NT-1)+iseven
+            iS = group*(Neven*nE*nS)
+        iS = iS+iF
+        iE = iS+(nS-1)+iseven+iF
 
         lambdas = geom.getxs('lambda') if self.problem == 'omega' else None
 
+        # take eigenvector
         if mode == 0:
             _, vect = eigenproblem.getfundamental(self, lambdas)
         else:
             vect = self.eigvect[:, mode]
 
-        if moment == 0 and normalise is True:
-            # normalise total flux
-            vect[0:nE*NT] = vect[0:nE*NT]/np.linalg.norm(vect[0:nE*NT+1])
+        if normalise:
+            # normalisation constant computed over total flux
+            A = 1/np.linalg.norm(vect[0:nE*nS])
+            vect = A*vect
 
         yr = np.real(vect[iS:iE])
         yi = np.imag(vect[iS:iE])

@@ -333,8 +333,8 @@ def delfiss(obj, meshtype='mesh', fmt='csr'):
             Mapp = M.append
 
             for dep_gro in range(0, obj.G):  # departure
-
-                chinusf = chi[emi_gro, :]*nub[dep_gro, :]*fxs[dep_gro, :]
+                # /2 for fission isotropic emission
+                chinusf = chi[emi_gro, :]*nub[dep_gro, :]*fxs[dep_gro, :]/2
                 f = fd.zero(obj, beta[family, :]*chinusf, meshtype)
 
                 if emi_gro == 0 and dep_gro == 0:
