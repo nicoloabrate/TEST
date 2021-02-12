@@ -14,7 +14,7 @@ from .EigenProblem import eigenproblem
 class delta(eigenproblem):
 
     def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=False,
-                 normalization=None):
+                 normalization=None, tol=1E-8):
 
         super(delta, self).__init__(nte, 'delta')
 
@@ -27,7 +27,8 @@ class delta(eigenproblem):
             try:
                 start = t.time()
                 eigvals, eigvect = eigenproblem._petsc(B, nev, 'delta',  P=L,
-                                                       which='SR', sigma=1)
+                                                       which='SR', sigma=1,
+                                                       tol=1E-8)
                 eigvals = 1/eigvals
                 end = t.time()
 

@@ -17,7 +17,7 @@ from .EigenProblem import eigenproblem
 class alpha(eigenproblem):
 
     def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=False,
-                 normalization=None, which='SM', generalized=False):
+                 normalization=None, which='SM', generalized=False, tol=1E-8):
 
         super(alpha, self).__init__(nte, 'alpha')
         # nev = min(nev + 10, nte.L.shape[0]-5)
@@ -54,7 +54,8 @@ class alpha(eigenproblem):
                 start = t.time()
                 eigvals, eigvect = eigenproblem._petsc(B, nev, 'alpha', P=T,
                                                        which=which,
-                                                       verbosity=verbosity)
+                                                       verbosity=verbosity, 
+                                                       tol=1E-8)
                 end = t.time()
 
             except NameError:
@@ -139,7 +140,7 @@ class alpha(eigenproblem):
 class omega(eigenproblem):
 
     def __init__(self, geom, nte, npe, nev=1, algo='PETSc', verbosity=False,
-                 normalization=None, which='SM', shift=None):
+                 normalization=None, which='SM', shift=None, tol=1E-8):
 
         super(omega, self).__init__(nte, 'omega')
         # nev = min(nev + 10, nte.L.shape[0]-5)
@@ -169,7 +170,7 @@ class omega(eigenproblem):
                                                        'alpha', P=T,
                                                        which=which,
                                                        verbosity=verbosity,
-                                                       sigma=shift)
+                                                       sigma=shift, tol=1E-8)
                 end = t.time()
 
             except NameError:

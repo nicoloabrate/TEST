@@ -35,7 +35,7 @@ class eigenproblem():
         self.BC = nte.BC
         self.problem = which
 
-    def _petsc(L, nev, what, P=None, which='LM', verbosity=False, sigma=0):
+    def _petsc(L, nev, what, P=None, which='LM', verbosity=False, sigma=0, tol=1E-8):
 
         start = t.time()
         # BUG: set to 0 explicitly diagonal terms that does not appear (and thus are null)
@@ -123,6 +123,7 @@ class eigenproblem():
         if verbosity is True:
             print("ELAPSED TIME (PETSc setup): %f [s]" % (end-start))
 
+        E.setTolerances(tol=tol)
         start = t.time()
         E.solve()
         end = t.time()
