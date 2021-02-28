@@ -18,7 +18,7 @@ class gamma(eigenproblem):
                  normalization=None, tol=1E-8):
 
         super(gamma, self).__init__(nte, 'gamma')
-
+        res = None
         # define kappa eigenproblem operators
         if nev == 0:  # kappa infinite
             L = nte.R  # no leakage, infinite medium
@@ -89,6 +89,7 @@ class gamma(eigenproblem):
             eigvect[:, iv] = v/np.linalg.norm(v)
 
         # FIXME call balance function
-
+        if res is not None:
+             self.residual = res
         self.eigvals = eigvals
         self.eigvect = eigvect

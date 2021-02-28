@@ -324,8 +324,8 @@ def imposeBC(op, slab):
 
         else:
 
-            if bc in ['markodd', 'Markodd', 'markOdd', 'MarkOdd']:
-                A = MarkCoeffs(N, odd=True)
+            if bc in ['markeven', 'Markeven', 'markEven', 'MarkEven']:
+                A = MarkCoeffs(N, even=True)
 
             elif bc in ['mark', 'Mark']:
                 A = MarkCoeffs(N)
@@ -391,7 +391,7 @@ def imposeBC(op, slab):
     return op
 
 
-def MarkCoeffs(PN, odd=False):
+def MarkCoeffs(PN, even=False):
     """
     Evaluate Mark boundary condition coefficients.
 
@@ -399,7 +399,7 @@ def MarkCoeffs(PN, odd=False):
     ----------
     PN : int
         Spherical harmonics approximation order.
-    odd : bool, optional
+    even : bool, optional
         If true, previous order Legendre polynomials roots are used instead
         of current even order roots. The default is ``False``.
 
@@ -416,7 +416,7 @@ def MarkCoeffs(PN, odd=False):
     else:
         M = PN
 
-    if odd is True and PN % 2 == 0:
+    if even is True and PN % 2 == 0:
         roots, weights = roots_legendre(PN)
     else:
         roots, weights = roots_legendre(PN+1)

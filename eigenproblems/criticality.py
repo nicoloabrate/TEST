@@ -17,7 +17,7 @@ class kappa(eigenproblem):
                  normalization=None, tol=1E-8):
 
         super(kappa, self).__init__(nte, 'kappa')
-
+        res = None
         # define kappa eigenproblem operators
         if nev == 0:  # kappa infinite
             L = nte.R-nte.S  # no leakage, infinite medium
@@ -29,25 +29,25 @@ class kappa(eigenproblem):
 
         if algo == 'PETSc':
 
-            try:
-                start = t.time()
-                eigvals, eigvect = eigenproblem._petsc(L, nev, 'kappa',  P=F,
-                                                       which='LM', tol=tol)
-                end = t.time()
+            #try:
+            start = t.time()
+            eigvals, eigvect, res = eigenproblem._petsc(L, nev, 'kappa',  P=F,
+                                                        which='LM', tol=tol)
+            end = t.time()
 
-            except NameError:
-                print('PETSc/SLEPc packages not available.')
+            #except NameError:
+                #print('PETSc/SLEPc packages not available.')
 
-                if L.format != 'csc':
-                    L = L.tocsc()
+                #if L.format != 'csc':
+                #    L = L.tocsc()
 
-                if F.format != 'csc':
-                    F = F.tocsc()
+                #if F.format != 'csc':
+                #    F = F.tocsc()
 
-                start = t.time()
-                eigvals, eigvect = eigs(F, M=L, k=nev, which='LM')
-                end = t.time()
-                algo = 'eigs'
+                #start = t.time()
+                #eigvals, eigvect = eigs(F, M=L, k=nev, which='LM')
+                #end = t.time()
+                #algo = 'eigs'
 
         elif algo == 'eigs':
 
@@ -88,6 +88,7 @@ class kappa(eigenproblem):
             eigvect[:, iv] = v/np.linalg.norm(v)
 
         # FIXME call balance function
-
+        if res is not None:
+             self.residual = res
         self.eigvals = eigvals
         self.eigvect = eigvect

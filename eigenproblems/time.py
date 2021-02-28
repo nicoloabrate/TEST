@@ -20,6 +20,7 @@ class alpha(eigenproblem):
                  normalization=None, which='SM', generalized=False, tol=1E-8):
 
         super(alpha, self).__init__(nte, 'alpha')
+        res = None
         # nev = min(nev + 10, nte.L.shape[0]-5)
 
         # define alpha prompt eigenproblem operators
@@ -52,10 +53,10 @@ class alpha(eigenproblem):
 
             try:
                 start = t.time()
-                eigvals, eigvect = eigenproblem._petsc(B, nev, 'alpha', P=T,
-                                                       which=which,
-                                                       verbosity=verbosity, 
-                                                       tol=1E-8)
+                eigvals, eigvect, res = eigenproblem._petsc(B, nev, 'alpha', P=T,
+                                                            which=which,
+                                                            verbosity=verbosity,
+                                                            tol=1E-8)
                 end = t.time()
 
             except NameError:
@@ -132,7 +133,8 @@ class alpha(eigenproblem):
             eigvect[:, iv] = v/np.linalg.norm(v)
 
         # FIXME call balance function
-
+        if res is not None:
+            self.residual = res
         self.eigvals = eigvals
         self.eigvect = eigvect
 
@@ -247,7 +249,8 @@ class omega(eigenproblem):
             eigvect[:, iv] = v/np.linalg.norm(v)
 
         # FIXME call balance function
-
+        if res is not None:
+             self.residual = res
         self.eigvals = eigvals
         self.eigvect = eigvect
 

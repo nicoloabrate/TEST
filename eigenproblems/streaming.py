@@ -17,7 +17,7 @@ class delta(eigenproblem):
                  normalization=None, tol=1E-8):
 
         super(delta, self).__init__(nte, 'delta')
-
+        res = None
         # define eigenproblem operators
         L = nte.L  # leakage operator
         B = nte.F+nte.S-nte.R  # material operator
@@ -26,9 +26,9 @@ class delta(eigenproblem):
 
             try:
                 start = t.time()
-                eigvals, eigvect = eigenproblem._petsc(B, nev, 'delta',  P=L,
-                                                       which='SR', sigma=1,
-                                                       tol=1E-8)
+                eigvals, eigvect, res = eigenproblem._petsc(B, nev, 'delta',  P=L,
+                                                            which='SR', sigma=1,
+                                                            tol=1E-8)
                 eigvals = 1/eigvals
                 end = t.time()
 
@@ -82,6 +82,7 @@ class delta(eigenproblem):
         eigvect = np.conj(signs)*eigvect
 
         # FIXME call balance function
-
+        if res is not None:
+             self.residual = res
         self.eigvals = eigvals
         self.eigvect = eigvect

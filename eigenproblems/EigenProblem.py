@@ -116,15 +116,14 @@ class eigenproblem():
             E.setWhichEigenpairs(E.Which.LARGEST_MAGNITUDE)
             E.setDimensions(nev=nev)
 
-        E.setFromOptions()
-
         end = t.time()
 
         if verbosity is True:
             print("ELAPSED TIME (PETSc setup): %f [s]" % (end-start))
 
-        E.setTolerances(tol=tol)
+        E.setTolerances(tol=tol) #
         start = t.time()
+        E.setFromOptions()
         E.solve()
         end = t.time()
 
@@ -135,16 +134,19 @@ class eigenproblem():
 
         vals = []
         vecs = []
+        err = []
         eigvect = np.full((rows, max(nev, E.getConverged())), np.nan)
         for iE in range(E.getConverged()):
             val = E.getEigenpair(iE, vr, vi)
             vals.append(val)
+            err.append(E.computeError(iE))
             vecs = [complex(vr0, wi0) for vr0, wi0 in zip(vr.getArray(),
                                                           vi.getArray())]
             eigvect[:, iE] = np.asarray(vecs, dtype=np.complex).T
 
         eigvals = np.asarray(vals)
-        return eigvals, eigvect
+        res = np.asarray(err)
+        return eigvals, eigvect, res
 
     def issingular(A):
         A = A.todense()
