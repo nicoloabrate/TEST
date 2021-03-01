@@ -17,7 +17,7 @@ coeffs0 = coeffs0[:, 2].reshape((NMax, NMax), order='C')
 Mcoeffs = cp(coeffs0)
 # coeffsN = np.loadtxt('Nicolo.txt')
 
-PN = 1001
+PN = 2001
 m = 1
 M = PN
 normcoeff = (2*(np.arange(0, PN+1))+1)/2
@@ -37,4 +37,4 @@ for row in range(0, (M+1)//2):
         Mcoeffs[row, n] = pos
     m = m+2
 
-np.savetxt('Marshak.txt', Mcoeffs, fmt='%.18e')
+np.savetxt('Marshak.txt', Mcoeffs[0:NMax//2, :], fmt='%.18e')
