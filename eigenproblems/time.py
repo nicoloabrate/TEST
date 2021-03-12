@@ -17,7 +17,8 @@ from .EigenProblem import eigenproblem
 class alpha(eigenproblem):
 
     def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=False,
-                 normalization=None, which='SM', generalized=False, tol=1E-8):
+                 normalization=None, which='SM', generalized=False,
+                 tol=1E-8, monitor=False):
 
         super(alpha, self).__init__(nte, 'alpha')
         res = None
@@ -29,7 +30,7 @@ class alpha(eigenproblem):
             # invert time operator (velocity reciprocal)
             invT = inv(nte.T)
 
-            if nev == 0:  # kappa infinite
+            if nev == 0:  # alpha infinite
                 B = nte.S+nte.F-nte.R  # no leakage, infinite medium
                 nev = 1
             else:
@@ -56,7 +57,8 @@ class alpha(eigenproblem):
                 eigvals, eigvect, res = eigenproblem._petsc(B, nev, 'alpha', P=T,
                                                             which=which,
                                                             verbosity=verbosity,
-                                                            tol=1E-8)
+                                                            tol=tol,
+                                                            monitor=monitor)
                 end = t.time()
 
             except NameError:
@@ -142,9 +144,11 @@ class alpha(eigenproblem):
 class omega(eigenproblem):
 
     def __init__(self, geom, nte, npe, nev=1, algo='PETSc', verbosity=False,
-                 normalization=None, which='SM', shift=None, tol=1E-8):
+                 normalization=None, which='SM', shift=None, tol=1E-8,
+                 monitor=False):
 
         super(omega, self).__init__(nte, 'omega')
+        res = None
         # nev = min(nev + 10, nte.L.shape[0]-5)
 
         T = omega.time(nte, npe)
@@ -172,7 +176,8 @@ class omega(eigenproblem):
                                                        'alpha', P=T,
                                                        which=which,
                                                        verbosity=verbosity,
-                                                       sigma=shift, tol=1E-8)
+                                                       sigma=shift, tol=tol,
+                                                       monitor=monitor)
                 end = t.time()
 
             except NameError:

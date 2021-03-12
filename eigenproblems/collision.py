@@ -15,7 +15,7 @@ from .EigenProblem import eigenproblem
 class gamma(eigenproblem):
 
     def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=False,
-                 normalization=None, tol=1E-8):
+                 normalization=None, tol=1E-8, monitor=False):
 
         super(gamma, self).__init__(nte, 'gamma')
         res = None
@@ -32,8 +32,9 @@ class gamma(eigenproblem):
 
             try:
                 start = t.time()
-                eigvals, eigvect = eigenproblem._petsc(L, nev, 'gamma', P=P,
-                                                      which='LM', tol=1E-8)
+                eigvals, eigvect, res = eigenproblem._petsc(L, nev, 'gamma', P=P,
+                                                            which='LM', tol=tol,
+                                                            monitor=monitor)
                 end = t.time()
 
             except NameError:

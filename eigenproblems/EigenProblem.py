@@ -13,13 +13,9 @@ try:
 except ImportError:
     print('WARNING: PETSc/SLEPc packages not available. Computational speed' +
           ' may be seriously affected.')
-
+import os
 import time as t
-import scipy.sparse as scisparse
 import numpy as np
-import scipy.linalg as scilinalg
-from numpy.linalg import norm
-from copy import copy
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib.patches import ConnectionPatch
@@ -35,7 +31,8 @@ class eigenproblem():
         self.BC = nte.BC
         self.problem = which
 
-    def _petsc(L, nev, what, P=None, which='LM', verbosity=False, sigma=0, tol=1E-8):
+    def _petsc(L, nev, what, P=None, which='LM', verbosity=False, sigma=0,
+               tol=1E-8, monitor=True):
 
         start = t.time()
         # BUG: set to 0 explicitly diagonal terms that does not appear (and thus are null)
@@ -121,7 +118,10 @@ class eigenproblem():
         if verbosity is True:
             print("ELAPSED TIME (PETSc setup): %f [s]" % (end-start))
 
-        E.setTolerances(tol=tol) #
+        if monitor is True:
+            E.setMonitor(eigenproblem.convmonitor)
+
+        E.setTolerances(tol=tol)
         start = t.time()
         E.setFromOptions()
         E.solve()
@@ -412,3 +412,41 @@ class eigenproblem():
         yr = np.real(vect[iS:iE])
         yi = np.imag(vect[iS:iE])
         return yr, yi
+
+    def convmonitor(eps, its, nconv, eig, err):
+        """
+        Monitor convergence of the PETSc eigensolver
+
+        Parameters
+        ----------
+        eps : object
+            EPS object of PETSc.
+        its : int
+            Iterations.
+        nconv : int
+            Number of converged eigenvalues.
+        eig : float, complex
+            Eigenvalues.
+        err : float
+            Relative error on eigenvalue.
+
+        Returns
+        -------
+        ``None``
+
+        """
+        # vr, vi = eps.getOperators()[0].createVecs()
+        # # k = eps.getEigenpair(i, vr, vi)
+        # print(k)
+        if os.path.exists('tmp.txt'):
+            append_write = 'a' # append if already exists
+        else:
+            append_write = 'w' # make a new file if not
+
+        nev = eps.getDimensions()[0]
+        arr = np.zeros((nev, 3))
+        for i in range(0, nev):
+            arr[i, :] = np.array([its, eig[i].real, eig[i].imag])
+
+        with open('tmp.txt', append_write) as f:
+            np.savetxt(f, arr)

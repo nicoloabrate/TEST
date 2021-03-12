@@ -14,7 +14,7 @@ from .EigenProblem import eigenproblem
 class kappa(eigenproblem):
 
     def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=False,
-                 normalization=None, tol=1E-8):
+                 normalization=None, tol=1E-8, monitor=False):
 
         super(kappa, self).__init__(nte, 'kappa')
         res = None
@@ -32,7 +32,8 @@ class kappa(eigenproblem):
             #try:
             start = t.time()
             eigvals, eigvect, res = eigenproblem._petsc(L, nev, 'kappa',  P=F,
-                                                        which='LM', tol=tol)
+                                                        which='LM', tol=tol,
+                                                        monitor=monitor)
             end = t.time()
 
             #except NameError:
