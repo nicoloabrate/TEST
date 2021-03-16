@@ -19,7 +19,7 @@ class kappa(eigenproblem):
         super(kappa, self).__init__(nte, 'kappa')
         res = None
         # define kappa eigenproblem operators
-        if nev == 0:  # kappa infinite
+        if nev == 0 or self.BC is False:  # kappa infinite
             L = nte.R-nte.S  # no leakage, infinite medium
             nev = 1
         else:
@@ -29,26 +29,26 @@ class kappa(eigenproblem):
 
         if algo == 'PETSc':
 
-            #try:
-            start = t.time()
-            eigvals, eigvect, res = eigenproblem._petsc(L, nev, 'kappa',  P=F,
-                                                        which='LM', tol=tol,
-                                                        monitor=monitor)
-            end = t.time()
+            try:
+                start = t.time()
+                eigvals, eigvect, res = eigenproblem._petsc(L, nev, 'kappa',  P=F,
+                                                            which='LM', tol=tol,
+                                                            monitor=monitor)
+                end = t.time()
 
-            #except NameError:
-                #print('PETSc/SLEPc packages not available.')
+            except NameError:
+                print('PETSc/SLEPc packages not available.')
 
-                #if L.format != 'csc':
-                #    L = L.tocsc()
+                if L.format != 'csc':
+                    L = L.tocsc()
 
-                #if F.format != 'csc':
-                #    F = F.tocsc()
+                if F.format != 'csc':
+                    F = F.tocsc()
 
-                #start = t.time()
-                #eigvals, eigvect = eigs(F, M=L, k=nev, which='LM')
-                #end = t.time()
-                #algo = 'eigs'
+                start = t.time()
+                eigvals, eigvect = eigs(F, M=L, k=nev, which='LM')
+                end = t.time()
+                algo = 'eigs'
 
         elif algo == 'eigs':
 

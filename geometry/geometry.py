@@ -14,7 +14,8 @@ from collections import OrderedDict
 class Slab:
     """Define slab geometry object."""
 
-    def __init__(self, NMFP, layers, matlist, BCs, G, datapath=None):
+    def __init__(self, NMFP, layers, matlist, BCs, G, AngOrd, spatial_scheme,
+                 datapath=None):
 
         # assign "test" path for data library
         self.datapath = datapath
@@ -72,6 +73,8 @@ class Slab:
         Slab.mesher(self, minmfp)
 
         self.regionmap = OrderedDict(zip(range(0, len(matlist)), matlist))
+        self.AngOrd = AngOrd
+        self.spatial_scheme = spatial_scheme
         self.G = G
         self.geometry = 'slab'
 
@@ -180,10 +183,31 @@ class Slab:
         if region is None:
 
             if key.startswith('S') or key.startswith('Sp'):
-                vals = np.full((self.G, self.G, self.nLayers), None)
+                if key == 'S' or key == 'Sp':  # take all moments
+                    # look for maximum number of moments available in the data
+                    L = 0
+                    for ireg, reg in self.regionmap.items():
+                        datastr = list(self.regions[reg].__dict__.keys())
+                        # //2 since there are 'S' and 'Sp'
+                        S = sum('S' in s for s in datastr)//2
+                        L = S if S > L else L  # get maximum scattering order
+                    shape = (self.G, self.G, self.nLayers, L)
+                    allL = True
+                else:
+                    shape = (self.G, self.G, self.nLayers)
+                    allL = False
+
+                vals = np.full(shape, None)
                 # loop over regions
                 for ireg, reg in self.regionmap.items():
-                    vals[:, :, ireg] = self.regions[reg].getxs(key, pos1, pos2)
+                    if allL is True:
+                        old_key = 'S'
+                        # get all scattering order matrices for each region
+                        for l in range(0, L):
+                            key = '%s%d' % (old_key, l)
+                            vals[:, :, ireg, l] = self.regions[reg].getxs(key, pos1, pos2)
+                    else:
+                        vals[:, :, ireg] = self.regions[reg].getxs(key, pos1, pos2)
 
             elif key == 'beta' or key == 'lambda':
 
