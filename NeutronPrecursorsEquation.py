@@ -7,7 +7,7 @@ Description: Class that defines numerically approximated neutron precursors
              operators.
 """
 from numpy import ones
-from TEST.methods import finitedifference as fd
+from TEST.methods.space import FD, FV
 from scipy.sparse import diags, block_diag, vstack, hstack
 
 
@@ -48,7 +48,7 @@ class NPE():
             Mapp = M.append
 
             for family in range(0, geom.NPF):  # precursor family
-                e = fd.zero(geom, ones((1, geom.nLayers)), 'mesh')
+                e = FD.zero(geom, ones((1, geom.nLayers)), 'mesh')
                 if g == 0 and family == 0:
                     m = e.shape[1]
                     n = m
@@ -86,7 +86,7 @@ class NPE():
 
             for family in range(0, geom.NPF):  # precursor family
                 # *2 for integration over all directions (emission isotropic)
-                e = fd.zero(geom, 2*lambdas[family, :], 'mesh')
+                e = FD.zero(geom, 2*lambdas[family, :], 'mesh')
                 if g == 0 and family == 0:
                     m = e.shape[1]
                     n = m
@@ -122,7 +122,7 @@ class NPE():
             Mapp = M.append
 
             for family in range(0, geom.NPF):  # precursor family
-                e = fd.zero(geom, lambdas[family, :], 'mesh')
+                e = FD.zero(geom, lambdas[family, :], 'mesh')
                 if g == 0 and family == 0:
                     m = e.shape[1]
                     n = m

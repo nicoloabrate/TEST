@@ -309,7 +309,7 @@ def fission(obj, xs, fmt='csc'):
     return M
 
 
-def delfiss(obj, beta, xs, fmt='csc'):
+def delfission(obj, beta, xs, fmt='csc'):
     """
     Assemble multi-group delayed fission operator sub-matrix.
 
@@ -325,13 +325,25 @@ def delfiss(obj, beta, xs, fmt='csc'):
     None.
 
     """
+    model = obj.spatial_scheme
     NPF = beta.shape[0]
     MPF = []
     MPFapp = MPF.append
 
     for family in range(0, NPF):  # precursors
-        M = fission(obj, beta[family, :]*xs, fmt=fmt)
-        MPFapp(M)
+
+        meshtype = 'mesh'
+
+        if model == 'FD':
+            f = FD.zero(obj, beta[family, :]*xs, meshtype)
+        elif model == 'FV':
+            f = FV.zero(obj, beta[family, :]*xs, meshtype)
+        else:
+            raise OSError('%s model not available for spatial variable!' % model)
+
+        m = f.shape[1]
+        n = m
+        MPFapp(diags(f, [0], (m, n),  format=fmt))
 
     MPF = vstack((MPF))
-    return M
+    return MPF
