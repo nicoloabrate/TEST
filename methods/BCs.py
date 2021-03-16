@@ -88,31 +88,34 @@ def imposeBC(op, slab):
             A[0:m//2, :] = -2/slab.dx[0]*A[0:m//2, :]
             A[m//2:m, :] = 2/slab.dx[-1]*A[m//2:m, :]
 
-            count = 0
-
             for gro in range(0, op.nE):
+
+                count = 0
 
                 for moment in range(0, n):
 
                     Neq = 2*moment  # only even moments need BCs
                     No = (N+1)//2 if N % 2 != 0 else N//2
                     Ne = N+1-No
-                    ip = moment*(M+(M-1))+gro*(2*M-1)
-                    igr = gro*(2*M-1)
-                    igc = gro*(M-1)
+                    ip = moment*(2*M-1)  #
+                    idg = (No*(M-1)+Ne*M)*gro
                     ig = gro*(No*(M-1)+Ne*M)
 
                     if moment >= 1:  # *2 for one-side f.d. FIXME >=
                         # right boundary, lower diag
-                        L[igr+ip, igc+ip-(M-1)] = 2*L[igr+ip, igc+ip-(M-1)]
+                        # FIXME
+                        L[ip+idg, ip-(M-1)+idg] = 2*L[ip+idg, ip-(M-1)+idg]
                         # left boundary, lower diag
-                        L[M+igr+ip-1, igc+ip-1] = 2*L[M+igr+ip-1, igc+ip-1]
+                        # FIXME
+                        L[ip+M-1+idg, ip-1+idg] = 2*L[ip+M-1+idg, ip-1+idg]
 
                     if moment < n-1 or N % 2 != 0:  # no last and odd eq.
                         # right boundary, upper diag
-                        L[igr+ip, igc+ip+(gro+1)*M] = 2*L[igr+ip, igc+ip+(gro+1)*M]
+                        # FIXME
+                        L[ip+idg, ip+M+idg] = 2*L[ip+idg, ip+M+idg]
                         # left boundary, upper diag
-                        L[M+igr+ip-1, (M-1)+igc+ip-1+(gro+1)*M] = 2*L[M+igr+ip-1, (M-1)+igc+ip-1+(gro+1)*M]
+                        # FIXME
+                        L[ip+M-1+idg, ip+M-1+M-1+idg] = 2*L[ip+M-1+idg, ip+M-1+M-1+idg]
 
                     # set non-diagonal entries (even moments)
                     jj = np.arange(0, n)
@@ -126,12 +129,12 @@ def imposeBC(op, slab):
 
                     else:
                         # sum coeffs in previous row (Lower)
-                        L[ip+igr, ig+iEv] = Neq/(2*Neq+1)*A[count, jj]  # angle>0
-                        L[ip+igr+M-1, ig+iEv+M-1] = Neq/(2*Neq+1)*A[count+m//2, jj]  # angle<0
+                        L[ip+idg, ig+iEv] = Neq/(2*Neq+1)*A[count, jj]  # angle>0
+                        L[ip+M-1+idg, ig+iEv+M-1] = Neq/(2*Neq+1)*A[count+m//2, jj]  # angle<0
 
                         if moment < n-1 or N % 2 != 0:
-                            L[ip+igr, ig+iEv] = L[ip+igr, ig+iEv]+(Neq+1)/(2*Neq+1)*A[count+1, jj]
-                            L[ip+igr+M-1, ig+iEv+M-1] = L[ip+igr+M-1, ig+iEv+M-1]+(Neq+1)/(2*Neq+1)*A[count+m//2+1, jj]
+                            L[ip+idg, ig+iEv] = L[ip+idg, ig+iEv]+(Neq+1)/(2*Neq+1)*A[count+1, jj]
+                            L[ip+M-1+idg, ig+iEv+M-1] = L[ip+M-1+idg, ig+iEv+M-1]+(Neq+1)/(2*Neq+1)*A[count+m//2+1, jj]
 
                     count = count + 1*(moment > 0)
 
