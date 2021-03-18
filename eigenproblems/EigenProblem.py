@@ -159,10 +159,10 @@ class eigenproblem():
         """Normalize eigenvectors according to a user-defined criterion."""
         print('under develop')
 
-    def plot(self, geom, group, moment=0, mode=0, family=0, precursors=False,
+    def plot(self, geom, group, angle=0, mode=0, family=0, precursors=False,
              ax=None, title=None, imag=False, **kwargs):
 
-        yr, yi = eigenproblem.get(self, geom, group, moment=moment, mode=mode,
+        yr, yi = eigenproblem.get(self, geom, group, angle=angle, mode=mode,
                                   family=family, precursors=precursors)
         x = geom.mesh if len(yr) == geom.NT else geom.stag_mesh
         ax = ax or plt.gca()
@@ -351,17 +351,17 @@ class eigenproblem():
         eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
         return eigenvalue, eigenvector
 
-    def get(self, geom, group, moment=0, mode=0, family=0, normalise=True,
+    def get(self, geom, group, angle=0, mode=0, family=0, normalise=True,
             precursors=False):
         """
-        Get spatial flux distribution for group, moment and spatial mode.
+        Get spatial flux distribution for group, angle and spatial mode.
 
         Parameters
         ----------
         geom : object
             Geometry object.
-        moment : int
-            Moment number.
+        angle : int
+            Moment/direction number.
         group : int
             Group number.
         mode : int
@@ -375,26 +375,19 @@ class eigenproblem():
             Imaginary part of the flux mode.
 
         """
+        nE = self.nE
+        nA = self.nA
+        nS = self.nS
         if precursors and self.problem == 'omega':
-            moment = self.nA+1
+            angle = nA
+            nF = self.nF
             family = family-1
-            iF = self.nS*family
+            iF = nS*family
         else:
             iF = 0
 
-        Neven = sum(np.arange(0, moment) % 2 == 0)
-        Nodd = moment-Neven
-
-        nS = self.nS
-        nE = self.nE
-
-        iseven = 0 if moment % 2 else 1
-        if Nodd >= 0:
-            iS = Neven*(nE*nS)+Nodd*(nE*(nS-1))+(group-1)*((nS-1)+iseven)
-        else:
-            iS = group*(Neven*nE*nS)
-        iS = iS+iF
-        iE = iS+(nS-1)+iseven+iF
+        No = (nA+1)//2 if nA % 2 != 0 else nA//2
+        Ne = nA+1-No
 
         lambdas = geom.getxs('lambda') if self.problem == 'omega' else None
 
@@ -406,8 +399,24 @@ class eigenproblem():
 
         if normalise:
             # normalisation constant computed over total flux
-            A = 1/np.linalg.norm(vect[0:nE*nS])
-            vect = A*vect
+            totflx = np.zeros((nE*nS,))
+            for gro in range(0, nE):
+                skip = (Ne*nS+No*(nS-1))*gro
+                totflx[gro*nS:(gro+1)*nS] = vect[skip:skip+nS]
+            vect = vect/np.linalg.norm(totflx)
+
+        if precursors is False:
+            # compute No and Ne for the requested moment/angle
+            skip = (Ne*nS+No*(nS-1))*(group-1)
+            NO = (angle+1)//2 if (angle-1) % 2 != 0 else angle//2
+            NE = angle-NO
+
+            M = nS if angle % 2 == 0 else nS-1
+            iS = skip+NE*nS+NO*(nS-1)
+            iE = skip+NE*nS+NO*(nS-1)+M
+        else:
+            iS = (Ne*nS+No*(nS-1))*nE+group*nF+iF
+            iE = (Ne*nS+No*(nS-1))*nE+group*nF+iF+nS
 
         yr = np.real(vect[iS:iE])
         yi = np.imag(vect[iS:iE])
@@ -435,9 +444,6 @@ class eigenproblem():
         ``None``
 
         """
-        # vr, vi = eps.getOperators()[0].createVecs()
-        # # k = eps.getEigenpair(i, vr, vi)
-        # print(k)
         if os.path.exists('tmp.txt'):
             append_write = 'a' # append if already exists
         else:

@@ -256,6 +256,7 @@ class omega(eigenproblem):
         # FIXME call balance function
         if res is not None:
              self.residual = res
+        self.nF = npe.nF
         self.eigvals = eigvals
         self.eigvect = eigvect
 
@@ -274,9 +275,21 @@ class omega(eigenproblem):
 
     def delayedfiss(N, P):
         F = N.Fp
+        Fd = N.Fd.tocsr()
         A1 = csr_matrix((P.nF*N.nS*N.nE, F.shape[0]))
         A2 = copy(A1.T)
-        A1[:, 0:N.nS*N.nE] = N.Fd
+        nE = N.nE
+        nA = N.nA
+        nS = N.nS
+        nF = P.nF
+        # odd and even eqs.
+        No = (nA+1)//2 if nA % 2 != 0 else nA//2
+        Ne = nA+1-No
+        # loop over each group
+        for gro in range(0, nE):
+            skip = (Ne*nS+No*(nS-1))*gro
+            A1[:, skip:nS+skip] = Fd[:, nS*gro:nS*(gro+1)]
+
         n, m = P.T.shape[0], N.T.shape[0]
         C = csr_matrix((n, n))
         Z = csr_matrix((m, m))
@@ -307,10 +320,17 @@ class omega(eigenproblem):
         return L
 
     def emission(N, P):
+        nA = N.nA
+        No = (nA+1)//2 if nA % 2 != 0 else nA//2
+        Ne = nA+1-No
         F = N.Fp
         A1 = csr_matrix((F.shape[0], P.nF*N.nS*N.nE))
         A2 = copy(A1.T)
-        A1[0:N.nS*N.nE, :] = P.E
+        # loop over each group
+        for gro in range(0, N.nE):
+            skip = (No*(N.nS-1)+Ne*N.nS)*gro
+            A1[skip:N.nS+skip, :] = P.E[N.nS*gro:N.nS*(gro+1), :]
+
         n, m = P.T.shape[0], N.T.shape[0]
         C = csr_matrix((n, n))
         Z = csr_matrix((m, m))

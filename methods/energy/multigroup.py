@@ -5,7 +5,7 @@ File: multigroup.py
 
 Description: Class for multi-energy group operators.
 """
-from scipy.sparse import block_diag, bmat, vstack
+from scipy.sparse import block_diag, bmat
 from TEST.methods.angle.discreteordinates import SN
 from TEST.methods.angle.sphericalharmonics import PN
 from TEST.methods.angle import Diffusion
@@ -242,6 +242,8 @@ def promptfiss(obj, model, fmt='csc'):
     fxs = obj.getxs('Fiss')
     nub = obj.getxs('Nubar')
     chi = obj.getxs('Chip')
+    beta = obj.getxs('beta')
+
 
     for emi_gro in range(0, obj.G):  # emission
 
@@ -252,11 +254,11 @@ def promptfiss(obj, model, fmt='csc'):
 
             chinusf = chi[emi_gro, :]*nub[dep_gro, :]*fxs[dep_gro, :]
             if model == 'PN':
-                Mapp(PN.fission(obj, chinusf, fmt=fmt))
+                Mapp(PN.fission(obj, (1-sum(beta))*chinusf, fmt=fmt))
             elif model == 'SN':
-                Mapp(SN.fission(obj, chinusf, fmt=fmt))
+                Mapp(SN.fission(obj, (1-sum(beta))*chinusf, fmt=fmt))
             elif model == 'Diffusion':
-                Mapp(Diffusion.fission(obj, chinusf, fmt=fmt))
+                Mapp(Diffusion.fission(obj, (1-sum(beta))*chinusf, fmt=fmt))
             else:
                 raise OSError('%s model not available!' % model)
 

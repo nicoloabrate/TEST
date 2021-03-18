@@ -9,7 +9,7 @@ Description: Class that defines numerically approximated neutron precursors
 from numpy import ones
 from TEST.methods.space import FD, FV
 from scipy.sparse import diags, block_diag, vstack, hstack
-
+# TODO add choice between FD and FV
 
 class NPE():
 
