@@ -135,14 +135,14 @@ class eigenproblem():
         vals = []
         vecs = []
         err = []
-        eigvect = np.full((rows, max(nev, E.getConverged())), np.nan)
+        eigvect = np.full((rows, max(nev, E.getConverged())), np.nan, dtype=complex)
         for iE in range(E.getConverged()):
             val = E.getEigenpair(iE, vr, vi)
             vals.append(val)
             err.append(E.computeError(iE))
             vecs = [complex(vr0, wi0) for vr0, wi0 in zip(vr.getArray(),
                                                           vi.getArray())]
-            eigvect[:, iE] = np.asarray(vecs, dtype=np.complex).T
+            eigvect[:, iE] = np.asarray(vecs, dtype=complex).T
 
         eigvals = np.asarray(vals)
         res = np.asarray(err)
