@@ -44,7 +44,7 @@ def zero(obj, f, meshtype='mesh'):
 
 def first(obj, f, meshtype='mesh'):
     """
-    Efuate first-order derivatives with Central Difference Scheme.
+    Evaluate first-order derivatives with Central Difference Scheme.
 
     Parameters
     ----------
@@ -80,8 +80,8 @@ def first(obj, f, meshtype='mesh'):
         dfdx[0, inner_pts[0]:inner_pts[-1]+1] = -f[i]/dx[i]*np.ones((len(inner_pts),
                                                                      1)).ravel()
 
-        if NL > 1 and i < NL and mesh[inner_pts[-1]] < obj.layers[i+1]:
-            dfdx[0, -1] = -2*f[i]/(dx[i]+dx[i+1])
+        if NL > 1 and i < NL-1 and mesh[inner_pts[-1]] <= obj.layers[i+1]:
+            dfdx[0, inner_pts[-1]] = -2*f[i]/(dx[i]+dx[i+1])
 
         dfdx[1, :] = -dfdx[0, :]
 
@@ -114,21 +114,22 @@ def second(obj, f, meshtype='mesh'):
     N_old = 0
     for i in range(0, NL):
         dx = obj.dx[i]
-        N = N_old+obj.N[i]
+        N = int(N_old+obj.N[i])
         # upper diagonal
-        d2fdx2[0, 0+N_old:N] = -f[i]/dx**2*np.ones((obj.N[i], 1))
+        d2fdx2[0, N_old:N] = -f[i]/dx**2*np.ones((int(obj.N[i]), 1)).ravel()
         # main diagonal
-        d2fdx2[1, 0+N_old:N] = 2*f[i]/dx**2*np.ones((obj.N[i], 1))
+        d2fdx2[1, N_old:N] = 2*f[i]/dx**2*np.ones((int(obj.N[i]), 1)).ravel()
         # lower diagonal
-        d2fdx2[2, 0+N_old:N] = -f[i]/dx**2*np.ones((obj.N[i], 1))
+        d2fdx2[2, N_old:N] = -f[i]/dx**2*np.ones((int(obj.N[i]), 1)).ravel()
 
-        if NL > 1 and i < NL:
-            d2fdx2[0, N] = -f[i]/dx[N]/(dx[N]/2+dx[N+1]/2)
-            d2fdx2[1, N] = (f[i]/dx[N]+f[i+1]/dx[N+1])/(dx[N]/2+dx[N+1]/2)
-            d2fdx2[2, N] = -f[i+1]/dx[N+1]/(dx[N]/2+dx[N+1]/2)
+        if NL > 1 and i < NL-1:
+            d2fdx2[2, N-1] = -f[i+1]/obj.dx[i+1]/(dx/2+obj.dx[i+1]/2)
+            d2fdx2[1, N-1] = (f[i]/dx+f[i+1]/obj.dx[i+1])/(dx/2+obj.dx[i+1]/2)
+            d2fdx2[0, N-1] = -f[i]/dx/(dx/2+obj.dx[i+1]/2)
 
         N_old = N
-
+    # shift sub-diagonal
+    d2fdx2[0, 0:-1] = d2fdx2[0, 1:]
     return d2fdx2
 
 

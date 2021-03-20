@@ -46,27 +46,27 @@ def imposeBC(op, slab):
     op.BC = BCs
 
     # copy leakage operator to new variable
-    L = op.Linf  # .tocsr()+0
-
+    L = op.Linf
     for bc in BCs:
 
         # FIXME: actually only the same bc can be handled on two boundaries
         # TODO: check boundary conditions consistency (if different can be imposed)
 
-
         if bc in ['zero', 'zeroflux']:
-            print('Under development')
-            L[0, 0] = 1
-            L[0, slab.NT] = 0
-            L[slab.NT-1, slab.NT-1] = 1
-            L[slab.NT-1, -1] = 0
-
-            op.F[0, 0] = 0
-            op.F[slab.NT, slab.NT] = 0
-            op.R[0, 0] = 0
-            op.R[slab.NT, slab.NT] = 0
-            op.S[0, 0] = 0
-            op.S[slab.NT, slab.NT] = 0
+            if N == 0:
+                # diffusion
+                for gro in range(0, op.nE):
+                    skip = gro*M
+                    L[skip, :] = 0
+                    L[skip+M-1, :] = 0
+                    L[skip, skip] = 1  # right boundary
+                    L[skip+M-1, skip+M-1] = 1  # left boundary
+    
+                    op.F[[skip, skip+M-1], :] = 0
+                    op.R[[skip, skip+M-1], :] = 0
+                    op.S[[skip, skip+M-1], :] = 0
+            else:
+                raise OSError('Zero flux BC available only for diffusion')
 
         else:
 
@@ -103,18 +103,14 @@ def imposeBC(op, slab):
 
                     if moment >= 1:  # *2 for one-side f.d. FIXME >=
                         # right boundary, lower diag
-                        # FIXME
                         L[ip+idg, ip-(M-1)+idg] = 2*L[ip+idg, ip-(M-1)+idg]
                         # left boundary, lower diag
-                        # FIXME
                         L[ip+M-1+idg, ip-1+idg] = 2*L[ip+M-1+idg, ip-1+idg]
 
                     if moment < n-1 or N % 2 != 0:  # no last and odd eq.
                         # right boundary, upper diag
-                        # FIXME
                         L[ip+idg, ip+M+idg] = 2*L[ip+idg, ip+M+idg]
                         # left boundary, upper diag
-                        # FIXME
                         L[ip+M-1+idg, ip+M-1+M-1+idg] = 2*L[ip+M-1+idg, ip+M-1+M-1+idg]
 
                     # set non-diagonal entries (even moments)

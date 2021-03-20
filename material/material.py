@@ -6,6 +6,7 @@ File: material.py
 Description: Class to handle different material regions.
 """
 import numpy as np
+from os import path
 from pathlib import Path
 from serpentTools import read
 from serpentTools.settings import rc
@@ -63,6 +64,10 @@ class Material():
 
             else:
                 fname = '%s_res.m' % str(datapath)
+
+            if not path.exists(path.dirname(datapath)):
+                pwd = Path(__file__).parent
+                fname = pwd.joinpath('datalib', '%gG' % nE, '%s' % fname)
 
             res = read(str(fname))
             univ = []

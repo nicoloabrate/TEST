@@ -46,19 +46,18 @@ class Slab:
 
         # assign material properties
         self.regions = {}
-        minmfp = []
+        minmfp = np.zeros((self.nLayers, ))
 
         for iLay in range(0, self.nLayers):
 
             uniName = matlist[iLay]
 
-            if uniName in self.regions.keys():
-                continue
+            if uniName not in self.regions.keys():
 
-            if datapath is not None:
-                datapath = datapath.joinpath('%s' % uniName)
-
-            self.regions[uniName] = Material(uniName, G, datapath=None)
+                if datapath is not None:
+                    path = datapath[iLay]
+    
+                self.regions[uniName] = Material(uniName, G, datapath=path)
 
             # consistency check precursor families
             if iLay == 0:
@@ -67,8 +66,11 @@ class Slab:
                 if self.NPF != self.regions[uniName].NPF:
                     raise OSError('Number of precursor families in %s not' +
                                   ' consistent with other regions' % uniName)
-            minmfp.append(1/np.max(self.regions[uniName].Tot))
-
+            if AngOrd > 0:
+                minmfp[iLay] = 1/np.max(self.regions[uniName].Tot)
+            else:
+                difflen = np.sqrt(self.regions[uniName].Diffcoef/self.regions[uniName].Remxs)
+                minmfp[iLay] = np.min(difflen)
         # assign mesh, ghost mesh and N
         Slab.mesher(self, minmfp)
 

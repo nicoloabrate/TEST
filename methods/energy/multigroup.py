@@ -9,6 +9,7 @@ from scipy.sparse import block_diag, bmat
 from TEST.methods.angle.discreteordinates import SN
 from TEST.methods.angle.sphericalharmonics import PN
 from TEST.methods.angle import Diffusion
+from numpy import newaxis
 
 
 def time(obj, model, fmt='csc'):
@@ -39,11 +40,11 @@ def time(obj, model, fmt='csc'):
         elif model == 'SN':
             TMGapp(SN.time(obj, invv[gro, :], fmt=fmt))
         elif model == 'Diffusion':
-            TMGapp(Diffusion.time(obj, invv[gro, :], fmt=fmt))
+            TMGapp(PN.time(obj, invv[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available for angular variable!' % model)
 
-    TMG = block_diag((TMG))
+    TMG = block_diag((TMG), format=fmt)
     return TMG
 
 
@@ -66,7 +67,7 @@ def removal(obj, model, fmt='csc'):
     """
     RMG = []
     RMGapp = RMG.append
-    totxs = obj.getxs('Tot') if model != 'Diffusion' else obj.getxs('Remxs')
+    totxs = obj.getxs('Tot')   # if model != 'Diffusion' else obj.getxs('Abs')
 
     for gro in range(0, obj.G):
 
@@ -75,11 +76,11 @@ def removal(obj, model, fmt='csc'):
         elif model == 'SN':
             RMGapp(SN.time(obj, totxs[gro, :], fmt=fmt))
         elif model == 'Diffusion':
-            RMGapp(Diffusion.time(obj, totxs[gro, :], fmt=fmt))
+            RMGapp(PN.time(obj, totxs[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available!' % model)
 
-    RMG = block_diag((RMG))
+    RMG = block_diag((RMG), format=fmt)
     return RMG
 
 
@@ -111,9 +112,10 @@ def leakage(obj, model, fmt='csc'):
         elif model == 'Diffusion':
             # diffusion coefficient is needed
             try:
-                dfc = obj.getxs('Diff')
+                dfc = obj.getxs('Diffcoef')
             except KeyError:
                 dfc = 1/(3*obj.getxs('Tot'))
+            # build leakage operator
             LMGapp(Diffusion.leakage(obj, dfc[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available!' % model)
@@ -161,15 +163,15 @@ def scattering(obj, model, prod=True, fmt='csc'):
                 Mapp(SN.scattering(obj, sm[arr_gro, dep_gro, :, :], fmt=fmt))
             elif model == 'Diffusion':
                 # only isotropic scattering is handles
-                Mapp(Diffusion.scattering(obj, sm[arr_gro, dep_gro, :, 0],
-                                          fmt=fmt))
+                Mapp(PN.scattering(obj, sm[arr_gro, dep_gro, :, 0, newaxis],
+                                   fmt=fmt))
             else:
                 raise OSError('%s model not available!' % model)
 
         # move along rows
         SMGapp(M)
 
-    SMG = bmat((SMG))
+    SMG = bmat((SMG), format=fmt)
     return SMG
 
 
@@ -209,14 +211,14 @@ def fission(obj, model, fmt='csc'):
             elif model == 'SN':
                 Mapp(SN.fission(obj, chinusf, fmt=fmt))
             elif model == 'Diffusion':
-                Mapp(Diffusion.fission(obj, chinusf, fmt=fmt))
+                Mapp(PN.fission(obj, chinusf, fmt=fmt))
             else:
                 raise OSError('%s model not available!' % model)
 
         # move along rows
         FMGapp(M)
 
-    FMG = bmat((FMG))
+    FMG = bmat((FMG), format=fmt)
     return FMG
 
 
@@ -258,14 +260,14 @@ def promptfiss(obj, model, fmt='csc'):
             elif model == 'SN':
                 Mapp(SN.fission(obj, (1-sum(beta))*chinusf, fmt=fmt))
             elif model == 'Diffusion':
-                Mapp(Diffusion.fission(obj, (1-sum(beta))*chinusf, fmt=fmt))
+                Mapp(PN.fission(obj, (1-sum(beta))*chinusf, fmt=fmt))
             else:
                 raise OSError('%s model not available!' % model)
 
         # move along rows
         PMGapp(M)
 
-    PMG = bmat((PMG))
+    PMG = bmat((PMG), format=fmt)
     return PMG
 
 
@@ -307,13 +309,13 @@ def delfiss(obj, model, fmt='csc'):
             elif model == 'SN':
                 Mapp(SN.delfission(obj, beta, chinusf, fmt=fmt))
             elif model == 'Diffusion':
-                Mapp(Diffusion.delfission(obj, beta, chinusf, fmt=fmt))
+                Mapp(PN.delfission(obj, beta, chinusf, fmt=fmt))
             else:
                 raise OSError('%s model not available!' % model)
 
         # move along rows
         MGapp(M)
 
-    MG = bmat((MG))
+    MG = bmat((MG), format=fmt)
 
     return MG
