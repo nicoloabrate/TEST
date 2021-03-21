@@ -9,7 +9,7 @@ from scipy.sparse import block_diag, bmat
 from TEST.methods.angle.discreteordinates import SN
 from TEST.methods.angle.sphericalharmonics import PN
 from TEST.methods.angle import Diffusion
-from numpy import newaxis
+from numpy import newaxis, asarray
 
 
 def time(obj, model, fmt='csc'):
@@ -125,7 +125,7 @@ def leakage(obj, model, fmt='csc'):
     return LMG
 
 
-def scattering(obj, model, prod=True, fmt='csc'):
+def scattering(obj, model, prod=True, fmt='csc', adjoint=False):
     """
     Assemble multi-group scattering operator sub-matrix.
 
@@ -171,11 +171,15 @@ def scattering(obj, model, prod=True, fmt='csc'):
         # move along rows
         SMGapp(M)
 
+    if adjoint is True:
+        SMG = asarray(SMG)
+        SMG = SMG.T
+
     SMG = bmat((SMG), format=fmt)
     return SMG
 
 
-def fission(obj, model, fmt='csc'):
+def fission(obj, model, fmt='csc', adjoint=False):
     """
     Assemble multi-group total fission operator sub-matrix.
 
@@ -218,11 +222,15 @@ def fission(obj, model, fmt='csc'):
         # move along rows
         FMGapp(M)
 
+    if adjoint is True:
+        FMG = asarray(FMG)
+        FMG = FMG.T
+
     FMG = bmat((FMG), format=fmt)
     return FMG
 
 
-def promptfiss(obj, model, fmt='csc'):
+def promptfiss(obj, model, fmt='csc', adjoint=False):
     """
     Assemble multi-group prompt fission operator sub-matrix.
 
@@ -266,6 +274,10 @@ def promptfiss(obj, model, fmt='csc'):
 
         # move along rows
         PMGapp(M)
+
+    if adjoint is True:
+        PMG = asarray(PMG)
+        PMG = PMG.T
 
     PMG = bmat((PMG), format=fmt)
     return PMG

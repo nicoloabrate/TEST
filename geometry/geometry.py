@@ -56,16 +56,19 @@ class Slab:
 
                 if datapath is not None:
                     path = datapath[iLay]
+                else:
+                    path = None
     
                 self.regions[uniName] = Material(uniName, G, datapath=path)
 
             # consistency check precursor families
-            if iLay == 0:
-                self.NPF = self.regions[uniName].NPF
-            else:
-                if self.NPF != self.regions[uniName].NPF:
-                    raise OSError('Number of precursor families in %s not' +
-                                  ' consistent with other regions' % uniName)
+            if 'NPF' in self.__dict__.keys():
+                if iLay == 0:
+                    self.NPF = self.regions[uniName].NPF
+                else:
+                    if self.NPF != self.regions[uniName].NPF:
+                        raise OSError('Number of precursor families in %s not' +
+                                      ' consistent with other regions' % uniName)
             if AngOrd > 0:
                 minmfp[iLay] = 1/np.max(self.regions[uniName].Tot)
             else:
@@ -193,6 +196,7 @@ class Slab:
                         # //2 since there are 'S' and 'Sp'
                         S = sum('S' in s for s in datastr)//2
                         L = S if S > L else L  # get maximum scattering order
+                    L = 1 if L == 0 else L
                     shape = (self.G, self.G, self.nLayers, L)
                     allL = True
                 else:

@@ -107,7 +107,11 @@ class Material():
             except FileNotFoundError:
                 raise OSError('Material file for %s does not exist!' % uniName)
 
-        self.NPF = (self.beta).size
+        try:
+            self.NPF = (self.beta).size
+        except AttributeError:
+            print('Kinetic parameters not available!')
+
 
     def _readtxt(self, fname, nE):
         """
@@ -167,7 +171,7 @@ class Material():
 
             else:
 
-                data = np.asarray([float(val) for val in line.split(' ')])
+                data = np.asarray([float(val) for val in line.split()])
                 if G is None:
                     G = len(data)
 

@@ -1,11 +1,9 @@
 """
-Created on Sat May 16 10:11:57 2020
+Author: N. Abrate.
 
-author: N. Abrate.
+File: test_eigenvaluesPN_1G.py
 
-file: .py
-
-description:
+Description: Benchmark eigenvalues computed with PN approximation.
 """
 import sys
 sys.path.append('../../')
