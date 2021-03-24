@@ -245,3 +245,60 @@ class Slab:
                     vals = self.regions[reg].getxs(key, pos1, pos2)
 
         return vals
+
+    def perturb(self, what, where, howmuch, depgro=None):
+        """
+        Add perturbations to an unperturbed, reference system.
+
+        Parameters
+        ----------
+        what : str
+            DESCRIPTION.
+        where : ndarray
+            DESCRIPTION.
+        howmuch : float
+            DESCRIPTION.
+        system : object
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        if isinstance(what, str):
+            what = [what]
+        if isinstance(where, list):
+            where = np.asarray(where)
+        if isinstance(howmuch, float):
+            howmuch = list[howmuch]
+
+        iP = 0  # perturbation counter
+        for what, where, how in zip(what, where, howmuch):
+            # TODO input sanity check
+
+            # identify region(s)
+            iR = 0
+            newlay = []
+            newmap = {}
+            for i in range(0, self.nlayers):
+                newlay.add(self.layers[i])
+                if i == self.nlayers:
+                    newlay.add(self.layers[i+1])
+                # loop over coordinates
+                for j in where:
+                    if where[0] < self.layers[i] and where[0] >= self.layers[i]:
+                        newlay.add()
+                        regname = 'Perturbation%d' % iP
+                        iP = iP+1
+                        newmap[iR] = regname
+                        iR = iR+1
+                        # add new regions data
+                        k = self.regionmap[i]
+                        self.regions[regname] = self.regions[k].perturb(what, how)
+                    else:
+                        if iR not in newmap.keys():
+                            newmap[iR] = self.regionmap[i]
+
+            self.nLayers = len(newlay)-1
+            self.regionmap = newmap
