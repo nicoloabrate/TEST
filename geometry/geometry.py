@@ -5,6 +5,7 @@ File: geometry.py
 
 Description: Class for simplified 1D geometries.
 """
+import json
 import numpy as np
 from matplotlib.pyplot import gca
 from TEST.material import Material
@@ -17,10 +18,16 @@ class Slab:
     def __init__(self, NMFP, layers, matlist, BCs, G, AngOrd, spatial_scheme,
                  datapath=None):
 
-        # assign "test" path for data library
-        self.datapath = datapath
         # assign number of layers
         self.nLayers = len(layers)-1
+        # check input consistency
+        if self.nLayers != len(matlist):
+            raise OSError('%d regions but only %d materials specified!'
+                          % (self.nLayers, len(matlist)))
+
+        # assign "test" path for data library
+        self.datapath = datapath
+
         # assign layers coordinates
         self.layers = layers
 
@@ -70,17 +77,16 @@ class Slab:
                         raise OSError('Number of precursor families in %s not' +
                                       ' consistent with other regions' % uniName)
             if AngOrd > 0:
-                minmfp[iLay] = 1/np.max(self.regions[uniName].Tot)
+                minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
             else:
-                difflen = np.sqrt(self.regions[uniName].Diffcoef/self.regions[uniName].Remxs)
-                minmfp[iLay] = np.min(difflen)
+                minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
         # assign mesh, ghost mesh and N
         Slab.mesher(self, minmfp)
 
         self.regionmap = OrderedDict(zip(range(0, len(matlist)), matlist))
         self.AngOrd = AngOrd
         self.spatial_scheme = spatial_scheme
-        self.G = G
+        self.nE = G
         self.geometry = 'slab'
 
     def mesher(self, minmfp):
@@ -136,7 +142,7 @@ class Slab:
             gridg[gridg == 0] = np.finfo(float).eps
 
         self.N = N
-        self.NT = int(sum(N))
+        self.nS = int(sum(N))
         self.dx = dx
         self.mesh = grid
         self.stag_mesh = gridg
@@ -192,15 +198,13 @@ class Slab:
                     # look for maximum number of moments available in the data
                     L = 0
                     for ireg, reg in self.regionmap.items():
-                        datastr = list(self.regions[reg].__dict__.keys())
-                        # //2 since there are 'S' and 'Sp'
-                        S = sum('S' in s for s in datastr)//2
+                        S = self.regions[reg].L
                         L = S if S > L else L  # get maximum scattering order
                     L = 1 if L == 0 else L
-                    shape = (self.G, self.G, self.nLayers, L)
+                    shape = (self.nE, self.nE, self.nLayers, L)
                     allL = True
                 else:
-                    shape = (self.G, self.G, self.nLayers)
+                    shape = (self.nE, self.nE, self.nLayers)
                     allL = False
 
                 vals = np.full(shape, None)
@@ -226,7 +230,7 @@ class Slab:
                     vals[:, ireg] = self.regions[reg].getxs(key, pos1, pos2)
 
             else:
-                vals = np.full((self.G, self.nLayers), None)
+                vals = np.full((self.nE, self.nLayers), None)
                 # loop over regions
                 for ireg, reg in self.regionmap.items():
                     vals[:, ireg] = self.regions[reg].getxs(key, pos1, pos2)
@@ -234,19 +238,19 @@ class Slab:
         else:
 
             if key.startswith('S') or key.startswith('Sp'):
-                vals = np.full((self.G, self.G), None)
+                vals = np.full((self.nE, self.nE), None)
                 # loop over regions
                 vals = self.regions[reg].getxs(key, pos1, pos2)
 
             else:
-                vals = np.full((self.G, 1), None)
+                vals = np.full((self.nE, 1), None)
                 # loop over regions
                 for reg, ireg in self.regionmap.items():
                     vals = self.regions[reg].getxs(key, pos1, pos2)
 
         return vals
 
-    def perturb(self, what, where, howmuch, depgro=None):
+    def perturb(self, perturbation):
         """
         Add perturbations to an unperturbed, reference system.
 
@@ -266,39 +270,58 @@ class Slab:
         None.
 
         """
-        if isinstance(what, str):
-            what = [what]
-        if isinstance(where, list):
-            where = np.asarray(where)
-        if isinstance(howmuch, float):
-            howmuch = list[howmuch]
+        # parse file content
+        if isinstance(perturbation, str):
+            if '.json' not in perturbation:
+                perturbation = '%s.json' % perturbation
+            with open(perturbation) as f:
+                perturbation = json.load(f)
 
         iP = 0  # perturbation counter
-        for what, where, how in zip(what, where, howmuch):
-            # TODO input sanity check
+        regs = list(self.regionmap.values())
+        for k, v in perturbation.items():
+            # check perturbation consistency
+            if 'where' not in v.keys():
+                raise OSError('Perturbation coordinates are missing')
+            if 'howmuch' not in v.keys():
+                raise OSError('Perturbation intensities are missing')
+            if 'depgro' not in v.keys():
+                v['depgro'] = None
 
-            # identify region(s)
-            iR = 0
-            newlay = []
-            newmap = {}
-            for i in range(0, self.nlayers):
-                newlay.add(self.layers[i])
-                if i == self.nlayers:
-                    newlay.add(self.layers[i+1])
-                # loop over coordinates
-                for j in where:
-                    if where[0] < self.layers[i] and where[0] >= self.layers[i]:
-                        newlay.add()
-                        regname = 'Perturbation%d' % iP
-                        iP = iP+1
-                        newmap[iR] = regname
-                        iR = iR+1
-                        # add new regions data
-                        k = self.regionmap[i]
-                        self.regions[regname] = self.regions[k].perturb(what, how)
-                    else:
-                        if iR not in newmap.keys():
-                            newmap[iR] = self.regionmap[i]
+            x = v['where']
+            hw = v['howmuch']
+            dg = v['depgro']
+            if isinstance(x, tuple):
+                x = [x]
 
-            self.nLayers = len(newlay)-1
-            self.regionmap = newmap
+            coo = zip(self.layers[:-1], self.layers[1:])
+
+            for x1, x2 in x:  # loop over perturbation coordinates
+                iP = iP + 1
+                for r, l in coo:  # loop to identify regions involved
+                    # perturbation inside region
+                    if x1 >= r and x2 <= l:
+                        # is included in this region
+                        if x1 not in self.layers:
+                            idx = self.layers.index(r)
+                            self.layers.insert(idx+1, x1)
+                        if x2 not in self.layers:
+                            self.layers.insert(idx+2, x2)
+                        # add new region
+                        if x1 == r and x2 < l:  # on the right
+                            regs.insert(idx, 'Perturbation%d' % iP)
+                        elif x2 == l:  # on the left
+                            regs.insert(idx+1, 'Perturbation%d' % iP)
+                        else:
+                            regs.insert(idx, regs[idx])
+                            regs.insert(idx+1, 'Perturbation%d' % iP)
+                            # regs.insert(idx+2, regs[idx])
+
+                        newreg = self.regions[regs[idx]].perturb(k, hw, dg)
+                        self.regions['Perturbation%d' % iP] = newreg
+                    # perturbation between two or more regions
+                    elif x1 < l and x2 > l:
+                        raise OSError('Perturbations can be applied one region at a time!')
+
+            self.nLayers = len(self.layers)-1
+            self.regionmap = OrderedDict(zip(range(0, self.nLayers), regs))

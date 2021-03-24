@@ -114,6 +114,11 @@ class Material():
             print('Kinetic parameters not available!')
         
         # --- complete data and perform sanity check
+        L = 0
+        datastr = list(self.__dict__.keys())
+        # //2 since there are 'S' and 'Sp'
+        S = sum('S' in s for s in datastr)//2
+        self.L = S if S > L else L  # get maximum scattering order
         self.datacheck()
 
     def _readtxt(self, fname, nE):
@@ -221,16 +226,12 @@ class Material():
         """
         if pos1 is None and pos2 is None:
             vals = self.__dict__[key]
-
         else:
             if key.startswith('S') or key.startswith('Sp'):
-
                 if pos2 is None:
                     raise OSError('Two coordinates needed for %s data' % key)
-
                 else:
                     vals = self.__dict__[key][pos1, pos2]
-
             else:
                 vals = self.__dict__[key][pos1]
 
@@ -254,10 +255,12 @@ class Material():
 
         """
         for g in range(0, self.nE):
-           if howmuch[g] == 0:
+            # no perturbation
+            if howmuch[g] == 0:
                continue
-           mydic = self.__dict__
-           if what in indepdata:
+
+            mydic = self.__dict__
+            if what in indepdata:
                # update perturbed parameter
                if depgro is None:
                    delta = mydic[what][g]*howmuch[g]
@@ -265,13 +268,14 @@ class Material():
                else:  # select departure group for scattering matrix
                    delta = mydic[what][depgro][g]*howmuch[g]
                    mydic[what][depgro][g] = mydic[what][depgro][g]+delta
-               computesumxs = True
+
+               # computesumxs = True
                # select case to ensure data consistency
                if what == 'Fiss':
                    self.Nsf[g] = self.Nubar[g]*mydic[what][g]
                elif what == 'Nubar':
                    self.Nsf[g] = self.Fiss[g]*mydic[what][g]
-                   computesumxs = False
+                   # computesumxs = False
                elif what.startswith('Chi'):
                    computesumxs = False
                elif what == 'Diffcoef':
@@ -284,23 +288,23 @@ class Material():
                        key = 'S%d' % l
                        mydic[key][depgro][g] = mydic[key][depgro][g]*R
                    
-               if computesumxs is True:
-                   # force consistency
-                   for k in sumxs:
-                       if depgro != g:
-                           mydic[k][g] = mydic[k][g]+delta
-                       else:
-                           # absorption and removal indep. on in-group scatt.
-                           if k == 'Tot':
-                               mydic[k][g] = mydic[k][g]+delta
-               # force consistency diffusion coefficient
-               sTOT = sum(self.S0[g, :])  # total in-group scattering
-               self.Transpxs[g] = self.Tot[g]-self.mu0[g]*sTOT
-               self.Diffcoef[g] = 1/(3*self.Transpxs[g])
-               # compute secondaries per collision
-               self.secpercoll[g] = (sTOT+self.Nsf[g])/(self.Tot[g])
+               # if computesumxs is True:
+               #     # force consistency
+               #     for k in sumxs:
+               #         if depgro != g:
+               #             mydic[k][g] = mydic[k][g]+delta
+               #         else:
+               #             # absorption and removal indep. on in-group scatt.
+               #             if k == 'Tot':
+               #                 mydic[k][g] = mydic[k][g]+delta
+               # # force consistency diffusion coefficient
+               # sTOT = sum(self.S0[g, :])  # total in-group scattering
+               # self.Transpxs[g] = self.Tot[g]-self.mu0[g]*sTOT
+               # self.Diffcoef[g] = 1/(3*self.Transpxs[g])
+               # # compute secondaries per collision
+               # self.secpercoll[g] = (sTOT+self.Nsf[g])/(self.Tot[g])
 
-           else:
+            else:
                raise OSError('%s cannot be perturbed directly!' % what)
    
     def datacheck(self):
@@ -320,7 +324,7 @@ class Material():
                 raise OSError('%s is missing in %s data!' % (s, self.UniName))
         # --- compute in-group scattering
         InScatt = np.diag(self.S0)
-        sTOT = self.S0.sum(axis=1)
+        sTOT = self.S0.sum(axis=1) if len(self.S0.shape) > 1 else self.S0
         # --- compute fission production cross section
         self.Nsf = self.Fiss*self.Nubar
         # --- compute missing sum reactions
@@ -342,7 +346,6 @@ class Material():
         elif 'Diffcoef' in datavail:
             tmp = 1/(3*self.Diffcoef)
             self.mu0 = (self.Tot-tmp)/sTOT
-            # FIXME diffcoef does not need to change here
         else:
             self.mu0 = np.zeros((self.nE, ))
         # check consistency
@@ -368,8 +371,15 @@ class Material():
                     kincons = False
     
             if kincons is True:
+                if len(self.Chid.shape) == 1:
+                    # each family has same emission spectrum
+                    self.Chid = np.asarray([self.Chid]*self.NPF)
+                elif self.Chid.shape != (self.NPF, self.nE):
+                    raise OSError('Delayed fiss. spectrum should be (%d, %d)'
+                                  % (self.NPF, self.nE))
+
                 for g in range(0, self.nE):
-                    chit = (1-self.beta.sum())*self.Chip[g]+np.dot(self.beta, self.Chid[g])
+                    chit = (1-self.beta.sum())*self.Chip[g]+np.dot(self.beta, self.Chid[:, g])
                     if abs(self.Chit[g]-chit) > 1E-5:
                         raise OSError('Fission spectra or delayed fractions in %s not consistent!' % self.UniName)
             

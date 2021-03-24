@@ -3,7 +3,7 @@ Author: N. Abrate.
 
 File: AdjointTransportEquation.py
 
-Description: Class that defines numerically approximated adjoint neutron 
+Description: Class that defines numerically approximated adjoint neutron
              transport operators.
 """
 
@@ -14,16 +14,16 @@ from matplotlib.pyplot import spy
 
 class Diffusion():
 
-    def __init__(self, geom, steady, prod=None, BC=True, fmt='csr', 
+    def __init__(self, geom, steady, prod=None, BC=True, fmt='csr',
                  prompt=False, allope=False):
         angular_model = 'Diffusion'
-        self.nS = geom.NT
+        self.nS = geom.nS
         self.nA = 0
-        self.nE = geom.G
+        self.nE = geom.nE
         self.geometry = geom.geometry
         # assign operators
         self.R = MG.removal(geom, angular_model, fmt=fmt)
-        self.S = MG.scattering(geom, angular_model, prod=prod, fmt=fmt, 
+        self.S = MG.scattering(geom, angular_model, prod=prod, fmt=fmt,
                                adjoint=True)
 
         if allope is True:
@@ -41,7 +41,7 @@ class Diffusion():
                 self.T = MG.time(geom, angular_model, fmt=fmt)
 
                 if prompt is True:
-                    self.F = MG.fission(geom, angular_model, fmt=fmt, 
+                    self.F = MG.fission(geom, angular_model, fmt=fmt,
                                         adjoint=True)
                 else:
                     self.Fd = MG.delfiss(geom, angular_model, fmt=fmt,
@@ -50,7 +50,7 @@ class Diffusion():
                                             adjoint=True)
 
                 self.state = 'transient'
-                
+
         if BC is True or 'zero' in geom.BC:
             self.BC = geom.BC
             self.Linf = MG.leakage(geom, angular_model, fmt=fmt)

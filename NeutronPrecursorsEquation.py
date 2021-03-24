@@ -15,8 +15,8 @@ class NPE():
 
     def __init__(self, geom, fmt='csr'):
 
-        self.nS = geom.NT  # spatial points
-        self.nE = geom.G  # energy groups
+        self.nS = geom.nS  # spatial points
+        self.nE = geom.nE  # energy groups
         self.nF = geom.NPF  # number of families
         self.geometry = geom.geometry
 
@@ -42,7 +42,7 @@ class NPE():
         APF = []
         APFapp = APF.append
 
-        for g in range(0, geom.G):  # emission group
+        for g in range(0, geom.nE):  # emission group
 
             M = []
             Mapp = M.append
@@ -79,7 +79,7 @@ class NPE():
         lambdas = geom.getxs('lambda')
         # chid = geom.getxs('Chid')  chid[g, :]*
 
-        for g in range(0, geom.G):  # emission group
+        for g in range(0, geom.nE):  # emission group
 
             M = []
             Mapp = M.append
@@ -116,7 +116,7 @@ class NPE():
         APFapp = APF.append
         lambdas = geom.getxs('lambda')
 
-        for g in range(0, geom.G):  # emission group
+        for g in range(0, geom.nE):  # emission group
 
             M = []
             Mapp = M.append

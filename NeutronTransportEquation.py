@@ -16,9 +16,9 @@ class PN():
     def __init__(self, geom, N, steady, prod=None,
                  BC=True, fmt='csr', prompt=False, allope=False):
         angular_model = 'PN'
-        self.nS = geom.NT
+        self.nS = geom.nS
         self.nA = N
-        self.nE = geom.G
+        self.nE = geom.nE
         self.geometry = geom.geometry
         # assign operators
         self.R = MG.removal(geom, angular_model, fmt=fmt)
@@ -61,12 +61,12 @@ class PN():
 
 class Diffusion():
 
-    def __init__(self, geom, steady, prod=None, BC=True, fmt='csr', 
+    def __init__(self, geom, steady, prod=None, BC=True, fmt='csr',
                  prompt=False, allope=False):
         angular_model = 'Diffusion'
-        self.nS = geom.NT
+        self.nS = geom.nS
         self.nA = 0
-        self.nE = geom.G
+        self.nE = geom.nE
         self.geometry = geom.geometry
         # assign operators
         self.R = MG.removal(geom, angular_model, fmt=fmt)
@@ -93,7 +93,7 @@ class Diffusion():
                     self.Fp = MG.promptfiss(geom, angular_model, fmt=fmt)
 
                 self.state = 'transient'
-                
+
         if BC is True or 'zero' in geom.BC:
             self.BC = geom.BC
             self.Linf = MG.leakage(geom, angular_model, fmt=fmt)

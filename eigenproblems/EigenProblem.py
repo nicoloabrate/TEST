@@ -164,7 +164,7 @@ class eigenproblem():
 
         yr, yi = eigenproblem.get(self, geom, group, angle=angle, mode=mode,
                                   family=family, precursors=precursors)
-        x = geom.mesh if len(yr) == geom.NT else geom.stag_mesh
+        x = geom.mesh if len(yr) == geom.nS else geom.stag_mesh
         ax = ax or plt.gca()
 
         if imag is False:
