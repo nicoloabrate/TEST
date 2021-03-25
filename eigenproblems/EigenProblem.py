@@ -30,6 +30,7 @@ class eigenproblem():
         self.nA = nte.nA
         self.BC = nte.BC
         self.problem = which
+        self.model = nte.model
 
     def _petsc(L, nev, what, P=None, which='LM', verbosity=False, sigma=0,
                tol=1E-8, monitor=True):
@@ -167,14 +168,14 @@ class eigenproblem():
         x = geom.mesh if len(yr) == geom.nS else geom.stag_mesh
         ax = ax or plt.gca()
 
-        if imag is False:
-            plt.plot(x, yr, **kwargs)
-        else:
-            plt.plot(x, yi, **kwargs)
+        y = yr if imag is False else yi
+        plt.plot(x, y, **kwargs)
 
         ax.locator_params(nbins=8)
+        # ax.set_ylim([y.min(), y.max()])
+        ax.set_xlim([min(geom.layers), max(geom.layers)])
         ax.xaxis.set_major_formatter(FormatStrFormatter('%g'))
-        ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
 
     def plotspectrum(self, loglog=False, gaussplane=True, geom=None,
                      grid=True, ylims=None, threshold=None, subplt=False):
@@ -375,9 +376,37 @@ class eigenproblem():
             Imaginary part of the flux mode.
 
         """
-        nE = self.nE
-        nA = self.nA
-        nS = self.nS
+        if self.model == 'PN' or self.model == 'Diffusion':
+            yr, yi = self._getPN(geom, group, angle=0, mode=0, family=0, normalise=True,
+                                 precursors=False)
+            return yr, yi
+
+    def _getPN(self, geom, group, angle=0, mode=0, family=0, normalise=True,
+               precursors=False):
+        """
+        Get spatial flux distribution for group, angle and spatial mode.
+
+        Parameters
+        ----------
+        geom : object
+            Geometry object.
+        angle : int
+            Moment/direction number.
+        group : int
+            Group number.
+        mode : int
+            Eigen-mode number.
+
+        Returns
+        -------
+        yr : ndarray
+            Real part of the flux mode.
+        yi : ndarray
+            Imaginary part of the flux mode.
+
+        """
+        nE, nA, nS = self.nE, self.nA, self.nS
+
         if precursors and self.problem == 'omega':
             angle = nA
             nF = self.nF

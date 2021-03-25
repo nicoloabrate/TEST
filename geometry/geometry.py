@@ -10,7 +10,7 @@ import numpy as np
 from matplotlib.pyplot import gca
 from TEST.material import Material
 from collections import OrderedDict
-
+from copy import deepcopy as cp
 
 class Slab:
     """Define slab geometry object."""
@@ -81,7 +81,7 @@ class Slab:
             else:
                 minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
         # assign mesh, ghost mesh and N
-        Slab.mesher(self, minmfp)
+        self.mesher(minmfp)
 
         self.regionmap = OrderedDict(zip(range(0, len(matlist)), matlist))
         self.AngOrd = AngOrd
@@ -311,6 +311,9 @@ class Slab:
             x = v['where']
             hw = v['howmuch']
             dg = v['depgro']
+            if len(hw) != self.nE:
+                raise OSError('The perturbation intensities required should be %d' % self.nE)
+
             if isinstance(x, tuple):
                 x = [x]
 
@@ -328,15 +331,21 @@ class Slab:
                             self.layers.insert(idx+2, x2)
                         # add new region
                         if x1 == r and x2 < l:  # on the right
+                            oldreg = regs[idx]
                             regs.insert(idx, 'Perturbation%d' % iP)
+                        elif (x1, x2) == (r, l):
+                            idx = self.layers.index(r)
+                            oldreg = regs[idx]
+                            regs[idx] =  'Perturbation%d' % iP
                         elif x2 == l:  # on the left
+                            oldreg = regs[idx]
                             regs.insert(idx+1, 'Perturbation%d' % iP)
                         else:
                             regs.insert(idx, regs[idx])
+                            oldreg = regs[idx]
                             regs.insert(idx+1, 'Perturbation%d' % iP)
-                            # regs.insert(idx+2, regs[idx])
 
-                        self.regions['Perturbation%d' % iP] = self.regions[regs[idx]] 
+                        self.regions['Perturbation%d' % iP] = cp(self.regions[oldreg])
                         self.regions['Perturbation%d' % iP].perturb(k, hw, dg)
                     # perturbation between two or more regions
                     elif x1 < l and x2 > l:
@@ -344,3 +353,19 @@ class Slab:
 
             self.nLayers = len(self.layers)-1
             self.regionmap = OrderedDict(zip(range(0, self.nLayers), regs))
+            # update mesh to take into account new layers
+            if list(set(self._NMFP.tolist())) == self._NMFP.tolist():
+                self._NMFP = self._NMFP*np.ones((self.nLayers))
+            else:
+                raise OSError('Number of MFP must be the same for all regions for perturbation!')
+
+            minmfp = np.zeros((self.nLayers, ))
+    
+            for iLay in range(0, self.nLayers):
+                uniName = self.regionmap[iLay]
+                if self.AngOrd > 0:
+                    minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
+                else:
+                    minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
+
+            self.mesher(minmfp)

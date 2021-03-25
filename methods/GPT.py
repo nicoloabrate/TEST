@@ -5,145 +5,106 @@ File: GPT.py
 
 Description: Class for Generalised Perturbation Theory method.
 """
-import numpy as np
+from numpy import zeros, dot
+from TEST.phasespace import PhaseSpace
+from PhaseSpace import interp
 
 
 class GPT():
 
-    def __init__(self, geom, unperturbed, perturbed, psi, phi, mu, N, M):
+    def __init__(self, N, geom, unperturbed, pertgeom, perturbed, fwd, adj):
+
+        self.PertOrder = N
+        # check forward and adjoint modes consistency
+        M, M1 = len(fwd.eigvals), len(adj.eigvals)
+        if M != M1:
+            raise OSError('Forward (%d) and adjoint (%d) modes mismatch!' % (M, M1))
+        else:
+            self.ModExpOrder = M
+            phi, psi =  fwd.eigvect, adj.eigvect
+            mu = fwd.eigvals
+
+        # define phase space
+        PS = PhaseSpace(geom)
+        xp = pertgeom.mesh
+
+        # --- get operators
         A, B = unperturbed.A, unperturbed.B
         Ap, Bp = perturbed.A, perturbed.B
 
         # normalisation constants
-        C = np.zeros(phi.shape[1],1)
-        for i in range(0, M):
-            C[i] = GPT.braket(psi[:,i], np.dot(B, psi[:,i]), geom)
+        C = zeros(phi.shape[1],1)
+        for i in range(0, self.ModExpOrder):
+            C[i] = PS.braket(psi[:,i], dot(B, psi[:,i]))
 
-        dB = Bp-B
-        dA = (Ap-A)-mu[0]*dB
-        lambdas, p = GPT.computeperturbations(N, dA, dB, B, Bp, mu, phi, psi, C, geom)
-
-    def computeperturbations(N, dA, dB, B, Bp, mu, fmodes, amodes, C, geom):
-        """
-        Compute the eigenvalue problem perturbations
-
-        Parameters
-        ----------
-        N : int
-            DESCRIPTION.
-        dA : ndarray
-            DESCRIPTION.
-        dB : ndarray
-            DESCRIPTION.
-        B : ndarray
-            DESCRIPTION.
-        Bp : ndarray
-            DESCRIPTION.
-        mu : ndarray
-            DESCRIPTION.
-        fmodes : ndarray
-            DESCRIPTION.
-        amodes : ndarray
-            DESCRIPTION.
-        C : ndarray
-            DESCRIPTION.
-        geom : object
-            DESCRIPTION.
-
-        Raises
-        ------
-        OSError
-            Forward and adjoint modes dimension mismatch!
-
-        Returns
-        -------
-        None.
-
-        """
-        if fmodes.shape[1] != amodes.shape[1]:
-            raise OSError('Forward and adjoint modes dimension mismatch!')
-        else:
-            M = fmodes.shape[1]
         # pre-allocation
-        alpha = np.zeros((M,N-1))  # alpha_{1,K} = 0 as normalization constant
-        lambdas = np.zeros((N-1,1))  # perturbed eigenvalue
-        p = np.zeros((M, N-1)) # perturbed system flux perturbations
+        alpha = zeros((M, N-1))  # alpha_{1,K} = 0 as normalization constant
+        lambdas = zeros((N-1, 1))  # perturbed eigenvalue
+        p = zeros((M, N-1)) # perturbed system flux perturbations
         # normalisation constants
-        Pp = GPT.braket(1,np.dot(Bp, p[:, 0]), geom)
-        
+        tmp = PS.interp(p[:, 0], xp)  # interpolate over pert. mesh
+        tmp = PS.interp(dot(Bp, tmp))  # interpolate product over ref. mesh
+        Pp = PS.braket(tmp)
+
         # eigenvalue perturbations
-        for n in range(0, N):
-            
-            S = np.dot(dA, fmodes[:, 0]) if n == 0 else np.dot(dA, p[:, n-1])
+        for n in range(0, self.N):
+            if n == 0:
+                v1 = PS.interp(phi[:, 0], xp)
+                S = PS.interp(dot(Ap-mu[0]*Bp, v1))-dot(A-mu[0]*B, phi[:, 0])
+            else:
+                v1 = PS.interp(p[:, n-1], xp)
+                S = PS.interp(dot(Ap-mu[0]*Bp, v1))-dot(A-mu[0]*B, p[:, n-1])
+
             S1, S2 = 0, 0
+
             # sum previous contributions
             for k in range(0, n-1):
                 if n > k:
-                    S1 = S1+lambdas[k]*np.dot(B, p[:, n-k])
                     if n > k+1:
-                        S2 = S2+lambdas[k]*np.dot(dB, p[:, n-k-1])
+                        v1 = PS.interp(p[:, n-k-1], xp)
+                        v2 = p[:, n-k-1]
                     else:
-                        S2 = S2+lambdas[k]*np.dot(dB, fmodes[:, 0])
+                        v1 = PS.interp(phi[:, 0], xp)
+                        v2 = phi[:, 0]
 
-            lambdas[n] = (GPT.braket(amodes[:, 0], S, geom)+
-                        -GPT.braket(amodes[:, 0], S1, geom)+
-                        -GPT.braket(amodes[:, 0], S2, geom))/C[0]
-                        
+                    S1 = S1+lambdas[k]*dot(B, p[:, n-k])
+                    S2 = S2+lambdas[k]*(PS.interp(dot(Bp, v1))-dot(B, v2))
+
+            lambdas[n] = (PS.braket(psi[:, 0], S)-PS.braket(psi[:, 0], S1)+
+                         -PS.braket(psi[:, 0], S2))/C[0]
+
             # eigenvector perturbations
             for m in range(1, M):
                 # initialisation 
                 S1a, S2a = 0, 0
                 for k in range(0, n-1):
                     if n > k:
-                        S1a = S1a+lambdas[k]*alpha[m, n-k]
-                        
                         if n > k+1:
-                            S2a = S2a+lambdas[k]*dB*p[:, n-k-1]
+                            v1 = PS.interp(p[:, n-k-1], xp)
+                            v2 = p[:, n-k-1]
                         else:
-                            S2a = S2a+lambdas[k]*dB*fmodes[:, 0]
-            
+                            v1 = PS.interp(phi[:, 0], xp)
+                            v2 = phi[:, 0]
+
+                        S1a = S1a+lambdas[k]*alpha[m, n-k]
+                        S2a = S2a+lambdas[k]*(PS.interp(dot(Bp, v1))-dot(B, v2))
+
                 # coefficient evaluation
-                alpha[m, n] = 1/((mu[m]-mu[0])*C[m])*(-GPT.braket(amodes[:, m], S, geom)+
-                                                      +S1a*C[m]+GPT.braket(amodes[:, m], S2a, geom))
+                alpha[m, n] = (-PS.braket(psi[:, m], S)+S1a*C[m]+
+                               +PS.braket(psi[:, m], S2a))
+                alpha[m, n] = alpha[m, n]/((mu[m]-mu[0])*C[m])
                 
                 if n == 0:
-                    alpha[0, n] = (-GPT.braket(1, np.dot(dB, fmodes[:, 0]), geom)+GPT.braket(1, Bp*np.dot(fmodes[:, 1:M], alpha[1:M, n]), geom))/Pp
+                    v1 = PS.interp(phi[:, 0], xp)
+                    Q1 = -PS.braket(PS.interp(dot(Bp, v1))-dot(B, phi[:, 0]))
+                    v1 = PS.interp(dot(phi[:, 1:M], alpha[1:M, n]), xp)
+                    Q2 = PS.braket(PS.interp(Bp*v1))
+                    alpha[0, n] = (Q1+Q2)/Pp
                 else:
-                    alpha[0, n] = -GPT.braket(1, Bp*np.dot(fmodes[:, 1:M], alpha[1:M, n]), geom)/Pp
+                    v1 = PS.interp(dot(phi[:, 1:M], alpha[1:M, n]), xp)
+                    alpha[0, n] = -PS.braket(PS.interp(Bp*v1))/Pp
                 # perturbation reconstruction
-                p[:, n] = np.dot(fmodes[:, 0:M], alpha[:, n])
-         
-        return lambdas, p
+                p[:, n] = dot(phi[:, 0:M], alpha[:, n])
 
-    def braket(v1, v2, geom):
-        """
-        Compute bra-ket product over the phase space.
-
-        Parameters
-        ----------
-        v1 : ndarray
-            DESCRIPTION.
-        v2 : ndarray
-            DESCRIPTION.
-        geom : object
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
-
-        """
-        if geom.nA > 0:
-            raise OSError('GPT cannot be applied yet to transport solutions!')
-
-        v1v2 = np.multiply(v1, v2)
-        G = geom.nE
-        S = geom.nS
-        grid = geom.mesh
-        I = 0
-        for g in range(0, G):
-            skip = g*S
-            I = np.trapz(v1v2[skip:skip+S], x=grid)
-        return I
-    
-            
+        self.EvalPert = lambdas
+        self.EvecPert = p

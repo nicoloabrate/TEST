@@ -13,15 +13,22 @@ from .EigenProblem import eigenproblem
 
 class delta(eigenproblem):
 
-    def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=False,
-                 normalization=None, tol=1E-8, monitor=False):
+    def __init__(self, geom, nte, nev=1):
 
         super(delta, self).__init__(nte, 'delta')
-        res = None
         # define eigenproblem operators
         L = nte.L  # leakage operator
         B = nte.F+nte.S-nte.R  # material operator
+        self.A = L
+        self.B = B
+        self.nev = nev
 
+    def solve(self, algo='PETSc', verbosity=False, normalization=None,
+              tol=1E-8, monitor=False):
+
+        L = self.A
+        B = self.B
+        res = None
         if algo == 'PETSc':
 
             try:
@@ -43,7 +50,7 @@ class delta(eigenproblem):
                     B = B.tocsc()
 
                 start = t.time()
-                eigvals, eigvect = eigs(B, M=L, k=nev, which='LM')
+                eigvals, eigvect = eigs(B, M=L, k=self.nev, which='LM')
                 end = t.time()
                 algo = 'eigs'
 
@@ -56,7 +63,7 @@ class delta(eigenproblem):
                 B = B.tocsc()
 
             start = t.time()
-            eigvals, eigvect = eigs(B, M=L, k=nev, which='LR', sigma=1)
+            eigvals, eigvect = eigs(B, M=L, k=self.nev, which='LR', sigma=1)
             end = t.time()
 
         elif algo == 'eig':
@@ -83,7 +90,9 @@ class delta(eigenproblem):
         eigvect = np.conj(signs)*eigvect
 
         # FIXME call balance function
+
         if res is not None:
              self.residual = res
+
         self.eigvals = eigvals
         self.eigvect = eigvect

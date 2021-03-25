@@ -16,12 +16,9 @@ from .EigenProblem import eigenproblem
 
 class alpha(eigenproblem):
 
-    def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=False,
-                 normalization=None, which='SM', generalized=False,
-                 tol=1E-8, monitor=False):
+    def __init__(self, geom, nte, nev=1, generalized=False):
 
         super(alpha, self).__init__(nte, 'alpha')
-        res = None
         # nev = min(nev + 10, nte.L.shape[0]-5)
 
         # define alpha prompt eigenproblem operators
@@ -50,6 +47,16 @@ class alpha(eigenproblem):
 
             T = nte.T
 
+        self.A = B
+        self.B = T
+        self.nev = nev
+
+    def solve(self, algo='PETSc', verbosity=False, normalization=None,
+              which='SM', tol=1E-8, monitor=False):
+
+        B = self.A
+        T = self.B
+        res = None
         if algo == 'PETSc':
 
             try:
@@ -78,7 +85,7 @@ class alpha(eigenproblem):
                     sigma = 0
 
                 start = t.time()
-                eigvals, eigvect = eigs(B, M=T, k=nev, which=which,
+                eigvals, eigvect = eigs(B, M=T, k=self.nev, which=which,
                                         sigma=sigma)
                 end = t.time()
                 algo = 'eigs'
@@ -99,7 +106,7 @@ class alpha(eigenproblem):
                 sigma = 0
 
             start = t.time()
-            eigvals, eigvect = eigs(B, M=T, k=nev, which=which, sigma=sigma)
+            eigvals, eigvect = eigs(B, M=T, k=self.nev, which=which, sigma=sigma)
             end = t.time()
 
         elif algo == 'eig':
@@ -135,20 +142,19 @@ class alpha(eigenproblem):
             eigvect[:, iv] = v/np.linalg.norm(v)
 
         # FIXME call balance function
+
         if res is not None:
             self.residual = res
+
         self.eigvals = eigvals
         self.eigvect = eigvect
 
 
 class omega(eigenproblem):
 
-    def __init__(self, geom, nte, npe, nev=1, algo='PETSc', verbosity=False,
-                 normalization=None, which='SM', shift=None, tol=1E-8,
-                 monitor=False):
+    def __init__(self, geom, nte, npe, nev=1):
 
         super(omega, self).__init__(nte, 'omega')
-        res = None
         # nev = min(nev + 10, nte.L.shape[0]-5)
 
         T = omega.time(nte, npe)
@@ -167,6 +173,18 @@ class omega(eigenproblem):
 
         else:
             B = S+Fp+Fd+E-R-D-L
+
+        self.A = B
+        self.B = T
+        self.nev = nev
+        self.nF = npe.nF
+
+    def solve(self, algo='PETSc', verbosity=False, normalization=None,
+              which='SM', shift=None, tol=1E-8, monitor=False):
+
+        B = self.A
+        T = self.B
+        res = None
 
         if algo == 'PETSc':
 
@@ -197,7 +215,7 @@ class omega(eigenproblem):
                     sigma = 0
 
                 start = t.time()
-                eigvals, eigvect = eigs(B, M=T, k=nev, which=which,
+                eigvals, eigvect = eigs(B, M=T, k=self.nev, which=which,
                                         sigma=sigma)
                 end = t.time()
                 algo = 'eigs'
@@ -218,7 +236,7 @@ class omega(eigenproblem):
                 sigma = 0
 
             start = t.time()
-            eigvals, eigvect = eigs(B, M=T, k=nev, which=which, sigma=sigma)
+            eigvals, eigvect = eigs(B, M=T, k=self.nev, which=which, sigma=sigma)
             end = t.time()
 
         elif algo == 'eig':
@@ -256,7 +274,7 @@ class omega(eigenproblem):
         # FIXME call balance function
         if res is not None:
              self.residual = res
-        self.nF = npe.nF
+
         self.eigvals = eigvals
         self.eigvect = eigvect
 
@@ -281,7 +299,6 @@ class omega(eigenproblem):
         nE = N.nE
         nA = N.nA
         nS = N.nS
-        nF = P.nF
         # odd and even eqs.
         No = (nA+1)//2 if nA % 2 != 0 else nA//2
         Ne = nA+1-No

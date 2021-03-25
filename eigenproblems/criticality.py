@@ -13,11 +13,9 @@ from .EigenProblem import eigenproblem
 
 class kappa(eigenproblem):
 
-    def __init__(self, geom, nte, nev=1, algo='PETSc', verbosity=False,
-                 normalization=None, tol=1E-8, monitor=False):
+    def __init__(self, geom, nte, nev=1):
 
         super(kappa, self).__init__(nte, 'kappa')
-        res = None
         # define kappa eigenproblem operators
         if nev == 0 or self.BC is False:  # kappa infinite
             L = nte.R-nte.S  # no leakage, infinite medium
@@ -27,6 +25,16 @@ class kappa(eigenproblem):
 
         F = nte.F  # multiplication operator
 
+        self.A = L
+        self.B = F
+        self.nev = nev
+
+    def solve(self, algo='PETSc', verbosity=False, normalization=None,
+              tol=1E-8, monitor=False):
+
+        L = self.A
+        F = self.B
+        res = None
         if algo == 'PETSc':
 
             try:
@@ -46,7 +54,7 @@ class kappa(eigenproblem):
                     F = F.tocsc()
 
                 start = t.time()
-                eigvals, eigvect = eigs(F, M=L, k=nev, which='LM')
+                eigvals, eigvect = eigs(F, M=L, k=self.nev, which='LM')
                 end = t.time()
                 algo = 'eigs'
 
@@ -59,7 +67,7 @@ class kappa(eigenproblem):
                 F = F.tocsc()
 
             start = t.time()
-            eigvals, eigvect = eigs(F, M=L, k=nev, which='LM')
+            eigvals, eigvect = eigs(F, M=L, k=self.nev, which='LM')
             end = t.time()
 
         elif algo == 'eig':
@@ -89,7 +97,9 @@ class kappa(eigenproblem):
             eigvect[:, iv] = v/np.linalg.norm(v)
 
         # FIXME call balance function
+
         if res is not None:
              self.residual = res
+
         self.eigvals = eigvals
         self.eigvect = eigvect

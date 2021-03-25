@@ -269,7 +269,6 @@ class Material():
                    delta = mydic[what][depgro][g]*howmuch[g]
                    mydic[what][depgro][g] = mydic[what][depgro][g]+delta
 
-               # computesumxs = True
                # select case to ensure data consistency
                if what == 'Fiss':
                    self.Nsf[g] = self.Nubar[g]*mydic[what][g]
@@ -277,7 +276,10 @@ class Material():
                    self.Nsf[g] = self.Fiss[g]*mydic[what][g]
                    # computesumxs = False
                elif what.startswith('Chi'):
-                   computesumxs = False
+                   if what in ['Chit']:
+                       mydic[what] = mydic[what]*(1+delta)
+                   else:
+                       raise OSError('Delayed/prompt spectra perturbation still missing!')
                elif what == 'Diffcoef':
                    # Hp: change in diffcoef implies change in capture
                    delta = 1/(3*mydic[what][g])-self.Transpxs[g]
@@ -287,26 +289,17 @@ class Material():
                        R = (mydic[what][g]/mydic[what][g]-delta)
                        key = 'S%d' % l
                        mydic[key][depgro][g] = mydic[key][depgro][g]*R
-                   
-               # if computesumxs is True:
-               #     # force consistency
-               #     for k in sumxs:
-               #         if depgro != g:
-               #             mydic[k][g] = mydic[k][g]+delta
-               #         else:
-               #             # absorption and removal indep. on in-group scatt.
-               #             if k == 'Tot':
-               #                 mydic[k][g] = mydic[k][g]+delta
-               # # force consistency diffusion coefficient
-               # sTOT = sum(self.S0[g, :])  # total in-group scattering
-               # self.Transpxs[g] = self.Tot[g]-self.mu0[g]*sTOT
-               # self.Diffcoef[g] = 1/(3*self.Transpxs[g])
-               # # compute secondaries per collision
-               # self.secpercoll[g] = (sTOT+self.Nsf[g])/(self.Tot[g])
 
             else:
                raise OSError('%s cannot be perturbed directly!' % what)
-   
+
+        # force normalisation
+        if abs(self.Chit.sum() - 1) > 1E-5:
+            self.Chit = self.Chit/self.Chit.sum()
+
+        self.datacheck()
+
+
     def datacheck(self):
         """
         Check data consistency and add missing data.
@@ -342,7 +335,8 @@ class Material():
         self.secpercoll = (sTOT+self.Nsf)/(self.Tot)
         # --- compute mean of scattering cosine
         if 'S1' in datavail:
-            self.mu0 = self.S1/self.S0
+            sTOT1 = self.S1.sum(axis=1) if len(self.S1.shape) > 1 else self.S1
+            self.mu0 = sTOT1/sTOT
         elif 'Diffcoef' in datavail:
             tmp = 1/(3*self.Diffcoef)
             self.mu0 = (self.Tot-tmp)/sTOT
