@@ -20,6 +20,7 @@ matname = ['Pu239_1L', 'Pu239a', 'Pu239_1L']
 xlayers = [-R, -H, H, R]
 # define geometry and mesh
 slab = Slab(M, xlayers, matname, [bc], G, 0, 'FD')
-perturbation = {'Fiss': {'where': [(0, 5), (7, 8)], 'howmuch': [3]},
-                'Capt': {'where': (-10, -2), 'howmuch': [1]}}
+perturbation = {'Fiss': {'where': [(0, 5), (30, 40)], 'howmuch': [1E-2]},
+                'Capt': {'where': (-10, -2), 'howmuch': [1E-2]}}
 slab.perturb(perturbation)
+slab.displaygeom()

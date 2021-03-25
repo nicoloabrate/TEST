@@ -147,7 +147,7 @@ class Slab:
         self.mesh = grid
         self.stag_mesh = gridg
 
-    def plot(self, ax=None, yVals=None, xlabel=None):
+    def plotmesh(self, ax=None, yVals=None, xlabel=None):
         """Plot mesh grid."""
         if yVals is None:
             ymin, ymax = 0, 1
@@ -165,6 +165,26 @@ class Slab:
         xlabel = xlabel if xlabel is not None else 'x coordinate [cm]'
         ax.set_xlabel(xlabel)
         ax.set_xticks(self.layers)
+
+    def displaygeom(self, ax=None, xlabel=None):
+        """Plot regions."""
+
+        ax = ax or gca()
+        c = ['royalblue', 'firebrick',
+             'forestgreen', 'gold', 'darkorange',
+             'darkviolet']
+
+        c = dict(zip(self.regions.keys(), c))
+        for i in range(0, self.nLayers):
+            which = self.regionmap[i]
+            col = c[which]
+            ax.axvspan(self.layers[i], self.layers[i+1],
+                       alpha=0.5, color=col, label=which)
+
+        xlabel = xlabel if xlabel is not None else 'x coordinate [cm]'
+        ax.set_xlabel(xlabel)
+        ax.set_xticks(self.layers)
+        ax.legend(bbox_to_anchor=(1.05, 1))
 
     def getxs(self, key, pos1=None, pos2=None, region=None):
         """
@@ -294,9 +314,8 @@ class Slab:
             if isinstance(x, tuple):
                 x = [x]
 
-            coo = zip(self.layers[:-1], self.layers[1:])
-
             for x1, x2 in x:  # loop over perturbation coordinates
+                coo = zip(self.layers[:-1], self.layers[1:])
                 iP = iP + 1
                 for r, l in coo:  # loop to identify regions involved
                     # perturbation inside region
@@ -317,8 +336,8 @@ class Slab:
                             regs.insert(idx+1, 'Perturbation%d' % iP)
                             # regs.insert(idx+2, regs[idx])
 
-                        newreg = self.regions[regs[idx]].perturb(k, hw, dg)
-                        self.regions['Perturbation%d' % iP] = newreg
+                        self.regions['Perturbation%d' % iP] = self.regions[regs[idx]] 
+                        self.regions['Perturbation%d' % iP].perturb(k, hw, dg)
                     # perturbation between two or more regions
                     elif x1 < l and x2 > l:
                         raise OSError('Perturbations can be applied one region at a time!')
