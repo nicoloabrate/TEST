@@ -61,7 +61,7 @@ class alpha(eigenproblem):
 
             try:
                 start = t.time()
-                eigvals, eigvect, res = eigenproblem._petsc(B, nev, 'alpha', P=T,
+                eigvals, eigvect, res = eigenproblem._petsc(B, self.nev, 'alpha', P=T,
                                                             which=which,
                                                             verbosity=verbosity,
                                                             tol=tol,

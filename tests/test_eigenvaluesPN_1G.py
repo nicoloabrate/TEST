@@ -41,7 +41,8 @@ def test_Modak_kappa0_1G(H, N, ref, algo):
     # define geometry and mesh
     slab = Slab(M, xlayers, ['Modak'], [bc], G, N, 'FD')
     PN = NTE.PN(slab, N, steady=True, fmt='csc')
-    k1 = kappa(slab, PN, nev=nev, verbosity=True)
+    k1 = kappa(slab, PN, nev=nev)
+    k1.solve(verbosity=True, algo=algo)
     assert abs(k1.eigvals[0]-ref)*1E5 < 5
 
 @pytest.mark.parametrize("algo",['eigs', 'PETSc'])
@@ -68,7 +69,8 @@ def test_Modak_kappa0_aniso_1G(algo):
     # define geometry and mesh
     slab = Slab(M, xlayers, ['ModakAni'], [bc], G, N, 'FD')
     PN = NTE.PN(slab, N, steady=True, fmt='csc')
-    k1 = kappa(slab, PN, nev=nev, verbosity=True, algo=algo)
+    k1 = kappa(slab, PN, nev=nev)
+    k1.solve(verbosity=True, algo=algo)
     assert abs(k1.eigvals[0]-ref)*1E5 < 5
 
 @pytest.mark.parametrize("algo",['eigs', 'PETSc'])
@@ -97,7 +99,8 @@ def test_Modak_kappa_higher_1G(algo):
     # define geometry and mesh
     slab = Slab(M, xlayers, ['Modak'], [bc], G, N, 'FD')
     PN = NTE.PN(slab, N, steady=True, fmt='csc')
-    k1 = kappa(slab, PN, nev=nev, verbosity=True, algo=algo)
+    k1 = kappa(slab, PN, nev=nev)
+    k1.solve(verbosity=True, algo=algo)
     for i, k in enumerate(k1.eigvals[0::2]):
         assert abs(k-ref[i])*1E5 < tol[i]
 
@@ -127,7 +130,8 @@ def test_Modak_gamma_higher_1G(algo):
     # define geometry and mesh
     slab = Slab(M, xlayers, ['Modak'], [bc], G, N, 'FD')
     PN = NTE.PN(slab, N, steady=True, fmt='csc')
-    g1 = gamma(slab, PN, nev=nev, verbosity=True, algo=algo)
+    g1 = gamma(slab, PN, nev=nev)
+    g1.solve(verbosity=True, algo=algo)
     for i, g in enumerate(g1.eigvals[0::2]):
         g = 1/g*(1.8)  # c=(XS_S-NU*XS_F)/XS_T/gamma
         assert abs(g-ref[i])*1E5 < tol[i]
@@ -159,6 +163,7 @@ def test_Modak_alpha_higher_1G(N, ref, tol, algo):
     # define geometry and mesh
     slab = Slab(M, xlayers, ['Dahl'], [bc], G, N, 'FD')
     PN = NTE.PN(slab, N, steady=False, prompt=True, fmt='csc')
-    a1 = alpha(slab, PN, nev=nev, verbosity=True, algo=algo)
+    a1 = alpha(slab, PN, nev=nev)
+    a1.solve(verbosity=True, algo=algo)
     for i, a in enumerate(a1.eigvals):
         assert abs(a-ref[i])*1E5 < tol[i]

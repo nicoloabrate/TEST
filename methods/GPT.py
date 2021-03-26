@@ -7,7 +7,7 @@ Description: Class for Generalised Perturbation Theory method.
 """
 from numpy import zeros, dot
 from TEST.phasespace import PhaseSpace
-from PhaseSpace import interp
+from TEST.phasespace import interp
 
 
 class GPT():

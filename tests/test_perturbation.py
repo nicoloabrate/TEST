@@ -59,4 +59,4 @@ plt.ylabel('[a.u.]')
 plt.ylim([0, 0.045])
 
 # --- GPT
-GPT(4, slab, unperturbed, slab0, perturbed, forward, adjoint)
+# GPT(4, slab, unperturbed, slab0, perturbed, forward, adjoint)

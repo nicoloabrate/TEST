@@ -39,7 +39,7 @@ class kappa(eigenproblem):
 
             try:
                 start = t.time()
-                eigvals, eigvect, res = eigenproblem._petsc(L, nev, 'kappa',  P=F,
+                eigvals, eigvect, res = eigenproblem._petsc(L, self.nev, 'kappa',  P=F,
                                                             which='LM', tol=tol,
                                                             monitor=monitor)
                 end = t.time()

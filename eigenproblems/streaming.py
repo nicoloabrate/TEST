@@ -33,7 +33,7 @@ class delta(eigenproblem):
 
             try:
                 start = t.time()
-                eigvals, eigvect, res = eigenproblem._petsc(B, nev, 'delta',  P=L,
+                eigvals, eigvect, res = eigenproblem._petsc(B, self.nev, 'delta',  P=L,
                                                             which='SR', sigma=1,
                                                             tol=tol,
                                                             monitor=monitor)

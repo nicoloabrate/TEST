@@ -7,7 +7,7 @@ Description: Class to handle phase space operation.
 """
 import numpy as np
 
-class Slab:
+class PhaseSpace:
     """Define phase space object."""
 
     def __init__(self, geometry, energygrid=None):
@@ -44,5 +44,8 @@ class Slab:
             skip = g*S
             I = np.trapz(v1v2[skip:skip+S], x=grid)
         return I
-    
+
+
+def interp():
+    print()
 

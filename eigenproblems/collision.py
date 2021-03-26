@@ -40,7 +40,7 @@ class gamma(eigenproblem):
 
             try:
                 start = t.time()
-                eigvals, eigvect, res = eigenproblem._petsc(L, nev, 'gamma', P=P,
+                eigvals, eigvect, res = eigenproblem._petsc(L, self.nev, 'gamma', P=P,
                                                             which='LM', tol=tol,
                                                             monitor=monitor)
                 end = t.time()

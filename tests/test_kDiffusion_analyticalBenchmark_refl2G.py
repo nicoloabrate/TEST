@@ -36,7 +36,8 @@ def test_Diffusion_kappa0(H, R, G, matrefl, ref, algo):
     # define geometry and mesh
     slab = Slab(M, xlayers, [matrefl, 'MontagniniFuel', matrefl], [bc], G, N, 'FD')
     PN = NTE.Diffusion(slab, steady=True, fmt='csc')
-    k1 = kappa(slab, PN, nev=nev, verbosity=True)
+    k1 = kappa(slab, PN, nev=nev)
+    k1.solve()
     assert abs(k1.eigvals[0]-ref)*1E5 < 1
 
 
@@ -62,5 +63,6 @@ def test_DiffusionAdjoint_kappa0(H, R, G, matrefl, ref, algo):
     # define geometry and mesh
     slab = Slab(M, xlayers, [matrefl, 'MontagniniFuel', matrefl], [bc], G, N, 'FD')
     PN = ATE.Diffusion(slab, steady=True, fmt='csc')
-    k1 = kappa(slab, PN, nev=nev, verbosity=True)
+    k1 = kappa(slab, PN, nev=nev)
+    k1.solve()
     assert abs(k1.eigvals[0]-ref)*1E5 < 1

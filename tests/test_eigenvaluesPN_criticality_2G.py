@@ -17,10 +17,11 @@ from TEST.eigenproblems.collision import gamma
 from TEST.eigenproblems.streaming import delta
 
 
-def test_PNcriticality(N):
+def test_PNcriticality():
     nev = 1
     M = 100
     G = 2
+    N = 51
     bc = 'Mark'
     H = 1.795602
     
@@ -30,10 +31,13 @@ def test_PNcriticality(N):
     slab = Slab(M, xlayers, matname, [bc], G, N, 'FD')
     PN = NTE.PN(slab, N, steady=False, fmt='csc', prompt=True)
     
-    a = alpha(slab, PN, nev=nev, verbosity=True)
-    g = gamma(slab, PN, nev=nev, verbosity=True)
-    d = delta(slab, PN, nev=nev, verbosity=True)
-    k = kappa(slab, PN, nev=nev, verbosity=True)
+    a = alpha(slab, PN, nev=nev)
+    g = gamma(slab, PN, nev=nev)
+    g.solve(algo='PETSc')
+    d = delta(slab, PN, nev=nev+3)
+    d.solve(algo='PETSc')
+    k = kappa(slab, PN, nev=nev)
+    k.solve(algo='PETSc')
     
     flxk1, _ = k.get(slab, 1, angle=0, mode=0)
     flxk2, _ = k.get(slab, 2, angle=0, mode=0)
