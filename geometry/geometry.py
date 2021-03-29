@@ -166,7 +166,7 @@ class Slab:
         ax.set_xlabel(xlabel)
         ax.set_xticks(self.layers)
 
-    def displaygeom(self, ax=None, xlabel=None):
+    def displaygeom(self, ax=None, xlabel=None, labels=None):
         """Plot regions."""
 
         ax = ax or gca()
@@ -184,7 +184,10 @@ class Slab:
         xlabel = xlabel if xlabel is not None else 'x coordinate [cm]'
         ax.set_xlabel(xlabel)
         ax.set_xticks(self.layers)
-        ax.legend(bbox_to_anchor=(1.05, 1))
+        if labels is None:
+            ax.legend(bbox_to_anchor=(1.05, 1))
+        else:
+            ax.legend(labels, bbox_to_anchor=(1.05, 1))
 
     def getxs(self, key, pos1=None, pos2=None, region=None):
         """

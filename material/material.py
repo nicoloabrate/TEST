@@ -28,6 +28,8 @@ sumxs = ['Tot', 'Abs', 'Remxs']
 indepdata = ['Capt', 'Fiss', 'S0', 'Nubar', 'Diffcoef', 'Chid', 'Chip']
 basicdata = ['Fiss', 'Nubar', 'S0', 'Chit']
 kinetics = ['lambda', 'beta', 'Chid', 'Chip']
+
+
 class Material():
     """Create material regions with multi-group constants."""
 

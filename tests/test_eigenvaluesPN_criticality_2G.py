@@ -11,10 +11,7 @@ sys.path.append('../../')
 import time as t
 from TEST.geometry import Slab
 import TEST.NeutronTransportEquation as NTE
-from TEST.eigenproblems.time import alpha
-from TEST.eigenproblems.criticality import kappa
-from TEST.eigenproblems.collision import gamma
-from TEST.eigenproblems.streaming import delta
+from TEST.eigenproblems.EigenProblem import eigenproblem
 
 
 def test_PNcriticality():
@@ -28,19 +25,19 @@ def test_PNcriticality():
     matname = ['Pu239a']
     xlayers = [-H, H]
     # define geometry and mesh
-    slab = Slab(M, xlayers, matname, [bc], G, N, 'FD')
-    PN = NTE.PN(slab, N, steady=False, fmt='csc', prompt=True)
+    myslab = Slab(M, xlayers, matname, [bc], G, N, 'FD')
+    myPN = NTE.PN(myslab, N, steady=False, fmt='csc', prompt=True)
     
-    a = alpha(slab, PN, nev=nev)
-    g = gamma(slab, PN, nev=nev)
+    a = eigenproblem(myPN, 'alpha', myslab, nev=nev)
+    g = eigenproblem(myPN, 'gamma', myslab, nev=nev)
     g.solve(algo='PETSc')
-    d = delta(slab, PN, nev=nev+3)
+    d = eigenproblem(myPN, 'delta', myslab, nev=nev+2)
     d.solve(algo='PETSc')
-    k = kappa(slab, PN, nev=nev)
+    k = eigenproblem(myPN, 'kappa', myslab, nev=nev)
     k.solve(algo='PETSc')
     
-    flxk1, _ = k.get(slab, 1, angle=0, mode=0)
-    flxk2, _ = k.get(slab, 2, angle=0, mode=0)
+    flxk1, _ = k.solution.get(1, angle=0, mode=0)
+    flxk2, _ = k.solution.get(2, angle=0, mode=0)
     
-    assert abs(k.eigvals[0]-1)<10 and abs(g.eigvals[0]-1)<10 and abs(d.eigvals[0]-1)<10
+    assert abs(k.solution.eigvals[0]-1)<10 and abs(g.solution.eigvals[0]-1)<10 and abs(d.solution.eigvals[0]-1)<10
 

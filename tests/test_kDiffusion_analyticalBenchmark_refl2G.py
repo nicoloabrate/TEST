@@ -12,7 +12,7 @@ import pytest
 from TEST.geometry import Slab
 import TEST.NeutronTransportEquation as NTE
 import TEST.AdjointTransportEquation as ATE
-from TEST.eigenproblems.criticality import kappa
+from TEST.eigenproblems.EigenProblem import eigenproblem
 
 @pytest.mark.filterwarnings('ignore::DeprecationWarning:SparseEfficiencyWarning')
 @pytest.mark.parametrize("algo",['eigs', 'PETSc'])
@@ -34,11 +34,11 @@ def test_Diffusion_kappa0(H, R, G, matrefl, ref, algo):
     bc = 'zero'
     xlayers = [-R, -H, H, R]
     # define geometry and mesh
-    slab = Slab(M, xlayers, [matrefl, 'MontagniniFuel', matrefl], [bc], G, N, 'FD')
-    PN = NTE.Diffusion(slab, steady=True, fmt='csc')
-    k1 = kappa(slab, PN, nev=nev)
+    myslab = Slab(M, xlayers, [matrefl, 'MontagniniFuel', matrefl], [bc], G, N, 'FD')
+    myPN = NTE.Diffusion(myslab, steady=True, fmt='csc')
+    k1 = eigenproblem(myPN, 'kappa', myslab, nev=nev)
     k1.solve()
-    assert abs(k1.eigvals[0]-ref)*1E5 < 1
+    assert abs(k1.solution.eigvals[0]-ref)*1E5 < 1
 
 
 @pytest.mark.filterwarnings('ignore::DeprecationWarning:SparseEfficiencyWarning')
@@ -61,8 +61,8 @@ def test_DiffusionAdjoint_kappa0(H, R, G, matrefl, ref, algo):
     bc = 'zero'
     xlayers = [-R, -H, H, R]
     # define geometry and mesh
-    slab = Slab(M, xlayers, [matrefl, 'MontagniniFuel', matrefl], [bc], G, N, 'FD')
-    PN = ATE.Diffusion(slab, steady=True, fmt='csc')
-    k1 = kappa(slab, PN, nev=nev)
+    myslab = Slab(M, xlayers, [matrefl, 'MontagniniFuel', matrefl], [bc], G, N, 'FD')
+    myPN = ATE.Diffusion(myslab, steady=True, fmt='csc')
+    k1 = eigenproblem(myPN, 'kappa', myslab, nev=nev)
     k1.solve()
-    assert abs(k1.eigvals[0]-ref)*1E5 < 1
+    assert abs(k1.solution.eigvals[0]-ref)*1E5 < 1

@@ -47,11 +47,14 @@ class alpha(eigenproblem):
 
             T = nte.T
 
+        self.nev = nev
+        if 2*nev+1 >= B.shape[0]:
+            raise OSError('Too many eigenvalues required! 2*nev+1 should be < operator rank')
+
         self.A = B
         self.B = T
-        self.nev = nev
 
-    def solve(self, algo='PETSc', verbosity=False, normalization=None,
+    def solve(self, algo='PETSc', verbosity=False, phasespace=None,
               which='SM', tol=1E-8, monitor=False):
 
         B = self.A
@@ -137,17 +140,21 @@ class alpha(eigenproblem):
         signs = np.sign(eigvect[1, :])  # sign of 2nd row to avoid BCs
         eigvect = np.conj(signs)*eigvect
 
+        self.eigvals = eigvals[0:self.nev]
+        # convert to np.float64 if imaginary part is null
+        if np.iscomplex(eigvect[:, 0:self.nev]).sum() == 0:
+            self.eigvect = eigvect[:, 0:self.nev].real
+        else:
+            self.eigvect = eigvect[:, 0:self.nev]
+
         # normalize eigenvectors
-        for iv, v in enumerate(eigvect.T):
-            eigvect[:, iv] = v/np.linalg.norm(v)
+        self.normalize(phasespace=phasespace)
 
         # FIXME call balance function
 
         if res is not None:
             self.residual = res
 
-        self.eigvals = eigvals
-        self.eigvect = eigvect
 
 
 class omega(eigenproblem):
@@ -174,12 +181,15 @@ class omega(eigenproblem):
         else:
             B = S+Fp+Fd+E-R-D-L
 
+        self.nev = nev
+        if 2*nev+1 >= B.shape[0]:
+            raise OSError('Too many eigenvalues required! 2*nev+1 should be < operator rank')
+
         self.A = B
         self.B = T
-        self.nev = nev
         self.nF = npe.nF
 
-    def solve(self, algo='PETSc', verbosity=False, normalization=None,
+    def solve(self, algo='PETSc', verbosity=False, phasespace=None,
               which='SM', shift=None, tol=1E-8, monitor=False):
 
         B = self.A
@@ -267,16 +277,20 @@ class omega(eigenproblem):
         signs = np.sign(eigvect[1, :])  # sign of 2nd row to avoid BCs
         eigvect = np.conj(signs)*eigvect
 
+        self.eigvals = eigvals[0:self.nev]
+        # convert to np.float64 if imaginary part is null
+        if np.iscomplex(eigvect[:, 0:self.nev]).sum() == 0:
+            self.eigvect = eigvect[:, 0:self.nev].real
+        else:
+            self.eigvect = eigvect[:, 0:self.nev]
+
         # normalize eigenvectors
-        for iv, v in enumerate(eigvect.T):
-            eigvect[:, iv] = v/np.linalg.norm(v)
+        self.normalize(phasespace=phasespace)
 
         # FIXME call balance function
         if res is not None:
              self.residual = res
 
-        self.eigvals = eigvals
-        self.eigvect = eigvect
 
     def time(N, P):
         TN = N.T

@@ -11,30 +11,48 @@ try:
     from slepc4py import SLEPc
 
 except ImportError:
-    print('WARNING: PETSc/SLEPc packages not available. Computational speed' +
-          ' may be seriously affected.')
+    print('WARNING: PETSc/SLEPc packages not available!')
+    print('Computational speed may be seriously affected.')
 import os
 import time as t
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.ticker import FormatStrFormatter
-from matplotlib.patches import ConnectionPatch
+from copy import copy
+from scipy.linalg import eig
+from scipy.sparse.linalg import eigs
+from scipy.sparse import block_diag, bmat, csr_matrix, hstack, vstack
+from TEST.phasespace import PhaseSpace
 
 
 class eigenproblem():
 
-    def __init__(self, nte, which):
+    def __init__(self, nte, which, geom, nev=1):
 
+        # --- problem settings
         self.nS = nte.nS
         self.nE = nte.nE
         self.nA = nte.nA
         self.BC = nte.BC
         self.problem = which
         self.model = nte.model
+        self.operators = nte
+        self.geometry = geom
 
-    def _petsc(L, nev, what, P=None, which='LM', verbosity=False, sigma=0,
-               tol=1E-8, monitor=True):
+        if 2*nev+1 >= self.operators.L.shape[0]:
+            raise OSError('Too many eigenvalues required! 2*nev+1 should be < operator rank')
+        else:
+            self.nev = nev
 
+        # --- call eigenvalue problem
+        try:
+            evp = getattr(self, which)
+            evp()
+        except AttributeError:
+            raise OSError('{} eigenproblem not available!'.format(which))
+
+
+    def _petsc(self, verbosity=False, sigma=0, tol=1E-8, monitor=True):
+
+        L, P = self.A, self.B
         start = t.time()
         # BUG: set to 0 explicitly diagonal terms that does not appear (and thus are null)
         if L.format != 'csr':
@@ -44,7 +62,7 @@ class eigenproblem():
         diagL = L.diagonal()
         idL = np.array(np.where([diagL == 0])[1])
         # explicitly force 0 on diagonal
-        L[idL, idL] = 0  # np.zeros((len(idL), 0))
+        L[idL, idL] = 0
 
         if P is not None:
             P = P.tocsr()
@@ -54,31 +72,29 @@ class eigenproblem():
 
         rows, cols = L.shape
         # create PETSc matrices
-        L = PETSc.Mat().createAIJ(size=L.shape,
-                                  csr=(L.indptr, L.indices, L.data))
+        L = PETSc.Mat().createAIJ(size=L.shape, csr=(L.indptr, L.indices, L.data))
         if P is not None:
-            P = PETSc.Mat().createAIJ(size=P.shape,
-                                      csr=(P.indptr, P.indices, P.data))
+            P = PETSc.Mat().createAIJ(size=P.shape, csr=(P.indptr, P.indices, P.data))
 
             # PC = PETSc.PC()  # PCFactorSetShiftType('NONZERO')
             # PC.setFactorSolverType('matsolverumfpack')
             # PC.setFactorShift(shift_type='nonzero', amount=0)
             # P.reorderForNonzeroDiagonal(atol=1E-12)
 
-        if what in ['alpha', 'delta']:
+        if self.which in ['alpha', 'delta', 'omega']:
 
-            if which in ['SM', 'SR']:
+            if self.whichspectrum in ['SM', 'SR']:
                 # E settings
                 E = SLEPc.EPS().create()
 
                 if P is not None:
                     E.setOperators(P, L)
-                    E.setDimensions(nev=nev)
+                    E.setDimensions(nev=self.nev)
                     E.setProblemType(SLEPc.EPS.ProblemType.GNHEP)
 
                 else:
                     E.setOperators(L)
-                    E.setDimensions(nev=nev)
+                    E.setDimensions(nev=self.nev)
                     E.setProblemType(SLEPc.EPS.ProblemType.NHEP)
 
                 E.setWhichEigenpairs(E.Which.TARGET_MAGNITUDE)
@@ -94,25 +110,28 @@ class eigenproblem():
                 E = SLEPc.EPS().create()
                 if P is not None:
                     E.setOperators(P, L)
-                    E.setDimensions(nev=nev)
+                    E.setDimensions(nev=self.nev)
                     E.setProblemType(SLEPc.EPS.ProblemType.GNHEP)
 
                 else:
                     E.setOperators(L)
-                    E.setDimensions(nev=nev)
+                    E.setDimensions(nev=self.nev)
                     E.setProblemType(SLEPc.EPS.ProblemType.NHEP)
 
-                if which == 'LM':
+                if self.whichspectrum == 'LM':
                     E.setWhichEigenpairs(SLEPc.EPS.Which.LARGEST_MAGNITUDE)
 
-                elif which == 'LR':
+                elif self.whichspectrum == 'LR':
                     E.setWhichEigenpairs(SLEPc.EPS.Which.LARGEST_REAL)
 
-        elif what in ['gamma', 'kappa']:
+        elif self.which in ['gamma', 'kappa']:
             E = SLEPc.EPS().create()
             E.setOperators(P, L)
             E.setWhichEigenpairs(E.Which.LARGEST_MAGNITUDE)
-            E.setDimensions(nev=nev)
+            E.setDimensions(nev=self.nev)
+
+        else:
+            raise OSError('{} eigenproblem not available!'.format(self.which))
 
         end = t.time()
 
@@ -136,7 +155,7 @@ class eigenproblem():
         vals = []
         vecs = []
         err = []
-        eigvect = np.full((rows, max(nev, E.getConverged())), np.nan, dtype=complex)
+        eigvect = np.full((rows, max(self.nev, E.getConverged())), np.nan, dtype=complex)
         for iE in range(E.getConverged()):
             val = E.getEigenpair(iE, vr, vi)
             vals.append(val)
@@ -155,301 +174,6 @@ class eigenproblem():
         rankcheck = np.linalg.matrix_rank(A) == A.shape[0]
         isinvertible = shapecheck and rankcheck
         return ~isinvertible
-
-    def normalize(eigvect, which=None):
-        """Normalize eigenvectors according to a user-defined criterion."""
-        print('under develop')
-
-    def plot(self, geom, group, angle=0, mode=0, family=0, precursors=False,
-             ax=None, title=None, imag=False, **kwargs):
-
-        yr, yi = eigenproblem.get(self, geom, group, angle=angle, mode=mode,
-                                  family=family, precursors=precursors)
-        x = geom.mesh if len(yr) == geom.nS else geom.stag_mesh
-        ax = ax or plt.gca()
-
-        y = yr if imag is False else yi
-        plt.plot(x, y, **kwargs)
-
-        ax.locator_params(nbins=8)
-        # ax.set_ylim([y.min(), y.max()])
-        ax.set_xlim([min(geom.layers), max(geom.layers)])
-        ax.xaxis.set_major_formatter(FormatStrFormatter('%g'))
-        ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-
-    def plotspectrum(self, loglog=False, gaussplane=True, geom=None,
-                     grid=True, ylims=None, threshold=None, subplt=False):
-
-        if self.problem == 'omega' and geom is not None:
-            lambdas = geom.getxs('lambda')
-            subplt = False if subplt is False else True
-        else:
-            lambdas = None
-
-        if subplt is True:
-            fig = plt.figure(figsize=(6.4*2, 4.8))
-            sub1 = fig.add_subplot(1, 2, 1)
-            sub2 = fig.add_subplot(1, 2, 2)
-        else:
-            fig = plt.figure()
-            sub1 = fig.add_subplot(1, 1, 1)
-            subplt = False
-
-        val, vect = eigenproblem.getfundamental(self, lambdas)
-        evals = np.delete(self.eigvals, np.where(self.eigvals == val))
-
-        show = np.nan if threshold is not None and abs(val) > threshold else 1
-
-        if threshold is not None:
-            evals = evals[abs(evals) < threshold]
-
-        if gaussplane is True:
-            sub1.scatter(evals.real, evals.imag, marker='o', color='red')
-            # plot fundamental
-            sub1.scatter(show*val.real, show*val.imag, marker='*', s=100,
-                         color='blue')
-        else:
-            sub1.scatter(np.arange(0, len(evals.real)-1), evals.real,
-                         marker='o', color='red')
-            # plot fundamental
-            sub1.scatter(0, show*val, marker='*', s=100, color='blue')
-
-        if self.problem == 'alpha':
-            label = 'alpha'
-        elif self.problem == 'omega':
-            label = 'omega'
-        else:
-            label = self.problem
-
-        if self.problem == 'alpha' or self.problem == 'omega':
-            sub1.set_xlabel('$Re(\%s) ~[s^{-1}]$' % label)
-            sub1.set_ylabel('$Im(\%s) ~[s^{-1}]$' % label)
-        else:
-            sub1.set_xlabel('$Re(\%s)$' % label)
-            sub1.set_ylabel('$Im(\%s)$' % label)
-
-        if ylims is None:
-            sub1.set_ylim([min(self.eigvals.imag)*1.1, max(self.eigvals.imag)*1.1])
-        else:
-            sub1.set_ylim(ylims)
-
-        if loglog is True:
-            sub1.set_yscale('symlog')
-            sub1.set_xscale('symlog')
-        else:
-            sub1.ticklabel_format(axis='x', scilimits=[-5, 5])
-            sub1.ticklabel_format(axis='y', scilimits=[-5, 5])
-
-        if grid is True:
-            sub1.grid(alpha=0.2)
-
-        if subplt is True:
-            minl, maxl = min(-lambdas[:, 0]), max(-lambdas[:, 0])
-            miny, maxy = min(self.eigvals.imag), max(self.eigvals.imag)
-            minx, maxx = min(self.eigvals.real), max(self.eigvals.real)
-            # plot blocked area
-            sub1.fill_between((minl*maxx/10, -minl*maxx/10), miny*1.1, maxy*1.1,
-                              facecolor='red', alpha=0.15)
-
-            choice = np.logical_and(np.greater_equal(self.eigvals.real, minl),
-                                    np.less_equal(self.eigvals.real, maxl))
-            delayed = np.extract(choice, self.eigvals.real)
-            sub2.scatter(delayed.real, delayed.imag,
-                         marker='o', color='red')
-
-            # add fundamental
-            val, vect = eigenproblem.getfundamental(self, lambdas)
-            sub2.scatter(0, val, marker='*', s=100, color='blue')
-
-            # plot fundamental
-            sub2.set_ylim([-1, 1])
-
-            for la in lambdas:
-                sub2.axvline(-la, color='k', linestyle='--', linewidth=0.5)
-
-            xlo1, xup1 = sub1.get_xlim()
-            ylo1, yup1 = sub1.get_ylim()
-            xlo2, xup2 = sub2.get_xlim()
-            ylo2, yup2 = sub2.get_ylim()
-            # connection patch for first axes
-            con1 = ConnectionPatch(xyA=(minl*maxx/10, (ylo1+yup1)/2), coordsA=sub1.transData,
-                                   xyB=(xlo2, yup2), coordsB=sub2.transData,
-                                   color='red', alpha=0.2)
-            # Add left side to the figure
-            fig.add_artist(con1)
-
-            # connection patch for first axes
-            con2 = ConnectionPatch(xyA=(-minl*maxx/10, (ylo1+yup1)/2), coordsA=sub1.transData,
-                                   xyB=(xlo2, ylo2), coordsB=sub2.transData,
-                                   color='red', alpha=0.2)
-            # Add right side to the figure
-            fig.add_artist(con2)
-
-            sub2.set_xlabel('$Re(\%s)$' % label)
-            sub2.set_ylabel('$Im(\%s)$' % label)
-            sub2.ticklabel_format(axis='x', scilimits=[-5, 5])
-            sub2.ticklabel_format(axis='y', scilimits=[-5, 5])
-            if grid is True:
-                sub2.grid(alpha=0.2)
-            plt.tight_layout()
-
-    def polarspectrum(self, ax=None):
-        ax = ax or plt.gca()
-        plt.polar(np.angle(self.eigvals[1:]), abs(self.eigvals[1:]),
-                  marker='o', color='red')
-        # plot fundamental
-        val, vect = eigenproblem.getfundamental(self)
-        plt.polar(np.angle(val), abs(val), marker='*', color='blue')
-
-    def getfundamental(self, lambdas=None):
-        if self.problem in ['kappa', 'gamma']:
-            idx = 0
-        elif self.problem == 'delta':
-            # select real eigenvalues
-            reals = self.eigvals[self.eigvals.imag == 0]
-            # FIXME clean spurious big eigenvalues (temporary patch)
-            reals = reals[abs(reals) < 1E3]
-
-            if np.all(reals <= 0):
-                reals = reals[reals != 0]
-                fund = min(reals)
-                idx = np.where(self.eigvals == fund)[0][0]
-            elif np.all(reals > 0):
-                fund = min(reals)
-                idx = np.where(self.eigvals == fund)[0][0]
-            else:
-                # FIXME patch to find delta
-                reals = reals[reals > 0]
-                reals = reals[reals < 10]
-                minreal = np.where(reals == reals.max())
-                idx = np.where(self.eigvals == reals[minreal])[0][0]
-
-        else:
-            if self.problem == 'alpha':
-                # select real eigenvalues
-                reals = self.eigvals[self.eigvals.imag == 0]
-                # all negative
-                if np.all(reals < 0):
-                    reals_abs = abs(self.eigvals[self.eigvals.imag == 0])
-                    whichreal = np.where(reals_abs == reals_abs.min())
-                else:
-                    reals_abs = self.eigvals[self.eigvals.imag == 0]
-                    whichreal = np.where(reals_abs == reals_abs.max())
-                # blended
-                idx = np.where(self.eigvals == reals[whichreal])[0][0]
-            elif lambdas is not None:
-                # select real eigenvalues
-                choice = np.logical_and(np.greater_equal(self.eigvals.real,
-                                                         min(-lambdas)),
-                                        np.less_equal(self.eigvals.real,
-                                                      max(-lambdas)))
-                prompt = np.extract(~choice, self.eigvals)
-                reals = prompt[prompt.imag == 0]
-                reals_abs = abs(prompt[prompt.imag == 0])
-                minreal = np.where(reals_abs == reals_abs.min())
-                idx = np.where(self.eigvals == reals[minreal])[0][0]
-
-        eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
-        return eigenvalue, eigenvector
-
-    def get(self, geom, group, angle=0, mode=0, family=0, normalise=True,
-            precursors=False):
-        """
-        Get spatial flux distribution for group, angle and spatial mode.
-
-        Parameters
-        ----------
-        geom : object
-            Geometry object.
-        angle : int
-            Moment/direction number.
-        group : int
-            Group number.
-        mode : int
-            Eigen-mode number.
-
-        Returns
-        -------
-        yr : ndarray
-            Real part of the flux mode.
-        yi : ndarray
-            Imaginary part of the flux mode.
-
-        """
-        if self.model == 'PN' or self.model == 'Diffusion':
-            yr, yi = self._getPN(geom, group, angle=0, mode=0, family=0, normalise=True,
-                                 precursors=False)
-            return yr, yi
-
-    def _getPN(self, geom, group, angle=0, mode=0, family=0, normalise=True,
-               precursors=False):
-        """
-        Get spatial flux distribution for group, angle and spatial mode.
-
-        Parameters
-        ----------
-        geom : object
-            Geometry object.
-        angle : int
-            Moment/direction number.
-        group : int
-            Group number.
-        mode : int
-            Eigen-mode number.
-
-        Returns
-        -------
-        yr : ndarray
-            Real part of the flux mode.
-        yi : ndarray
-            Imaginary part of the flux mode.
-
-        """
-        nE, nA, nS = self.nE, self.nA, self.nS
-
-        if precursors and self.problem == 'omega':
-            angle = nA
-            nF = self.nF
-            family = family-1
-            iF = nS*family
-        else:
-            iF = 0
-
-        No = (nA+1)//2 if nA % 2 != 0 else nA//2
-        Ne = nA+1-No
-
-        lambdas = geom.getxs('lambda') if self.problem == 'omega' else None
-
-        # take eigenvector
-        if mode == 0:
-            _, vect = eigenproblem.getfundamental(self, lambdas)
-        else:
-            vect = self.eigvect[:, mode]
-
-        if normalise:
-            # normalisation constant computed over total flux
-            totflx = np.zeros((nE*nS,))
-            for gro in range(0, nE):
-                skip = (Ne*nS+No*(nS-1))*gro
-                totflx[gro*nS:(gro+1)*nS] = vect[skip:skip+nS]
-            vect = vect/np.linalg.norm(totflx)
-
-        if precursors is False:
-            # compute No and Ne for the requested moment/angle
-            skip = (Ne*nS+No*(nS-1))*(group-1)
-            NO = (angle+1)//2 if (angle-1) % 2 != 0 else angle//2
-            NE = angle-NO
-
-            M = nS if angle % 2 == 0 else nS-1
-            iS = skip+NE*nS+NO*(nS-1)
-            iE = skip+NE*nS+NO*(nS-1)+M
-        else:
-            iS = (Ne*nS+No*(nS-1))*nE+group*nF+iF
-            iE = (Ne*nS+No*(nS-1))*nE+group*nF+iF+nS
-
-        yr = np.real(vect[iS:iE])
-        yi = np.imag(vect[iS:iE])
-        return yr, yi
 
     def convmonitor(eps, its, nconv, eig, err):
         """
@@ -485,3 +209,239 @@ class eigenproblem():
 
         with open('tmp.txt', append_write) as f:
             np.savetxt(f, arr)
+
+    def alpha(self):
+        """
+        Cast operators into the prompt time eigenvalue problem "alpha".
+
+        Returns
+        -------
+        None.
+
+        """
+        op = self.operators
+        # define alpha prompt eigenproblem operators
+        if self.nev == 0:  # alpha infinite
+            B = op.S+op.F-op.R  # no leakage, infinite medium
+            self.nev = 1
+        else:
+            B = op.S+op.F-op.R-op.L  # destruction operator
+
+        T = op.T
+
+        self.A = B
+        self.B = T
+        self.which = 'alpha'
+        self.whichspectrum = 'SM'
+
+    def gamma(self):
+        """
+        Cast operators into the collision eigenvalue problem "gamma".
+
+        Returns
+        -------
+        None.
+
+        """
+        op = self.operators
+        if self.nev == 0:  # gamma infinite
+            self.A = op.R  # no leakage, infinite medium
+            self.nev = 1
+        else:
+            self.A = op.L + op.R  # destruction operator
+
+        self.B = op.F + op.S  # multiplication operator
+        self.which = 'gamma'
+        self.whichspectrum = 'LM'
+
+    def delta(self):
+        """
+        Cast operators into the streaming/density eigenvalue problem "delta".
+
+        Returns
+        -------
+        None.
+
+        """
+        op = self.operators
+        self.A = op.L  # leakage operator
+        self.B = op.F+op.S-op.R  # material operator
+        self.which = 'delta'
+        self.whichspectrum = 'SR'
+
+    def kappa(self):
+        """
+        Cast operators into the criticality eigenvalue problem "kappa".
+
+        Returns
+        -------
+        None.
+
+        """
+        op = self.operators
+        # define kappa eigenproblem operators
+        if self.nev == 0 or self.BC is False:  # kappa infinite
+            self.A = op.R-op.S  # no leakage, infinite medium
+            self.nev = 1
+        else:
+            self.A = op.L+op.R-op.S  # destruction operator
+
+        self.B = op.F  # multiplication operator
+        self.which = 'kappa'
+        self.whichspectrum = 'LM'
+
+    def omega(self):
+        """
+        Cast operators into the delayed time eigenvalue problem "omega".
+
+        Returns
+        -------
+        None.
+
+        """
+        self.nF = self.operatorsPrec.nF
+        # get dimensions
+        nS, nE, nF = self.nS, self.nE, self.nF
+        nA = self.operators.nA
+        n = self.operators.Fp.shape[0]
+        m = nE*nF*nS
+
+        # odd and even eqs.
+        No = (nA+1)//2 if nA % 2 != 0 else nA//2
+        Ne = nA+1-No
+
+        # define matrices to fill blocks
+        A1 = csr_matrix((n, m))
+        A2 = csr_matrix((m, m))
+        A3 = csr_matrix((m, n))
+        A4 = csr_matrix((n, n))
+
+        # --- time
+        T = block_diag([self.operators.T, self.operatorsPrec.T])
+        # --- prompt fission
+        self.Fp = bmat([[self.operators.Fp, A1], [A1.T, A2]])
+        # --- delayed fission
+        Fd1 = self.operators.Fd.tocsr()
+        tmp = copy(A3)
+        # loop over each group
+        for g in range(0, nE):
+            skip = (Ne*nS+No*(nS-1))*g
+            tmp[:, skip:nS+skip] = Fd1[:, nS*g:nS*(g+1)]
+
+        self.Fd = bmat([[A4, A3.T], [tmp.copy, A2]])
+        # --- scattering
+        self.S = bmat([[self.operators.S, A1], [A1.T, A2]])
+        # --- removal
+        tmp1, tmp2 = hstack([self.operators.R, A1]), hstack([A1.T, A2])
+        self.R = vstack(([tmp1.copy, tmp2.copy]))
+        # --- leakage
+        self.L = bmat([[self.operators.L, A1], [A1.T, A2]])
+
+        # --- emission
+        tmp = copy(A1.T)
+        # loop over each group
+        for gro in range(0, nE):
+            skip = (No*(nS-1)+Ne*nS)*gro
+            tmp[skip:nS+skip, :] = self.operatorsPrec.E[nS*gro:nS*(gro+1), :]
+
+        self.E = bmat([[A4, tmp.copy], [A1, A2]])
+        # --- decay
+        self.D = block_diag(([A4, self.operatorsPrec.D]))
+
+        # define alpha delayed eigenproblem operators
+        if self.nev == 0:  # omega infinite S+Fp+Fd+E-(R+D)
+            self.A = self.S+self.Fp+self.Fd+self.E-self.R-self.D  # no leakage, inf medium
+            self.nev = 1
+    
+        else:
+            self.A = self.S+self.Fp+self.Fd+self.E-self.R-self.D-self.L
+
+        self.B = T
+        self.which = 'omega'
+        self.whichspectrum = 'SM'
+
+    def solve(self, algo='PETSc', verbosity=False,tol=1E-14, monitor=False,
+              sigma=None):
+
+        A = self.A
+        B = self.B
+        res = None
+        if algo == 'PETSc':
+            try:
+                start = t.time()
+                eigvals, eigvect, res = self._petsc(tol=tol, monitor=monitor)
+                end = t.time()
+            except NameError:
+                print('PETSc/SLEPc packages not installed. Switching to scipy...')
+                algo = 'eigs'
+
+        if algo == 'eigs':
+            if A.format != 'csc':
+                A = A.tocsc()
+            if B.format != 'csc':
+                B = B.tocsc()
+
+            if self.which in ['kappa', 'delta', 'gamma']:
+                self.whichspectrum = 'LR'
+                sigma = sigma
+                M1, M2 = B, A
+            elif self.which in ['alpha', 'omega']:
+                self.whichspectrum = 'LM'
+                sigma = 0
+                M1, M2 = A, B
+
+            start = t.time()
+            eigvals, eigvect = eigs(M1, M=M2, k=self.nev, sigma=sigma,
+                                    which=self.whichspectrum)
+            end = t.time()
+
+        elif algo == 'eig':
+
+            if self.which in ['kappa', 'gamma']:
+                M1, M2 = B, A
+            elif self.which in ['alpha', 'delta', 'omega']:
+                M1, M2 = A, B
+
+            start = t.time()
+            eigvals, eigvect = eig(M1.todense(), M2.todense())
+            end = t.time()
+
+            if self.which == 'delta':
+                eigvals = 1/eigvals
+
+        else:
+            if algo != 'PETSc':
+                raise OSError('%s algorithm is unavailable!' % algo)
+
+        if verbosity is True and algo != 'PETSc':
+            print("ELAPSED TIME: %f [s]" % (end-start))
+
+        self.algo = algo
+
+        # --- manipulate eigenpairs
+        # sort eigenvalues
+        idx = eigvals.argsort()[::-1]
+        eigvals = eigvals[idx]
+        eigvect = eigvect[:, idx]
+
+        # force sign consistency
+        signs = np.sign(eigvect[1, :])  # sign of 2nd row to avoid BCs
+        eigvect = np.conj(signs)*eigvect
+
+        # convert to np.float64 if imaginary part is null
+        if np.iscomplex(eigvect[:, 0:self.nev]).sum() == 0:
+            ev = eigvect[:, 0:self.nev].real
+        else:
+            ev = eigvect[:, 0:self.nev]
+
+        if res is not None:
+            self.residual = res
+
+        # create native phase space
+        myeigpair = {'eigenvalues': eigvals[0:self.nev],
+                     'eigenvectors' : ev,
+                     'problem': self.which}
+        self.solution = PhaseSpace(self.geometry, eigenpair=myeigpair,
+                                   normalize=True, whichnorm='norm2',
+                                   operators=self.operators)
+

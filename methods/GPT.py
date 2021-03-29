@@ -11,21 +11,24 @@ from TEST.phasespace import PhaseSpace
 
 class GPT():
 
-    def __init__(self, N, geom, unperturbed, pertgeom, perturbed, adj):
+    def __init__(self, N, unperturbed, perturbed, adj):
 
         self.PertOrder = N
         # check forward and adjoint modes consistency
-        M, M1 = len(unperturbed.eigvals), len(adj.eigvals)
+        M, M1 = unperturbed.nev, adj.nev
         if M != M1:
             raise OSError('Forward (%d) and adjoint (%d) modes mismatch!' % (M, M1))
         else:
             self.ModExpOrder = M
-            phi, psi =  unperturbed.eigvect, adj.eigvect
-            mu = 1/unperturbed.eigvals
+            mu = 1/unperturbed.solution.eigvals
+            # force normalisation
+            unperturbed.solution.normalize(which='phasespace')
+            adj.solution.normalize(which='phasespace')
+            phi, psi =  unperturbed.solution.eigvect, adj.solution.eigvect
+            PS = unperturbed.solution
 
         # define phase space
-        PS = PhaseSpace(geom)
-        xp = pertgeom.mesh
+        xp = perturbed.geometry.mesh
 
         # --- get operators
         A, B = unperturbed.A, unperturbed.B
@@ -34,12 +37,12 @@ class GPT():
         # normalisation constants
         C = zeros((phi.shape[1], ))
         for i in range(0, self.ModExpOrder):
-            C[i] = PS.braket(psi[:,i], B.dot(psi[:,i]))
+            C[i] = PS.braket(psi[:,i], B.dot(phi[:,i]))
 
         # pre-allocation
-        alpha = zeros((M, N))  # alpha_{1,K} = 0 as normalization constant
-        lambdas = zeros((N, ))  # perturbed eigenvalue
-        p = zeros((phi.shape[0], N)) # perturbed system flux perturbations
+        alpha = zeros((M, N), dtype=complex)  # alpha_{1,K} = 0 as normalization constant
+        lambdas = zeros((N, ), dtype=complex)  # perturbed eigenvalue
+        p = zeros((phi.shape[0], N), dtype=complex) # perturbed system flux perturbations
         # normalisation constants
         tmp = PS.interp(phi[:, 0], xp, isref=False)  # interpolate over pert. mesh
         tmp = PS.interp(Bp.dot(tmp), xp)  # interpolate product over refer. mesh
@@ -57,16 +60,16 @@ class GPT():
             S1, S2 = 0, 0
 
             # sum previous contributions
-            for k in range(1, n-1):
+            for k in range(0, n):
                 if n > k:
                     if n > k+1:
-                        v1 = PS.interp(p[:, n-k-1], xp, isref=False)
-                        v2 = p[:, n-k-1]
+                        v1 = PS.interp(p[:, n-k-2], xp, isref=False)
+                        v2 = p[:, n-k-2]
                     else:
                         v1 = PS.interp(phi[:, 0], xp, isref=False)
                         v2 = phi[:, 0]
 
-                    S1 = S1+lambdas[k]*B.dot(p[:, n-k])
+                    S1 = S1+lambdas[k]*B.dot(p[:, n-k-1])
                     S2 = S2+lambdas[k]*(PS.interp(Bp.dot(v1), xp)-B.dot(v2))
 
             lambdas[n] = (PS.braket(psi[:, 0], S)-PS.braket(psi[:, 0], S1)+
@@ -76,11 +79,11 @@ class GPT():
             for m in range(1, M):
                 # initialisation 
                 S1a, S2a = 0, 0
-                for k in range(1, n-1):
+                for k in range(0, n):
                     if n > k:
                         if n > k+1:
-                            v1 = PS.interp(p[:, n-k-1], xp, isref=False)
-                            v2 = p[:, n-k-1]
+                            v1 = PS.interp(p[:, n-k-2], xp, isref=False)
+                            v2 = p[:, n-k-2]
                         else:
                             v1 = PS.interp(phi[:, 0], xp, isref=False)
                             v2 = phi[:, 0]
@@ -107,6 +110,8 @@ class GPT():
         self.EvalPert = lambdas
         self.ExpCoeff = alpha
         self.EvecPert = p
-        self.pertEigv = mu[0]+lambdas.sum()
-        self.pertEvec = phi[:, 0]+p.sum(axis=1)
-        
+        myeigpair = {'eigenvalues': [1/(mu[0]+lambdas.sum())],
+                     'eigenvectors': phi[:, 0]+p.sum(axis=1),
+                     'problem': unperturbed.problem}
+        self.solution = PhaseSpace(perturbed.geometry, eigenpair=myeigpair,
+                                   operators=unperturbed)
