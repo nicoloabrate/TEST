@@ -42,7 +42,7 @@ def zero(obj, f, meshtype='mesh'):
     return fx
 
 
-def first(obj, f, meshtype='mesh'):
+def first(obj, f, meshtype='mesh', stag=True):
     """
     Evaluate first-order derivatives with Central Difference Scheme.
 
@@ -54,7 +54,11 @@ def first(obj, f, meshtype='mesh'):
         List of coefficient fues.
     meshtype : string, optional
         Mesh or staggered mesh type. The default is 'mesh'.
-
+    stag : bool, optional
+        Flag to determine where the derivative is evaluated. If ``True``, the
+        derivative is evaluated on the i-th node considering the (i+1/2)-th and
+        (i-1/2)-th nodes. If ``False``, the derivative is evaluated on the i-th
+        node considering the (i+1)-th and (i-1)-th nodes. Default is ``True``.
     Returns
     -------
     dfdx : np.ndarray
@@ -69,16 +73,17 @@ def first(obj, f, meshtype='mesh'):
     mesh = dicob[meshtype]
     # ensure dimension consistency
     f = [f]*NL if isinstance(f, (int, float)) else f
+    m = 1 if stag is True else 2
 
     for i in range(0, NL):
         pts = mesh[q::]
         dx = obj.dx
         bord = obj.layers[i+1]
         inner_pts = np.where(pts <= bord)[0]+q*(i > 0)
-        q = q+len(inner_pts)
+        P = len(inner_pts)
+        q = q+P
 
-        dfdx[0, inner_pts[0]:inner_pts[-1]+1] = -f[i]/dx[i]*np.ones((len(inner_pts),
-                                                                     1)).ravel()
+        dfdx[0, inner_pts[0]:inner_pts[-1]+1] = -f[i]/(m*dx[i])*np.ones((P, 1)).ravel()
 
         if NL > 1 and i < NL-1 and mesh[inner_pts[-1]] <= obj.layers[i+1]:
             dfdx[0, inner_pts[-1]] = -2*f[i]/(dx[i]+dx[i+1])

@@ -227,7 +227,14 @@ class Material():
 
         """
         if pos1 is None and pos2 is None:
-            vals = self.__dict__[key]
+            try:
+                vals = self.__dict__[key]
+            except KeyError:
+                if key.startswith('S') or key.startswith('Sp'):
+                    # set higher moments to zero if not available
+                    vals = self.__dict__['S0']*0
+                else:
+                    raise OSError('{} data not available!'.format(key))
         else:
             if key.startswith('S') or key.startswith('Sp'):
                 if pos2 is None:

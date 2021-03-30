@@ -37,7 +37,7 @@ def imposeBC(op, slab):
     None.
 
     """
-    # FIXME: to correctly handle one-side BC, only positive/negative directions
+    # TODO: to correctly handle one-side BC, only positive/negative directions
     # have to be kept!
     M = op.nS
     N = op.nA
