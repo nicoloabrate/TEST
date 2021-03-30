@@ -11,15 +11,21 @@ This is a suite of functions and procedures to solve 1D neutron transport equati
 
 ## Installation and pre-requisites
 To install the `master` version of the code, type:
-        ``git clone https://nicolo_abrate@bitbucket.org/nicolo_abrate/test.git``
-        ``cd TEST``
-        ``python setup.py install ``
+        ```bash
+	git clone https://nicolo_abrate@bitbucket.org/nicolo_abrate/test.git
+        cd TEST
+        python setup.py install 
+	```
 
 To install the `development` version of the code, type:
-        ``git clone https://nicolo_abrate@bitbucket.org/nicolo_abrate/test.git``
-        ``cd TEST``
-        `git checkout devel`
-        ``python setup.py install ``
+        ```bash
+	git clone https://nicolo_abrate@bitbucket.org/nicolo_abrate/test.git
+        cd TEST
+        git checkout devel
+        python setup.py install 
+	```
 
 To ensure the correct code installation, type
-        ``python setup.py test``
+        ```bash
+	python setup.py test
+	```
