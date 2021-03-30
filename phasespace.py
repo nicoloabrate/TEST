@@ -198,7 +198,7 @@ class PhaseSpace:
         plt.plot(x, y, **kwargs)
 
         ax.locator_params(nbins=8)
-        # ax.set_ylim([y.min(), y.max()])
+        ax.set_ylim(y.min())
         ax.set_xlim([min(self.geometry.layers), max(self.geometry.layers)])
         ax.xaxis.set_major_formatter(FormatStrFormatter('%g'))
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
@@ -454,7 +454,7 @@ class PhaseSpace:
 
         if normalise:
             # normalisation constant computed over total flux
-            totflx = np.zeros((nE*nS,))
+            totflx = np.zeros((nE*nS,), dtype=complex)
             for gro in range(0, nE):
                 skip = (Ne*nS+No*(nS-1))*gro
                 totflx[gro*nS:(gro+1)*nS] = vect[skip:skip+nS]

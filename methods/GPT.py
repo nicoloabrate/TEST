@@ -5,7 +5,7 @@ File: GPT.py
 
 Description: Class for Generalised Perturbation Theory method.
 """
-from numpy import zeros, dot
+from numpy import zeros, dot, newaxis
 from TEST.phasespace import PhaseSpace
 
 
@@ -110,8 +110,9 @@ class GPT():
         self.EvalPert = lambdas
         self.ExpCoeff = alpha
         self.EvecPert = p
+        v = phi[:, 0]+p.sum(axis=1)
         myeigpair = {'eigenvalues': [1/(mu[0]+lambdas.sum())],
-                     'eigenvectors': phi[:, 0]+p.sum(axis=1),
+                     'eigenvectors': v[:, newaxis],
                      'problem': unperturbed.problem}
-        self.solution = PhaseSpace(perturbed.geometry, eigenpair=myeigpair,
+        self.solution = PhaseSpace(unperturbed.geometry, eigenpair=myeigpair,
                                    operators=unperturbed)

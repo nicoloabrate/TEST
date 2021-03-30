@@ -1,7 +1,7 @@
 Metadata-Version: 1.2
 Name: TEST
-Version: 0.0.1
-Summary: A package for solving neutron transport equation in 1D geometries
+Version: 0.1.0
+Summary: A package for solving neutron transport equation in 1D plain geometry
 Home-page: https://nicolo_abrate@bitbucket.org/nicolo_abrate/test.git
 Author: N. Abrate
 Author-email: nicolo.abrate@polito.it
