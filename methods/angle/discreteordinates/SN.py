@@ -103,19 +103,47 @@ def leakage(obj, fmt='csc'):
     M = []
     appM = M.append
     mu = obj.QW['mu']
+
+    # --- create sub-matrix
+
+    # fill lower triangular matrix (mu > 0)
+    tmp = []
+    for i in range(0, obj.nS):
+        coeff = 2/obj.dx
+        if i == 0:
+            if model == 'FD':
+                d = FD.zero(obj, coeff).T.flatten()
+            elif model == 'FV':
+                d = FV.zero(obj, coeff).T.flatten()
+            else:
+                raise OSError('{} model not available for spatial variable!'.format(model))
+            tmp.append(list(d))
+        elif i % 2 != 0:
+            tmp.append(list(-2*d[0+i:obj.nS]))
+        else:
+            tmp.append(list(2*d[0+i:obj.nS]))
+    trilpos = diags(tmp, np.arange(0, -obj.nS, -1), (obj.nS, obj.nS), format=fmt)
+    # fill lower triangular matrix (mu < 0)
+    tmp = []
+    for i in range(0, obj.nS):
+        coeff = 2/np.flipud(obj.dx)
+        if i == 0:
+            if model == 'FD':
+                d = FD.zero(obj, coeff).T.flatten()
+            elif model == 'FV':
+                d = FV.zero(obj, coeff).T.flatten()
+            else:
+                raise OSError('{} model not available for spatial variable!'.format(model))
+            tmp.append(list(d))
+        elif i % 2 != 0:
+            tmp.append(list(2*d[0+i:obj.nS]))
+        else:
+            tmp.append(list(-2*d[0+i:obj.nS]))
+    trilneg = diags(tmp, np.arange(0, -obj.nS, -1), (obj.nS, obj.nS), format=fmt)
+
     for order in range(0, N):
 
-        if model == 'FD':
-            d = FD.first(obj, mu[order], stag=False)
-        elif model == 'FV':
-            d = FV.first(obj, mu[order], stag=False)
-        else:
-            raise OSError('{} model not available for spatial variable!'.format(model))
-
-        n = d.shape[1]
-        pos = np.array([-1, 1])
-        mat = diags(d, pos, (n, n), format=fmt)
-
+        mat = mu[order]*trilpos if mu[order] >= 0 else mu[order]*trilneg
         appM(mat)
 
     M = block_diag((M))

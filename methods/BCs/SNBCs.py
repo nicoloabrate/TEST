@@ -52,48 +52,48 @@ def setBCs(op, geometry):
         if bc not in ['vacuum', 'mark', 'Mark']:
             raise OSError('Unknown boundary condition {}!'.format(bc))
 
-        for gro in range(0, op.nE):
-            skip = M*N*gro
-            # sweeping to impose BCs
-            for n in range(0, N):
-                if mu[n] > 0:
-                    # no incoming flux
-                    # L[skip, skip+1] = 0
-                    # L[skip, skip] = 1
-                    # op.F[skip, M*np.arange(0, N)] = 0
-                    # op.S[skip, M*np.arange(0, N)] = 0
-                    # op.R[skip, skip] = 0
-                    # if op.state != 'steady':
-                    #     op.T[skip, skip] = 0
-                    L[skip, skip] = 0
-                    op.F[skip, skip] = 0
-                    op.S[skip, skip] = 0
-                    op.R[skip, skip] = 0
-                    if op.state != 'steady':
-                        op.T[skip, skip] = 0
-                    # upwind scheme for left boundary
-                    L[skip+M-1, skip+M-2] = 1/2*L[skip+M-1, skip+M-2]
-                    L[skip+M-1, skip+M-1] = -L[skip+M-1, skip+M-2]                        
-                    skip = skip+M
-                elif  mu[n] < 0: 
-                    # upwind scheme for right boundary
-                    L[skip, skip+1] = 1/2*L[skip, skip+1]
-                    L[skip, skip] = -L[skip, skip+1]
-                    # no incoming flux
-                    # L[skip+M-1, skip+M-1] = 1
-                    # L[skip+M-1, skip+M-2] = 0
-                    # op.S[skip+M-1, M-1+M*np.arange(0, N)] = 0
-                    # op.F[skip+M-1, M-1+M*np.arange(0, N)] = 0
-                    # op.R[skip+M-1, skip+M-1] = 0
-                    # if op.state != 'steady':
-                    #     op.T[skip+M-1, skip+M-1] = 0
-                    L[skip+M-1, skip+M-1] = 0
-                    op.S[skip+M-1, skip+M-1] = 0
-                    op.F[skip+M-1, skip+M-1] = 0
-                    op.R[skip+M-1, skip+M-1] = 0
-                    if op.state != 'steady':
-                        op.T[skip+M-1, skip+M-1] = 0
-                    skip = skip+M
+        # for gro in range(0, op.nE):
+        #     skip = M*N*gro
+        #     # sweeping to impose BCs
+        #     for n in range(0, N):
+        #         if mu[n] > 0:
+        #             # no incoming flux
+        #             # L[skip, skip+1] = 0
+        #             # L[skip, skip] = 1
+        #             # op.F[skip, M*np.arange(0, N)] = 0
+        #             # op.S[skip, M*np.arange(0, N)] = 0
+        #             # op.R[skip, skip] = 0
+        #             # if op.state != 'steady':
+        #             #     op.T[skip, skip] = 0
+        #             L[skip, skip] = 0
+        #             op.F[skip, skip] = 0
+        #             op.S[skip, skip] = 0
+        #             op.R[skip, skip] = 0
+        #             if op.state != 'steady':
+        #                 op.T[skip, skip] = 0
+        #             # upwind scheme for left boundary
+        #             L[skip+M-1, skip+M-2] = 1/2*L[skip+M-1, skip+M-2]
+        #             L[skip+M-1, skip+M-1] = -L[skip+M-1, skip+M-2]                        
+        #             skip = skip+M
+        #         elif  mu[n] < 0: 
+        #             # upwind scheme for right boundary
+        #             L[skip, skip+1] = 1/2*L[skip, skip+1]
+        #             L[skip, skip] = -L[skip, skip+1]
+        #             # no incoming flux
+        #             # L[skip+M-1, skip+M-1] = 1
+        #             # L[skip+M-1, skip+M-2] = 0
+        #             # op.S[skip+M-1, M-1+M*np.arange(0, N)] = 0
+        #             # op.F[skip+M-1, M-1+M*np.arange(0, N)] = 0
+        #             # op.R[skip+M-1, skip+M-1] = 0
+        #             # if op.state != 'steady':
+        #             #     op.T[skip+M-1, skip+M-1] = 0
+        #             L[skip+M-1, skip+M-1] = 0
+        #             op.S[skip+M-1, skip+M-1] = 0
+        #             op.F[skip+M-1, skip+M-1] = 0
+        #             op.R[skip+M-1, skip+M-1] = 0
+        #             if op.state != 'steady':
+        #                 op.T[skip+M-1, skip+M-1] = 0
+        #             skip = skip+M
 
     op.L = L
     return op

@@ -32,6 +32,8 @@ def zero(obj, f, meshtype='mesh'):
     fx = np.zeros((1, N))
     q = 0
     NL = obj.nLayers
+    if isinstance(f, (int, float, np.float)):
+        f = [f]*NL
     for i in range(0, NL):
         pts = dicob[meshtype][q::]
         bord = obj.layers[i+1]
