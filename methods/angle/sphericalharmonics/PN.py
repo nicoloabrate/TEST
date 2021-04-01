@@ -27,6 +27,8 @@ def time(obj, invv, fmt='csc'):
 
     """
     N = obj.AngOrd
+    if N <= 0:
+        raise OSError('Cannot build P_{}'.format(N))
     model = obj.spatial_scheme
     M = []
     appM = M.append
@@ -71,6 +73,8 @@ def removal(obj, xs, fmt='csc'):
 
     """
     N = obj.AngOrd
+    if N <= 0:
+        raise OSError('Cannot build P_{}'.format(N))
     model = obj.spatial_scheme
     M = []
     appM = M.append
@@ -115,6 +119,8 @@ def leakage(obj, fmt='csc'):
 
     """
     N = obj.AngOrd
+    if N <= 0:
+        raise OSError('Cannot build P_{}'.format(N))
     model = obj.spatial_scheme
     M = []
     appM = M.append
@@ -231,6 +237,8 @@ def scattering(obj, sm, fmt='csc'):
 
     """
     N = obj.AngOrd
+    if N <= 0:
+        raise OSError('Cannot build P_{}'.format(N))
     model = obj.spatial_scheme
     L = sm.shape[1]
     M = []
@@ -280,6 +288,8 @@ def fission(obj, xs, fmt='csc'):
 
     """
     N = obj.AngOrd
+    if N <= 0:
+        raise OSError('Cannot build P_{}'.format(N))
     model = obj.spatial_scheme
     M = []
     appM = M.append

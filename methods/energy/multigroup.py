@@ -5,11 +5,11 @@ File: multigroup.py
 
 Description: Class for multi-energy group operators.
 """
+from numpy import newaxis, asarray
 from scipy.sparse import block_diag, bmat
+from TEST.methods.angle import Diffusion
 from TEST.methods.angle.discreteordinates import SN
 from TEST.methods.angle.sphericalharmonics import PN
-from TEST.methods.angle import Diffusion
-from numpy import newaxis, asarray
 
 
 def time(obj, model, fmt='csc'):
@@ -95,7 +95,6 @@ def leakage(obj, model, fmt='csc'):
     meshtype : string, optional
         Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
         mesh. The default is 'mesh'.
-
     Returns
     -------
     None.
@@ -150,6 +149,7 @@ def scattering(obj, model, prod=True, fmt='csc', adjoint=False):
     SMGapp = SMG.append
     key = 'Sp' if prod is True else 'S'
     sm = obj.getxs('%s' % key)
+
     for dep_gro in range(0, obj.nE):  # departure group
 
         M = []
@@ -201,7 +201,6 @@ def fission(obj, model, fmt='csc', adjoint=False):
     fxs = obj.getxs('Fiss')
     nub = obj.getxs('Nubar')
     chi = obj.getxs('Chit')
-
     for emi_gro in range(0, obj.nE):  # emission
 
         M = []

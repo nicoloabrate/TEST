@@ -11,6 +11,8 @@ from matplotlib.pyplot import gca
 from TEST.material import Material
 from collections import OrderedDict
 from copy import deepcopy as cp
+from scipy.special import roots_legendre, eval_legendre
+
 
 class Slab:
     """Define slab geometry object."""
@@ -372,3 +374,27 @@ class Slab:
                     minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
 
             self.mesher(minmfp)
+
+    def computeQW(self):
+        """
+        Compute the set of quadrature weights and normalisation coefficients
+        needed for the PN approximation.
+
+        Returns
+        -------
+        None.
+
+        """
+        # compute Legendre expansion coefficients for SN
+        sm = self.getxs('%s' % 'S')
+        L = sm.shape[3]
+        mu, w = roots_legendre(self.AngOrd)
+        # ensure positive and then negative directions
+        mu[::-1].sort()
+
+        PL = np.zeros((L, self.AngOrd))
+        for order in range(0, L):
+            PL[order, :] = eval_legendre(order, mu)
+        C = (2*np.arange(0, self.AngOrd)+1)/2
+        QW = {'L': L, 'mu': mu, 'w': w, 'PL': PL, 'C': C}
+        self.QW = QW

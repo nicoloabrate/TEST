@@ -1,11 +1,9 @@
 """
-Created on Sun Mar 14 17:04:03 2021
+Author: N. Abrate.
 
-author: N. Abrate.
+File: PNBCs.py
 
-file: .py
-
-description:
+Description: Method for setting boundary conditions in PN model.
 """
 import os
 import warnings
@@ -16,7 +14,7 @@ from sympy import Symbol, legendre, integrate
 warnings.simplefilter('ignore')
 
 
-def imposeBC(op, slab):
+def setBCs(op, geometry):
     """
     Impose boundary conditions specified by the user.
 
@@ -24,7 +22,7 @@ def imposeBC(op, slab):
     ----------
     op : object
         Transport equation operators in PN approximation.
-    slab : object
+    geometry : object
         Geometry object representing a 1D cartesian domain.
 
     Raises
@@ -41,8 +39,7 @@ def imposeBC(op, slab):
     # have to be kept!
     M = op.nS
     N = op.nA
-    G = op.nE
-    BCs = slab.BC
+    BCs = geometry.BC
     op.BC = BCs
 
     # copy leakage operator to new variable
@@ -52,87 +49,69 @@ def imposeBC(op, slab):
         # FIXME: actually only the same bc can be handled on two boundaries
         # TODO: check boundary conditions consistency (if different can be imposed)
 
-        if bc in ['zero', 'zeroflux']:
-            if N == 0:
-                # diffusion
-                for gro in range(0, op.nE):
-                    skip = gro*M
-                    L[skip, :] = 0
-                    L[skip+M-1, :] = 0
-                    L[skip, skip] = 1  # right boundary
-                    L[skip+M-1, skip+M-1] = 1  # left boundary
-    
-                    op.F[[skip, skip+M-1], :] = 0
-                    op.R[[skip, skip+M-1], :] = 0
-                    op.S[[skip, skip+M-1], :] = 0
-            else:
-                raise OSError('Zero flux BC available only for diffusion')
+        if bc in ['markeven', 'Markeven', 'markEven', 'MarkEven']:
+            A = MarkCoeffs(N, even=True)
+
+        elif bc in ['mark', 'Mark']:
+            A = MarkCoeffs(N)
+
+        elif bc in ['marshak', 'Marshak']:
+            A = MarshakCoeffs(N)
 
         else:
+            raise OSError('Unknown boundary condition %s!' % bc)
 
-            if bc in ['markeven', 'Markeven', 'markEven', 'MarkEven']:
-                A = MarkCoeffs(N, even=True)
+        A = _getcoeffs(A)
+        m, n = A.shape
 
-            elif bc in ['mark', 'Mark']:
-                A = MarkCoeffs(N)
+        A[0:m//2, :] = -2/geometry.dx[0]*A[0:m//2, :]
+        A[m//2:m, :] = 2/geometry.dx[-1]*A[m//2:m, :]
 
-            elif bc in ['marshak', 'Marshak']:
-                A = MarshakCoeffs(N)
+        for gro in range(0, op.nE):
 
-            else:
-                raise OSError('Unknown boundary condition %s!' % bc)
+            count = 0
 
-            A = _getcoeffs(A)
-            m, n = A.shape
+            for moment in range(0, n):
 
-            A[0:m//2, :] = -2/slab.dx[0]*A[0:m//2, :]
-            A[m//2:m, :] = 2/slab.dx[-1]*A[m//2:m, :]
+                Neq = 2*moment  # only even moments need BCs
+                No = (N+1)//2 if N % 2 != 0 else N//2
+                Ne = N+1-No
+                ip = moment*(2*M-1)  #
+                idg = (No*(M-1)+Ne*M)*gro
+                ig = gro*(No*(M-1)+Ne*M)
 
-            for gro in range(0, op.nE):
+                if moment >= 1:  # *2 for one-side f.d.
+                    # right boundary, lower diag
+                    L[ip+idg, ip-(M-1)+idg] = 2*L[ip+idg, ip-(M-1)+idg]
+                    # left boundary, lower diag
+                    L[ip+M-1+idg, ip-1+idg] = 2*L[ip+M-1+idg, ip-1+idg]
 
-                count = 0
+                if moment < n-1 or N % 2 != 0:  # no last and odd eq.
+                    # right boundary, upper diag
+                    L[ip+idg, ip+M+idg] = 2*L[ip+idg, ip+M+idg]
+                    # left boundary, upper diag
+                    L[ip+M-1+idg, ip+M-1+M-1+idg] = 2*L[ip+M-1+idg, ip+M-1+M-1+idg]
 
-                for moment in range(0, n):
+                # set non-diagonal entries (even moments)
+                jj = np.arange(0, n)
+                iEv = jj*(2*M-1)
 
-                    Neq = 2*moment  # only even moments need BCs
-                    No = (N+1)//2 if N % 2 != 0 else N//2
-                    Ne = N+1-No
-                    ip = moment*(2*M-1)  #
-                    idg = (No*(M-1)+Ne*M)*gro
-                    ig = gro*(No*(M-1)+Ne*M)
+                if moment == 0:  # 1st row, eqs 1 and 2 (Upper)
+                    # right boundary, lower diag
+                    L[ig, ig+iEv] = (Neq+1)/(2*Neq+1)*A[0, jj]  # angle>0
+                    # left boundary, lower diag
+                    L[M+ig-1, ig+iEv+M-1] = (Neq+1)/(2*Neq+1)*A[m//2, jj]  # angle<0
 
-                    if moment >= 1:  # *2 for one-side f.d. FIXME >=
-                        # right boundary, lower diag
-                        L[ip+idg, ip-(M-1)+idg] = 2*L[ip+idg, ip-(M-1)+idg]
-                        # left boundary, lower diag
-                        L[ip+M-1+idg, ip-1+idg] = 2*L[ip+M-1+idg, ip-1+idg]
+                else:
+                    # sum coeffs in previous row (Lower)
+                    L[ip+idg, ig+iEv] = Neq/(2*Neq+1)*A[count, jj]  # angle>0
+                    L[ip+M-1+idg, ig+iEv+M-1] = Neq/(2*Neq+1)*A[count+m//2, jj]  # angle<0
 
-                    if moment < n-1 or N % 2 != 0:  # no last and odd eq.
-                        # right boundary, upper diag
-                        L[ip+idg, ip+M+idg] = 2*L[ip+idg, ip+M+idg]
-                        # left boundary, upper diag
-                        L[ip+M-1+idg, ip+M-1+M-1+idg] = 2*L[ip+M-1+idg, ip+M-1+M-1+idg]
+                    if moment < n-1 or N % 2 != 0:
+                        L[ip+idg, ig+iEv] = L[ip+idg, ig+iEv]+(Neq+1)/(2*Neq+1)*A[count+1, jj]
+                        L[ip+M-1+idg, ig+iEv+M-1] = L[ip+M-1+idg, ig+iEv+M-1]+(Neq+1)/(2*Neq+1)*A[count+m//2+1, jj]
 
-                    # set non-diagonal entries (even moments)
-                    jj = np.arange(0, n)
-                    iEv = jj*(2*M-1)
-
-                    if moment == 0:  # 1st row, eqs 1 and 2 (Upper)
-                        # right boundary, lower diag
-                        L[ig, ig+iEv] = (Neq+1)/(2*Neq+1)*A[0, jj]  # angle>0
-                        # left boundary, lower diag
-                        L[M+ig-1, ig+iEv+M-1] = (Neq+1)/(2*Neq+1)*A[m//2, jj]  # angle<0
-
-                    else:
-                        # sum coeffs in previous row (Lower)
-                        L[ip+idg, ig+iEv] = Neq/(2*Neq+1)*A[count, jj]  # angle>0
-                        L[ip+M-1+idg, ig+iEv+M-1] = Neq/(2*Neq+1)*A[count+m//2, jj]  # angle<0
-
-                        if moment < n-1 or N % 2 != 0:
-                            L[ip+idg, ig+iEv] = L[ip+idg, ig+iEv]+(Neq+1)/(2*Neq+1)*A[count+1, jj]
-                            L[ip+M-1+idg, ig+iEv+M-1] = L[ip+M-1+idg, ig+iEv+M-1]+(Neq+1)/(2*Neq+1)*A[count+m//2+1, jj]
-
-                    count = count + 1*(moment > 0)
+                count = count + 1*(moment > 0)
 
     op.L = L
     return op

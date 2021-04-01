@@ -73,7 +73,7 @@ def first(obj, f, meshtype='mesh', stag=True):
     mesh = dicob[meshtype]
     # ensure dimension consistency
     f = [f]*NL if isinstance(f, (int, float)) else f
-    m = 1 if stag is True else 2
+    m = 1 if stag else 2
 
     for i in range(0, NL):
         pts = mesh[q::]
@@ -84,9 +84,9 @@ def first(obj, f, meshtype='mesh', stag=True):
         q = q+P
 
         dfdx[0, inner_pts[0]:inner_pts[-1]+1] = -f[i]/(m*dx[i])*np.ones((P, 1)).ravel()
-
+        # at the boundaries both right and left dxs are needed
         if NL > 1 and i < NL-1 and mesh[inner_pts[-1]] <= obj.layers[i+1]:
-            dfdx[0, inner_pts[-1]] = -2*f[i]/(dx[i]+dx[i+1])
+            dfdx[0, inner_pts[-1]] = -f[i]/(m*(dx[i]/2+dx[i+1]/2))
 
         dfdx[1, :] = -dfdx[0, :]
 

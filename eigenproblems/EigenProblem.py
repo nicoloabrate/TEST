@@ -21,6 +21,7 @@ from scipy.linalg import eig
 from scipy.sparse.linalg import eigs
 from scipy.sparse import block_diag, bmat, csr_matrix, hstack, vstack
 from TEST.phasespace import PhaseSpace
+from matplotlib.pyplot import spy
 
 
 class eigenproblem():
@@ -37,7 +38,7 @@ class eigenproblem():
         self.operators = nte
         self.geometry = geom
 
-        if 2*nev+1 >= self.operators.L.shape[0]:
+        if 2*nev+1 >= self.operators.S.shape[0]:
             raise OSError('Too many eigenvalues required! 2*nev+1 should be < operator rank')
         else:
             self.nev = nev
@@ -221,7 +222,7 @@ class eigenproblem():
         """
         op = self.operators
         # define alpha prompt eigenproblem operators
-        if self.nev == 0:  # alpha infinite
+        if self.nev == 0 or self.BC is False:  # alpha infinite
             B = op.S+op.F-op.R  # no leakage, infinite medium
             self.nev = 1
         else:
@@ -244,9 +245,11 @@ class eigenproblem():
 
         """
         op = self.operators
-        if self.nev == 0:  # gamma infinite
-            self.A = op.R  # no leakage, infinite medium
-            self.nev = 1
+        if self.nev == 0 or self.BC is False:  # gamma infinite
+            if self.model != 'Diffusion':
+                self.A = op.Linf+op.R  # no leakage, infinite medium
+            else:
+                self.A = op.R  # no leakage, infinite medium
         else:
             self.A = op.L + op.R  # destruction operator
 
@@ -281,7 +284,10 @@ class eigenproblem():
         op = self.operators
         # define kappa eigenproblem operators
         if self.nev == 0 or self.BC is False:  # kappa infinite
-            self.A = op.R-op.S  # no leakage, infinite medium
+            if self.model != 'Diffusion':
+                self.A = op.Linf+op.R-op.S  # no leakage, infinite medium
+            else:
+                self.A = op.R-op.S  # no leakage, infinite medium
             self.nev = 1
         else:
             self.A = op.L+op.R-op.S  # destruction operator
@@ -349,7 +355,7 @@ class eigenproblem():
         self.D = block_diag(([A4, self.operatorsPrec.D]))
 
         # define alpha delayed eigenproblem operators
-        if self.nev == 0:  # omega infinite S+Fp+Fd+E-(R+D)
+        if self.nev == 0 or self.BC is False:  # omega infinite S+Fp+Fd+E-(R+D)
             self.A = self.S+self.Fp+self.Fd+self.E-self.R-self.D  # no leakage, inf medium
             self.nev = 1
     
@@ -445,3 +451,5 @@ class eigenproblem():
                                    normalize=True, whichnorm='norm2',
                                    operators=self.operators)
 
+    def spy(self, what, markersize=2):
+        spy(self.__dict__[what], markersize=markersize)
