@@ -10,9 +10,9 @@ import sys
 sys.path.append('../../')
 import pytest
 from TEST.geometry import Slab
-import TEST.NeutronTransportEquation as NTE
-import TEST.AdjointTransportEquation as ATE
-from TEST.eigenproblems.EigenProblem import eigenproblem
+import TEST.models.NeutronTransportEquation as NTE
+import TEST.models.AdjointTransportEquation as ATE
+from TEST.models.EigenProblem import eigenproblem
 
 @pytest.mark.filterwarnings('ignore::DeprecationWarning:SparseEfficiencyWarning')
 @pytest.mark.parametrize("algo",['eigs', 'PETSc'])

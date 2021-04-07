@@ -20,7 +20,7 @@ from copy import copy
 from scipy.linalg import eig
 from scipy.sparse.linalg import eigs
 from scipy.sparse import block_diag, bmat, csr_matrix, hstack, vstack
-from TEST.phasespace import PhaseSpace
+from TEST.geometry.phasespace import PhaseSpace
 from matplotlib.pyplot import spy
 
 
@@ -358,7 +358,7 @@ class eigenproblem():
         if self.nev == 0 or self.BC is False:  # omega infinite S+Fp+Fd+E-(R+D)
             self.A = self.S+self.Fp+self.Fd+self.E-self.R-self.D  # no leakage, inf medium
             self.nev = 1
-    
+
         else:
             self.A = self.S+self.Fp+self.Fd+self.E-self.R-self.D-self.L
 
@@ -411,6 +411,7 @@ class eigenproblem():
             start = t.time()
             eigvals, eigvect = eig(M1.todense(), M2.todense())
             end = t.time()
+            self.nev = len(eigvals)
 
             if self.which == 'delta':
                 eigvals = 1/eigvals
@@ -447,7 +448,7 @@ class eigenproblem():
         myeigpair = {'eigenvalues': eigvals[0:self.nev],
                      'eigenvectors' : ev,
                      'problem': self.which}
-        self.solution = PhaseSpace(self.geometry, eigenpair=myeigpair,
+        self.solution = PhaseSpace(self.geometry, myeigpair,
                                    normalize=True, whichnorm='norm2',
                                    operators=self.operators)
 

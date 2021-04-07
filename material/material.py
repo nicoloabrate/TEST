@@ -29,7 +29,7 @@ indepdata = ['Capt', 'Fiss', 'S0', 'Nubar', 'Diffcoef', 'Chid', 'Chip']
 basicdata = ['Fiss', 'Nubar', 'S0', 'Chit']
 kinetics = ['lambda', 'beta', 'Chid', 'Chip']
 
-
+# FIXME read energy grid from data
 class Material():
     """Create material regions with multi-group constants."""
 
@@ -307,7 +307,6 @@ class Material():
             self.Chit = self.Chit/self.Chit.sum()
 
         self.datacheck()
-
 
     def datacheck(self):
         """

@@ -126,7 +126,7 @@ def leakage(obj, fmt='csc'):
     # fill lower triangular matrix (mu < 0)
     tmp = []
     for i in range(0, obj.nS):
-        coeff = 2/np.flipud(obj.dx)
+        coeff = -2/np.flipud(obj.dx)
         if i == 0:
             if model == 'FD':
                 d = FD.zero(obj, coeff).T.flatten()
@@ -136,9 +136,9 @@ def leakage(obj, fmt='csc'):
                 raise OSError('{} model not available for spatial variable!'.format(model))
             tmp.append(list(d))
         elif i % 2 != 0:
-            tmp.append(list(2*d[0+i:obj.nS]))
-        else:
             tmp.append(list(-2*d[0+i:obj.nS]))
+        else:
+            tmp.append(list(2*d[0+i:obj.nS]))
     trilneg = diags(tmp, np.arange(0, -obj.nS, -1), (obj.nS, obj.nS), format=fmt)
 
     for order in range(0, N):

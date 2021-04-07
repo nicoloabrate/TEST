@@ -14,7 +14,7 @@ from matplotlib.patches import ConnectionPatch
 class PhaseSpace:
     """Define phase space object."""
 
-    def __init__(self, geometry, energygrid=None, eigenpair=None,
+    def __init__(self, geometry, solution, energygrid=None, source=False,
                  normalize=False, whichnorm='phasespace', operators=None):
         """
         Initialise phase space object.
@@ -23,10 +23,16 @@ class PhaseSpace:
         ----------
         geometry : object
             Geometry object containing the material data and the spatial mesh.
+        solution : dict or ndarray
+            Solution living in the phase space. If it is a dict, it is treated 
+            as the solution of an eigenvalue problem. If it is an ndarray and
+            ``source`` is True, it is treated as the solution of a source-driven
+            problem.
         energygrid : ndarray, optional
             Multi-group energy grid structure. The default is None.
-        eigenpair : dict, optional
-            Eigenpair living in the phase space. The default is None.
+        source : bool, optional
+            If ``True``, the solution is not normalised. 
+            The default is ``False``.
 
         Returns
         -------
@@ -38,14 +44,14 @@ class PhaseSpace:
         if energygrid is not None:
             self.energygrid = energygrid
 
-        if isinstance(eigenpair, dict):
+        if isinstance(solution, dict):
             if operators is not None:
                 self.model = operators.model
             else:
                 raise OSError('Numerical operators object is needed!')
-            self.eigvals = eigenpair['eigenvalues']
-            self.eigvect = eigenpair['eigenvectors']
-            self.problem = eigenpair['problem']
+            self.eigvals = solution['eigenvalues']
+            self.eigvect = solution['eigenvectors']
+            self.problem = solution['problem']
 
             self.nA = operators.nA
             self.nE = operators.nE
@@ -53,8 +59,12 @@ class PhaseSpace:
 
             if normalize is True:
                 self.normalize(which=whichnorm)
+        elif isinstance(solution, (np.ndarray)) and source is True:
+            self.flux = solution
         else:
-            raise OSError('Input eigenpair must be a dict!')
+            raise OSError('Type {} cannot be handled by phase space!'.format(type(solution)))
+
+
 
     def braket(self, v1, v2=None):
         """

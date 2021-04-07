@@ -9,8 +9,8 @@ import sys
 sys.path.append('../../')
 import pytest
 from TEST.geometry import Slab
-import TEST.NeutronTransportEquation as NTE
-from TEST.eigenproblems.EigenProblem import eigenproblem
+import TEST.models.NeutronTransportEquation as NTE
+from TEST.models.EigenProblem import eigenproblem
 
 
 @pytest.mark.filterwarnings('ignore::DeprecationWarning:SparseEfficiencyWarning')
@@ -22,8 +22,8 @@ from TEST.eigenproblems.EigenProblem import eigenproblem
                           (1, 255, 1.226406)])
 def test_Modak_kappa0_1G(H, N, ref, algo):
     """
-    Benchmark based on the eigenvalues taken from ``Modak, R. S., D. C. Sahni, 
-    and S. D. Paranjape. 1995. "Evaluation of higher k-eigenvalues of the 
+    Benchmark based on the eigenvalues taken from ``Modak, R. S., D. C. Sahni,
+    and S. D. Paranjape. 1995. "Evaluation of higher k-eigenvalues of the
     neutron transport equation by SN method" Ann. Nucl. Energy 22 (6):359–66.``
     Test for one-group PN and SN modules.
 
@@ -47,8 +47,8 @@ def test_Modak_kappa0_1G(H, N, ref, algo):
 @pytest.mark.parametrize("algo",['eigs', 'PETSc'])
 def test_Modak_kappa0_aniso_1G(algo):
     """
-    Benchmark based on the eigenvalues taken from ``Modak, R. S., D. C. Sahni, 
-    and S. D. Paranjape. 1995. "Evaluation of higher k-eigenvalues of the 
+    Benchmark based on the eigenvalues taken from ``Modak, R. S., D. C. Sahni,
+    and S. D. Paranjape. 1995. "Evaluation of higher k-eigenvalues of the
     neutron transport equation by SN method" Ann. Nucl. Energy 22 (6):359–66.``
     Test for one-group PN and SN modules.
 
@@ -76,8 +76,8 @@ def test_Modak_kappa0_aniso_1G(algo):
 @pytest.mark.filterwarnings('ignore::DeprecationWarning:SparseEfficiencyWarning')
 def test_Modak_kappa_higher_1G(algo):
     """
-    Benchmark based on the eigenvalues taken from ``Modak, R. S., D. C. Sahni, 
-    and S. D. Paranjape. 1995. "Evaluation of higher k-eigenvalues of the 
+    Benchmark based on the eigenvalues taken from ``Modak, R. S., D. C. Sahni,
+    and S. D. Paranjape. 1995. "Evaluation of higher k-eigenvalues of the
     neutron transport equation by SN method" Ann. Nucl. Energy 22 (6):359–66.``
     Test for one-group PN and SN modules.
 
@@ -107,8 +107,8 @@ def test_Modak_kappa_higher_1G(algo):
 @pytest.mark.filterwarnings('ignore::DeprecationWarning:SparseEfficiencyWarning')
 def test_Modak_gamma_higher_1G(algo):
     """
-    Benchmark based on the eigenvalues taken from ``Modak, R. S., D. C. Sahni, 
-    and S. D. Paranjape. 1995. "Evaluation of higher k-eigenvalues of the 
+    Benchmark based on the eigenvalues taken from ``Modak, R. S., D. C. Sahni,
+    and S. D. Paranjape. 1995. "Evaluation of higher k-eigenvalues of the
     neutron transport equation by SN method" Ann. Nucl. Energy 22 (6):359–66.``
     Test for one-group PN and SN modules.
 
@@ -144,7 +144,7 @@ def test_Modak_gamma_higher_1G(algo):
 def test_Modak_alpha_higher_1G(N, ref, tol, algo):
     """
     Benchmark based on the eigenvalues taken from ``Modak, R. S., and A. Gupta.
-    2003. "A simple scheme for the direct evaluation of time-eigen- values of 
+    2003. "A simple scheme for the direct evaluation of time-eigen- values of
     neutron transport equation". Ann. Nucl. Energy 30 (2):211–22.``
     Test for one-group PN and SN modules.
 

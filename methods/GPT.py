@@ -6,7 +6,7 @@ File: GPT.py
 Description: Class for Generalised Perturbation Theory method.
 """
 from numpy import zeros, dot, newaxis
-from TEST.phasespace import PhaseSpace
+from TEST.geometry.phasespace import PhaseSpace
 
 
 class GPT():
@@ -77,7 +77,7 @@ class GPT():
 
             # eigenvector perturbations
             for m in range(1, M):
-                # initialisation 
+                # initialisation
                 S1a, S2a = 0, 0
                 for k in range(0, n):
                     if n > k:
@@ -94,7 +94,7 @@ class GPT():
                 # coefficient evaluation
                 alpha[m, n] = -PS.braket(psi[:, m], S)+S1a*C[m]+PS.braket(psi[:, m], S2a)
                 alpha[m, n] = alpha[m, n]/((mu[m]-mu[0])*C[m])
-                
+
                 if n == 0:
                     v1 = PS.interp(phi[:, 0], xp, isref=False)
                     Q1 = -PS.braket(PS.interp(Bp.dot(v1), xp)-B.dot(phi[:, 0]))

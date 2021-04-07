@@ -11,9 +11,9 @@ sys.path.append('../../')
 import numpy as np
 import pytest
 from TEST.geometry import Slab
-import TEST.NeutronTransportEquation as NTE
-import TEST.AdjointTransportEquation as ATE
-from TEST.eigenproblems.EigenProblem import eigenproblem
+import TEST.models.NeutronTransportEquation as NTE
+import TEST.models.AdjointTransportEquation as ATE
+from TEST.models.EigenProblem import eigenproblem
 from TEST.methods.GPT import GPT
 import matplotlib.pyplot as plt
 from matplotlib import rcParams, rc
@@ -32,7 +32,7 @@ def test_GPT_vs_analytical(delta):
     N = 0
     bc = 'zero'
     H = 40
-    
+
     matname = ['MontagniniFuel']
     xlayers = [-H, H]
     # define geometry and mesh
@@ -44,7 +44,7 @@ def test_GPT_vs_analytical(delta):
     forward.solve()
     adjoint = eigenproblem(Adj, 'kappa', slab0, nev=nev)
     adjoint.solve()
-    
+
     # --- perturbation
     slab = Slab(M, xlayers, matname, [bc], G, 0, 'FD')
     perturbation = {'Nubar': {'where': [(-H, H)], 'howmuch': [0, delta]}}
@@ -77,7 +77,7 @@ def test_GPT_vs_DirectPerturbation(delta):
     G = 2
     bc = 'zero'
     H = 40
-    
+
     matname = ['MontagniniFuel']
     xlayers = [-H, H]
     # define geometry and mesh
@@ -89,7 +89,7 @@ def test_GPT_vs_DirectPerturbation(delta):
     forward.solve()
     adjoint = eigenproblem(Adj, 'kappa', slab0, nev=nev)
     adjoint.solve()
-    
+
     # --- perturbation
     slab = Slab(M, xlayers, matname, [bc], G, 0, 'FD')
     perturbation = {'Nubar': {'where': [(0, H/2)], 'howmuch': [0, delta]}}
@@ -99,7 +99,7 @@ def test_GPT_vs_DirectPerturbation(delta):
     DiffP = NTE.Diffusion(slab, steady=True, fmt='csc')
     pert = eigenproblem(DiffP, 'kappa', slab, nev=nev)
     pert.solve()
-    
+
     # --- GPT
     gpt = GPT(PO, forward, pert, adjoint)
 
