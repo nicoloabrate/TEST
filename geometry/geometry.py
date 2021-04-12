@@ -101,8 +101,8 @@ class Slab:
 
         """
         # preallocation
-        dx = np.zeros((self.nLayers, 1))
-        N = np.zeros((self.nLayers, 1))
+        dx = np.zeros((self.nLayers,))
+        N = np.zeros((self.nLayers,))
         old_grid = np.empty(0)
         old_grid_stag = np.empty(0)
 

@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib.patches import ConnectionPatch
+from scipy.special import eval_legendre
 
 
 class PhaseSpace:
@@ -63,8 +64,6 @@ class PhaseSpace:
             self.flux = solution
         else:
             raise OSError('Type {} cannot be handled by phase space!'.format(type(solution)))
-
-
 
     def braket(self, v1, v2=None):
         """
@@ -177,6 +176,16 @@ class PhaseSpace:
             # normalise to have fixed power
             power = 1 if power is None else power
             print('Under development')
+        # elif which == 'totalflux':
+        #     # normalise total flux
+        #     if self.model == 'Diffusion':
+
+        #     elif self.model == 'PN':
+        #         self.get()
+        #     elif self.model == 'SN':
+
+        # elif which == 'peaktotalflux':
+
         elif which == 'reaction':
             # normalise to have unitary reaction rate
             for iv, v in enumerate(self.eigvect.T):
@@ -388,21 +397,28 @@ class PhaseSpace:
         eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
         return eigenvalue, eigenvector
 
-    def get(self, group, angle=0, mode=0, family=0, normalise=True,
-            precursors=False):
+    def get(self, group=None, angle=None, moment=0, mode=0, family=0,
+            normalise=True, precursors=False):
         """
-        Get spatial flux distribution for group, angle and spatial mode.
+        Get spatial flux distribution for group, angle/moment and spatial mode.
 
         Parameters
         ----------
-        geom : object
-            Geometry object.
-        angle : int
-            Moment/direction number.
-        group : int
-            Group number.
+        group : int, optional
+            Group number. If ``None``, all groups are displayed. Default is 
+            ``None``.
+        angle : int or float, optional
+            Angle to be displayed. If ``int``, the direction matching the 
+            number will be provided, if ``float`` the direction closest to 
+            this number will be provided. Default is None.
+        moment : int
+            Flux moment number. Default is 0.
         mode : int
-            Eigen-mode number.
+            Eigen-mode number. Default is 0.
+        family : int, optional
+            Precursors family number. Default is 0.
+        precursors : bool, optional
+            Flag for precursor concentration. Default is ``False``.
 
         Returns
         -------
@@ -413,12 +429,17 @@ class PhaseSpace:
 
         """
         if self.model == 'PN' or self.model == 'Diffusion':
-            yr, yi = self._getPN(group, angle=0, mode=0, family=0, normalise=True,
-                                 precursors=False)
-            return yr, yi
+            yr, yi = self._getPN(group, angle=angle, moment=moment, mode=mode,
+                                 family=family, normalise=normalise,
+                                 precursors=precursors)
+        elif self.model == 'SN':
+            yr, yi = self._getSN(group, angle=angle, moment=moment, mode=mode,
+                                 family=family, normalise=normalise,
+                                 precursors=precursors)
+        return yr, yi
 
-    def _getPN(self, group, angle=0, mode=0, family=0, normalise=True,
-               precursors=False):
+    def _getPN(self, group, angle=None, moment=0, mode=0, family=0,
+               normalise=True, precursors=False):
         """
         Get spatial flux distribution for group, angle and spatial mode.
 
@@ -443,46 +464,143 @@ class PhaseSpace:
         """
         nE, nA, nS = self.nE, self.nA, self.nS
 
-        if precursors and self.problem == 'omega':
-            angle = nA
-            nF = self.nF
-            family = family-1
-            iF = nS*family
+        if angle is None:
+            if precursors and self.problem == 'omega':
+                moment = nA
+                nF = self.nF
+                family = family-1
+                iF = nS*family
+            else:
+                iF = 0
+
+            No = (nA+1)//2 if nA % 2 != 0 else nA//2
+            Ne = nA+1-No
+    
+            lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
+    
+            # take eigenvector
+            if mode == 0:
+                _, vect = self.getfundamental(lambdas)
+            else:
+                vect = self.eigvect[:, mode]
+    
+            # if normalise:
+            #     # normalisation constant computed over total flux
+            #     totflx = np.zeros((nE*nS,), dtype=complex)
+            #     for gro in range(0, nE):
+            #         skip = (Ne*nS+No*(nS-1))*gro
+            #         totflx[gro*nS:(gro+1)*nS] = vect[skip:skip+nS]
+            #     vect = vect/np.linalg.norm(totflx)
+            G = self.geometry.nE
+            dim = self.geometry.nS if moment % 2 == 0 else self.geometry.nS-1
+            # preallocation for group-wise moments
+            yr, yi = np.zeros((dim*G, )), np.zeros((dim*G, ))
+            gro = np.arange(0, self.geometry.nE) if group is None else group
+
+            for g in gro:
+
+                if precursors is False:
+                    # compute No and Ne for the requested moment/angle
+                    skip = (Ne*nS+No*(nS-1))*(g-1)
+                    NO = (moment+1)//2 if (moment-1) % 2 != 0 else moment//2
+                    NE = moment-NO
+                    M = nS if moment % 2 == 0 else nS-1
+                    iS = skip+NE*nS+NO*(nS-1)
+                    iE = skip+NE*nS+NO*(nS-1)+M
+    
+                else:
+                    iS = (Ne*nS+No*(nS-1))*nE+g*nF+iF
+                    iE = (Ne*nS+No*(nS-1))*nE+g*nF+iF+nS
+                # store slices
+                yr[g*dim:(g+1)*dim] = np.real(vect[iS:iE])
+                yi[g*dim:(g+1)*dim] = np.imag(vect[iS:iE])
+
         else:
-            iF = 0
+            # build angular flux and evaluate in angle
+            tmp = np.zeros((dim*G))
+            for n in range(0, self.nA):
+                # interpolate to have consistent PN moments
+                y = vect if n % 2 == 0 else self.interp(vect, self.geometry.stag_mesh)
+                tmp = tmp+(2*n+1)/2*eval_legendre(n, angle)*y
+            # get values for requested groups
+            iS, iE = 0, -1 if group is None else nS*(group-1), nS*(group-1)+nS
+            yr, yi = np.real(y[iS:iE]), np.imag(y[iS:iE])
 
-        No = (nA+1)//2 if nA % 2 != 0 else nA//2
-        Ne = nA+1-No
+        return yr, yi
 
-        lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
+    def _getSN(self, group, angle=None, moment=0, mode=0, family=0,
+               normalise=True, precursors=False):
+        """
+        Get spatial flux distribution for group, angle and spatial mode.
 
-        # take eigenvector
-        if mode == 0:
-            _, vect = self.getfundamental(lambdas)
+        Parameters
+        ----------
+        geom : object
+            Geometry object.
+        angle : int
+            Moment/direction number.
+        group : int
+            Group number.
+        mode : int
+            Eigen-mode number.
+
+        Returns
+        -------
+        yr : ndarray
+            Real part of the flux mode.
+        yi : ndarray
+            Imaginary part of the flux mode.
+
+        """
+        nE, nA = self.nE, self.nA
+        nS = self.nS if self.geometry.spatial_scheme == 'FD' else self.nS-1
+        mu = self.geometry.QW['mu']
+        w = self.geometry.QW['w']
+        if angle is not None:
+
+            if isinstance(angle, int):
+                idx = angle
+            elif isinstance(angle, float):
+                # look for closest direction
+                idx = np.argmin(abs(mu-angle))
+
+            if precursors and self.problem == 'omega':
+                moment = nA
+                nF = self.nF
+                family = family-1
+                iF = nS*family
+            else:
+                iF = 0
+
+            lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
+    
+            # take eigenvector
+            if mode == 0:
+                _, vect = self.getfundamental(lambdas)
+            else:
+                vect = self.eigvect[:, mode]
+
+            G = self.geometry.nE
+            # preallocation for group-wise moments
+            yr, yi = np.zeros((nS*G, )), np.zeros((nS*G, ))
+            gro = np.arange(0, self.geometry.nE) if group is None else group
+
+            for g in gro:
+
+                if precursors is False:
+                    # compute No and Ne for the requested moment/angle
+                    iS = (nS*idx)*(g-1)
+                    iE = (nS*idx)*(g-1)+nS
+                else:
+                    iS = len(mu)*nS*nE+g*nF+iF
+                    iE = len(mu)*nS*nE+g*nF+iF+nS
+                # store slices
+                yr[g*nS:(g+1)*nS] = np.real(vect[iS:iE])
+                yi[g*nS:(g+1)*nS] = np.imag(vect[iS:iE])
+
         else:
-            vect = self.eigvect[:, mode]
+            # build angular flux and evaluate in angle
+            tmp = np.zeros((dim*G))
 
-        if normalise:
-            # normalisation constant computed over total flux
-            totflx = np.zeros((nE*nS,), dtype=complex)
-            for gro in range(0, nE):
-                skip = (Ne*nS+No*(nS-1))*gro
-                totflx[gro*nS:(gro+1)*nS] = vect[skip:skip+nS]
-            vect = vect/np.linalg.norm(totflx)
 
-        if precursors is False:
-            # compute No and Ne for the requested moment/angle
-            skip = (Ne*nS+No*(nS-1))*(group-1)
-            NO = (angle+1)//2 if (angle-1) % 2 != 0 else angle//2
-            NE = angle-NO
-
-            M = nS if angle % 2 == 0 else nS-1
-            iS = skip+NE*nS+NO*(nS-1)
-            iE = skip+NE*nS+NO*(nS-1)+M
-        else:
-            iS = (Ne*nS+No*(nS-1))*nE+group*nF+iF
-            iE = (Ne*nS+No*(nS-1))*nE+group*nF+iF+nS
-
-        yr = np.real(vect[iS:iE])
-        yi = np.imag(vect[iS:iE])
         return yr, yi

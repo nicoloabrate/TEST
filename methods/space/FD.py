@@ -3,14 +3,14 @@ Author: N. Abrate.
 
 File: FD.py
 
-Description: Finite Difference scheme for spatial derivates.
+Description: Finite Differences scheme for spatial derivates.
 """
 import numpy as np
 
 
 def zero(obj, f, meshtype='mesh'):
     """
-    Efuate a function with Central Difference Scheme.
+    Evaluate a function with Central Difference Scheme.
 
     Parameters
     ----------
@@ -97,7 +97,7 @@ def first(obj, f, meshtype='mesh', stag=True):
 
 def second(obj, f, meshtype='mesh'):
     """
-    Efuate second-order derivatives with Central Difference Scheme.
+    Evaluate second-order derivatives with Central Difference Scheme.
 
     Parameters
     ----------
@@ -142,7 +142,7 @@ def second(obj, f, meshtype='mesh'):
 
 def avg(C1, C2, d1=1, d2=1):
     """
-    Efuate weighted averaged properties.
+    Evaluate weighted averaged properties.
 
     Parameters
     ----------

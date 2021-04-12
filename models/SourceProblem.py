@@ -64,7 +64,8 @@ class sourceproblem():
             NS = 1
             mu = np.linspace(-1, 1, NS)
         elif self.model == 'SN':
-            dim = self.nS*self.nA*self.nE
+            nx = self.nS if self.geometry.spatial_scheme == 'FD' else self.nS-1
+            dim = nx*self.nA*self.nE
         elif self.model == 'Diffusion':
             dim = self.nS*self.nE
 

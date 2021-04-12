@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Mar 30 13:00:55 2021
+
+@author: nabrate
+"""
+import sys
+sys.path.append('/opt/programs_nabrate/mycodes')
+import numpy as np
+from TEST.geometry import Slab
+import TEST.models.NeutronTransportEquation as NTE
+from TEST.models.EigenProblem import eigenproblem
+from TEST.models.SourceProblem import sourceproblem
+import matplotlib.pyplot as plt
+
+nev = 1
+M = -15
+N = 1
+G = 1
+bc = 'Mark'
+H = 0.1
+xlayers = [0, H]
+# define geometry and mesh
+myslabSk = Slab(M, xlayers, ['tmp'], [bc], G, N+1, 'FV')
+myslabS = Slab(M, xlayers, ['tmp2'], [bc], G, N+1, 'FV')
+myslabP = Slab(M, xlayers, ['tmp'], [bc], G, N, 'FD')
+myslabPsrc = Slab(M, xlayers, ['tmp2'], [bc], G, N, 'FD')
+
+myPN = NTE.PN(myslabP, N, steady=True, fmt='csc', BC=True)
+mySN = NTE.SN(myslabS, N+1, steady=True, fmt='csc', BC=True)
+mySNk = NTE.SN(myslabSk, N+1, steady=True, fmt='csc', BC=True)
+myPNsrc = NTE.PN(myslabPsrc, N, steady=True, fmt='csc', BC=True)
+
+kP = eigenproblem(myPN, 'kappa', myslabP)
+kP.solve()
+Ak = kP.A
+Bk = kP.B
+evPN = kP.solution.eigvect[:,0]
+keffP = kP.solution.eigvals.real[0]
+phiPN  = Bk.dot(evPN)/keffP
+phi = np.interp(myslabS.stag_mesh, myslabS.mesh, phiPN[0:myslabP.nS])
+# compute angular flux
+angphiPN = lambda mu: 1/2*np.interp(myslabS.stag_mesh, myslabS.mesh, evPN[0:myslabP.nS])+3/2*mu*evPN[myslabP.nS:]
+
+mu = 1/np.sqrt(3)
+qFiss = 1/keffP*mySNk.F.dot(np.concatenate([angphiPN(mu)+angphiPN(mu), np.flipud(angphiPN(-mu))]))
+
+mysrc = np.ones(((myslabS.nS-1)*2, ))/2
+dx = myslabS.dx[0]
+for j in range(0, 2):
+    # SN source-driven problem
+    sS = sourceproblem(mySN, 'static', myslabS, mysrc)
+    sS.solve()
+    phiSN = sS.solution.flux
+
+    # update source
+    mysrc = np.concatenate([phi, phi])/2
+
+    mysrcP = np.zeros((myslabS.nS*2-1, ))
+    q = np.zeros((myslabS.nS*2, ))
+    if j == 0:
+        mysrcP[0:myslabP.nS] = 1
+        q[:] = 1/2
+    else:
+        mysrcP[0:myslabP.nS] = phiPN[0:myslabP.nS]
+        q = np.concatenate([phiPN[0:myslabP.nS], phiPN[0:myslabP.nS]])/2
+
+    # SN with FD
+    phi1_num = np.zeros((myslabS.nS, ))
+    phi2_num = np.zeros((myslabS.nS, ))
+    for i in range(1, myslabS.nS):
+        phi1_num[i] = q[i]/(mu/dx+1/2)+phi1_num[i-1]*(1-dx/(2*mu))/(1+dx/(2*mu))
+        phi2_num[myslabS.nS-i-1] = q[myslabS.nS-i]/(mu/dx+1/2)+phi2_num[myslabS.nS-i]*(1-dx/(2*mu))/(1+dx/(2*mu))
+
+    sP = sourceproblem(myPNsrc, 'static', myslabPsrc, mysrcP)
+    sP.solve()
+    As = sP.A
+
+    totphiSN = phiSN[0:myslabS.nS-1]+np.flipud(phiSN[myslabS.nS-1:2*myslabS.nS-1])
+    if j > 0:
+        plt.plot(myslabP.mesh, kP.solution.eigvect[0:myslabS.nS, 0], label='PN-FD-k', c='r')
+    plt.plot(myslabP.mesh, sP.solution.flux[0:myslabS.nS], label='PN-FD', c='g', ls='--')
+    plt.plot(myslabS.stag_mesh, totphiSN, label='SN-FV', ls='-.')
+    plt.plot(myslabS.mesh, phi1_num+phi2_num, label='SN-FD', ls=':')
+    plt.legend()
+    plt.show()
+
+    # # prova ad interpolare la sorgente dalla P1 per verificare che i profili si sovrappongano
+    # plt.plot(myslabS.stag_mesh, phiSN[0:myslabS.nS-1], label='phi1 SN-FV')
+    # plt.plot(myslabS.mesh, phi1_num[0:myslabS.nS], label='phi1 SN-FD')
+    # plt.legend()
+    # plt.show()
