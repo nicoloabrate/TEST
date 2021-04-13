@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib.patches import ConnectionPatch
 from scipy.special import eval_legendre
+import TEST.methods.space.FD as FD
+import TEST.methods.space.FV as FV
 
 
 class PhaseSpace:
@@ -83,14 +85,15 @@ class PhaseSpace:
         None.
 
         """
-        if self.geometry.AngOrd > 0:
-            raise OSError('GPT cannot be applied yet to transport solutions!')
+        # if self.geometry.AngOrd > 0:
+        #     raise OSError('Braket cannot be applied yet to transport solutions!')
 
         v1v2 = np.multiply(v1, v2) if v2 is not None else v1
-            
-        G = self.geometry.nE
-        S = self.geometry.nS
-        grid = self.geometry.mesh
+        geom = self.geometry
+        G = geom.nE
+        S = geom.nS
+        grid = geom.mesh if geom.spatial_scheme == 'FD' else geom.stag_mesh
+
         I = 0
         # TODO consider integration over non-group energy grid
         for g in range(0, G):
@@ -107,11 +110,11 @@ class PhaseSpace:
         ----------
         yp : ndarray
             Vector to be interpolated.
-        xx : TYPE
+        xx : ndarray
             Old or new grid according to isref argument.
         isref : bool, optional
             Flag to choose new grid. If ``True`` the new grid is assumed
-            to be the one in self.geometry. The default is ``True``.
+            to be the one in self.geometry. Default is ``True``.
 
         Raises
         ------
@@ -135,8 +138,7 @@ class PhaseSpace:
             x = xx
             xp = self.geometry.mesh
 
-        n = len(xp)
-        N = len(x)
+        n, N = len(xp), len(x)
         y = np.zeros((G*N,), dtype=complex)
         for g in range(0, G):
             y[g*N:(g+1)*N] = np.interp(x, xp, yp[g*n:(g+1)*n])
@@ -161,8 +163,6 @@ class PhaseSpace:
         None.
 
         """
-        # TODO: normalise according to numerical method employed (PN, SN, diff)
-        # use getter methods to normalise over total flux
         if which == 'phasespace':
             # normalise on the inner product over the phase space
             for iv, v in enumerate(self.eigvect.T):
@@ -175,17 +175,32 @@ class PhaseSpace:
         elif which == 'power':
             # normalise to have fixed power
             power = 1 if power is None else power
-            print('Under development')
-        # elif which == 'totalflux':
-        #     # normalise total flux
-        #     if self.model == 'Diffusion':
-
-        #     elif self.model == 'PN':
-        #         self.get()
-        #     elif self.model == 'SN':
-
-        # elif which == 'peaktotalflux':
-
+            KFiss = []
+            for g in range(self.geometry.nE):
+                fisxs = self.geometry.getxs('Fiss')
+                try:
+                    kappa = self.geometry.getxs('Kappa')
+                except KeyError:
+                    kappa = 200  # MeV
+                if self.geometry.spatial_scheme == 'FV':
+                    KFiss.append(FV.zero(self.geometry, fisxs*kappa))
+                elif self.geometry.spatial_scheme == 'FD':
+                    KFiss.append(FD.zero(self.geometry, fisxs*kappa))
+            KFiss = np.asarray(KFiss)
+            for iv, v in enumerate(self.eigvect.T):
+                y = self.get(moment=0, mode=iv)
+                C = power/self.braket(KFiss*y)
+                self.eigvect[:, iv] = v/C
+        elif which == 'totalflux':
+            # normalise total flux
+            for iv, v in enumerate(self.eigvect.T):
+                y = self.get(moment=0, mode=iv)
+                self.eigvect[:, iv] = v/self.braket(y)
+        elif which == 'peaktotalflux':
+            # normalise peak total flux
+            for iv, v in enumerate(self.eigvect.T):
+                y = self.get(moment=0, mode=iv)
+                self.eigvect[:, iv] = v/y.max()
         elif which == 'reaction':
             # normalise to have unitary reaction rate
             for iv, v in enumerate(self.eigvect.T):
@@ -429,16 +444,16 @@ class PhaseSpace:
 
         """
         if self.model == 'PN' or self.model == 'Diffusion':
-            yr, yi = self._getPN(group, angle=angle, moment=moment, mode=mode,
-                                 family=family, normalise=normalise,
-                                 precursors=precursors)
+            y = self._getPN(group=group, angle=angle, moment=moment, mode=mode,
+                            family=family, normalise=normalise,
+                            precursors=precursors)
         elif self.model == 'SN':
-            yr, yi = self._getSN(group, angle=angle, moment=moment, mode=mode,
-                                 family=family, normalise=normalise,
-                                 precursors=precursors)
-        return yr, yi
+            y = self._getSN(group=group, angle=angle, moment=moment, mode=mode,
+                            family=family, normalise=normalise,
+                            precursors=precursors)
+        return y
 
-    def _getPN(self, group, angle=None, moment=0, mode=0, family=0,
+    def _getPN(self, group=None, angle=None, moment=0, mode=0, family=0,
                normalise=True, precursors=False):
         """
         Get spatial flux distribution for group, angle and spatial mode.
@@ -494,7 +509,7 @@ class PhaseSpace:
             G = self.geometry.nE
             dim = self.geometry.nS if moment % 2 == 0 else self.geometry.nS-1
             # preallocation for group-wise moments
-            yr, yi = np.zeros((dim*G, )), np.zeros((dim*G, ))
+            y = np.zeros((dim*G, ))
             gro = np.arange(0, self.geometry.nE) if group is None else group
 
             for g in gro:
@@ -512,9 +527,7 @@ class PhaseSpace:
                     iS = (Ne*nS+No*(nS-1))*nE+g*nF+iF
                     iE = (Ne*nS+No*(nS-1))*nE+g*nF+iF+nS
                 # store slices
-                yr[g*dim:(g+1)*dim] = np.real(vect[iS:iE])
-                yi[g*dim:(g+1)*dim] = np.imag(vect[iS:iE])
-
+                y[g*dim:(g+1)*dim] = vect[iS:iE]
         else:
             # build angular flux and evaluate in angle
             tmp = np.zeros((dim*G))
@@ -524,11 +537,10 @@ class PhaseSpace:
                 tmp = tmp+(2*n+1)/2*eval_legendre(n, angle)*y
             # get values for requested groups
             iS, iE = 0, -1 if group is None else nS*(group-1), nS*(group-1)+nS
-            yr, yi = np.real(y[iS:iE]), np.imag(y[iS:iE])
+            y = y[iS:iE]
+        return y
 
-        return yr, yi
-
-    def _getSN(self, group, angle=None, moment=0, mode=0, family=0,
+    def _getSN(self, group=None, angle=None, moment=0, mode=0, family=0,
                normalise=True, precursors=False):
         """
         Get spatial flux distribution for group, angle and spatial mode.
@@ -600,7 +612,16 @@ class PhaseSpace:
 
         else:
             # build angular flux and evaluate in angle
-            tmp = np.zeros((dim*G))
-
-
-        return yr, yi
+            tmp = np.zeros((nS*nE, ))
+            for n in range(0, moment):
+                phi = np.zeros((nE*nS, ))
+                for g in range(0, nE):
+                    iS = (nS*idx)*g
+                    iE = (nS*idx)*g+nS
+                    # get group-wise angular flux
+                    phi[g*nS:(g+1)*nS] = vect[iS:iE] if mu[n] > 0 else np.flipud(vect[iS:iE])
+                # compute flux moment
+                tmp = tmp+w[n]*mu[n]*phi
+            iS, iE = (0, -1) if group is None else (nS*(group-1), nS*(group-1)+nS)
+            y = tmp[iS:iE]
+        return y

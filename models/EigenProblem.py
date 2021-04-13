@@ -367,7 +367,7 @@ class eigenproblem():
         self.whichspectrum = 'SM'
 
     def solve(self, algo='PETSc', verbosity=False,tol=1E-14, monitor=False,
-              sigma=None):
+              sigma=None, normalisation='totalflux'):
 
         A = self.A
         B = self.B
@@ -448,9 +448,8 @@ class eigenproblem():
         myeigpair = {'eigenvalues': eigvals[0:self.nev],
                      'eigenvectors' : ev,
                      'problem': self.which}
-        self.solution = PhaseSpace(self.geometry, myeigpair,
-                                   normalize=True, whichnorm='norm2',
-                                   operators=self.operators)
+        self.solution = PhaseSpace(self.geometry, myeigpair, normalize=True,
+                                   whichnorm=normalisation, operators=self.operators)
 
     def spy(self, what, markersize=2):
         spy(self.__dict__[what], markersize=markersize)

@@ -24,8 +24,7 @@ class Slab:
         self.nLayers = len(layers)-1
         # check input consistency
         if self.nLayers != len(matlist):
-            raise OSError('%d regions but only %d materials specified!'
-                          % (self.nLayers, len(matlist)))
+            raise OSError('{} regions but only {} materials specified!'.format(self.nLayers, len(matlist)))
 
         # assign "test" path for data library
         self.datapath = datapath
@@ -51,7 +50,7 @@ class Slab:
             raise TypeError('Cannot read type %s for NMFP!' % type(NMFP))
 
         # set Boundary Conditions
-        self.BC = BCs
+        self.BC = BCs if isinstance(BCs, list) else [BCs]
 
         # assign material properties
         self.regions = {}

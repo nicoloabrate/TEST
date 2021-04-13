@@ -6,7 +6,7 @@ File: GPT.py
 Description: Class for Generalised Perturbation Theory method.
 """
 from numpy import zeros, dot, newaxis
-from TEST.geometry.phasespace import PhaseSpace
+import TEST.geometry.phasespace as PhaseSpace
 
 
 class GPT():
