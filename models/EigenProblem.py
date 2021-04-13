@@ -50,7 +50,6 @@ class eigenproblem():
         except AttributeError:
             raise OSError('{} eigenproblem not available!'.format(which))
 
-
     def _petsc(self, verbosity=False, sigma=0, tol=1E-8, monitor=True):
 
         L, P = self.A, self.B

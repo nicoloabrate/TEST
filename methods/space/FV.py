@@ -8,7 +8,7 @@ Description: Finite Volumes scheme for spatial derivates.
 import numpy as np
 
 
-def zero(obj, f, meshtype='mesh'):
+def zero(obj, f, meshtype='edges'):
     """
     Evaluate a function on cell center.
 
@@ -44,7 +44,7 @@ def zero(obj, f, meshtype='mesh'):
     return fx
 
 
-def first(obj, f, meshtype='mesh', stag=True):
+def first(obj, f, meshtype='edges', stag=True):
     """
     Evaluate first-order derivatives on cell centers.
 
@@ -95,7 +95,7 @@ def first(obj, f, meshtype='mesh', stag=True):
     return dfdx
 
 
-def second(obj, f, meshtype='mesh'):
+def second(obj, f, meshtype='edges'):
     """
     Evaluate second-order derivatives on cell center.
 

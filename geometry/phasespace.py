@@ -92,8 +92,7 @@ class PhaseSpace:
         geom = self.geometry
         G = geom.nE
         S = geom.nS
-        grid = geom.mesh if geom.spatial_scheme == 'FD' else geom.stag_mesh
-
+        grid = geom.mesh
         I = 0
         # TODO consider integration over non-group energy grid
         for g in range(0, G):
@@ -183,9 +182,9 @@ class PhaseSpace:
                 except KeyError:
                     kappa = 200  # MeV
                 if self.geometry.spatial_scheme == 'FV':
-                    KFiss.append(FV.zero(self.geometry, fisxs*kappa))
+                    KFiss.append(FV.zero(self.geometry, fisxs[g, :]*kappa[g, :]))
                 elif self.geometry.spatial_scheme == 'FD':
-                    KFiss.append(FD.zero(self.geometry, fisxs*kappa))
+                    KFiss.append(FD.zero(self.geometry, fisxs[g, :]*kappa[g, :]))
             KFiss = np.asarray(KFiss)
             for iv, v in enumerate(self.eigvect.T):
                 y = self.get(moment=0, mode=iv)
@@ -478,6 +477,13 @@ class PhaseSpace:
 
         """
         nE, nA, nS = self.nE, self.nA, self.nS
+        lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
+
+        # take eigenvector
+        if mode == 0:
+            _, vect = self.getfundamental(lambdas)
+        else:
+            vect = self.eigvect[:, mode]
 
         if angle is None:
             if precursors and self.problem == 'omega':
@@ -490,29 +496,14 @@ class PhaseSpace:
 
             No = (nA+1)//2 if nA % 2 != 0 else nA//2
             Ne = nA+1-No
-    
-            lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
-    
-            # take eigenvector
-            if mode == 0:
-                _, vect = self.getfundamental(lambdas)
-            else:
-                vect = self.eigvect[:, mode]
-    
-            # if normalise:
-            #     # normalisation constant computed over total flux
-            #     totflx = np.zeros((nE*nS,), dtype=complex)
-            #     for gro in range(0, nE):
-            #         skip = (Ne*nS+No*(nS-1))*gro
-            #         totflx[gro*nS:(gro+1)*nS] = vect[skip:skip+nS]
-            #     vect = vect/np.linalg.norm(totflx)
+
             G = self.geometry.nE
             dim = self.geometry.nS if moment % 2 == 0 else self.geometry.nS-1
             # preallocation for group-wise moments
-            y = np.zeros((dim*G, ))
-            gro = np.arange(0, self.geometry.nE) if group is None else group
+            gro = np.arange(1, self.geometry.nE+1) if group is None else [group]
+            y = np.zeros((dim*len(gro), ))
 
-            for g in gro:
+            for ig, g in enumerate(gro):
 
                 if precursors is False:
                     # compute No and Ne for the requested moment/angle
@@ -524,10 +515,10 @@ class PhaseSpace:
                     iE = skip+NE*nS+NO*(nS-1)+M
     
                 else:
-                    iS = (Ne*nS+No*(nS-1))*nE+g*nF+iF
-                    iE = (Ne*nS+No*(nS-1))*nE+g*nF+iF+nS
+                    iS = (Ne*nS+No*(nS-1))*nE+(g-1)*nF+iF
+                    iE = (Ne*nS+No*(nS-1))*nE+(g-1)*nF+iF+nS
                 # store slices
-                y[g*dim:(g+1)*dim] = vect[iS:iE]
+                y[ig*dim:dim*(ig+1)] = vect[iS:iE]
         else:
             # build angular flux and evaluate in angle
             tmp = np.zeros((dim*G))
@@ -536,7 +527,7 @@ class PhaseSpace:
                 y = vect if n % 2 == 0 else self.interp(vect, self.geometry.stag_mesh)
                 tmp = tmp+(2*n+1)/2*eval_legendre(n, angle)*y
             # get values for requested groups
-            iS, iE = 0, -1 if group is None else nS*(group-1), nS*(group-1)+nS
+            iS, iE = (0, -1) if group is None else (nS*(group-1), nS*(group-1)+nS)
             y = y[iS:iE]
         return y
 
@@ -565,9 +556,18 @@ class PhaseSpace:
 
         """
         nE, nA = self.nE, self.nA
-        nS = self.nS if self.geometry.spatial_scheme == 'FD' else self.nS-1
+        nS = self.nS
         mu = self.geometry.QW['mu']
         w = self.geometry.QW['w']
+
+        lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
+
+        # take eigenvector
+        if mode == 0:
+            _, vect = self.getfundamental(lambdas)
+        else:
+            vect = self.eigvect[:, mode]
+
         if angle is not None:
 
             if isinstance(angle, int):
@@ -584,20 +584,11 @@ class PhaseSpace:
             else:
                 iF = 0
 
-            lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
-    
-            # take eigenvector
-            if mode == 0:
-                _, vect = self.getfundamental(lambdas)
-            else:
-                vect = self.eigvect[:, mode]
-
-            G = self.geometry.nE
             # preallocation for group-wise moments
-            yr, yi = np.zeros((nS*G, )), np.zeros((nS*G, ))
-            gro = np.arange(0, self.geometry.nE) if group is None else group
+            gro = np.arange(0, self.geometry.nE) if group is None else [group]
+            y = np.zeros((nS*len(gro), ))
 
-            for g in gro:
+            for ig, g in enumerate(gro):
 
                 if precursors is False:
                     # compute No and Ne for the requested moment/angle
@@ -607,21 +598,20 @@ class PhaseSpace:
                     iS = len(mu)*nS*nE+g*nF+iF
                     iE = len(mu)*nS*nE+g*nF+iF+nS
                 # store slices
-                yr[g*nS:(g+1)*nS] = np.real(vect[iS:iE])
-                yi[g*nS:(g+1)*nS] = np.imag(vect[iS:iE])
+                y[ig*nS:(ig+1)*nS] = vect[iS:iE]
 
         else:
             # build angular flux and evaluate in angle
             tmp = np.zeros((nS*nE, ))
-            for n in range(0, moment):
-                phi = np.zeros((nE*nS, ))
+            for n in range(0, self.nA):
+                phi = np.zeros((nE*nS, ))  # allocate group-wise angular flux
                 for g in range(0, nE):
-                    iS = (nS*idx)*g
-                    iE = (nS*idx)*g+nS
+                    iS = nS*n*g+n*nS
+                    iE = nS*n*g+n*nS+nS
                     # get group-wise angular flux
-                    phi[g*nS:(g+1)*nS] = vect[iS:iE] if mu[n] > 0 else np.flipud(vect[iS:iE])
-                # compute flux moment
-                tmp = tmp+w[n]*mu[n]*phi
-            iS, iE = (0, -1) if group is None else (nS*(group-1), nS*(group-1)+nS)
+                    phi[g*nS:(g+1)*nS] = vect[iS:iE] if mu[n] >= 0 else np.flipud(vect[iS:iE])
+                # compute flux moment contribution
+                tmp = tmp+w[n]*eval_legendre(moment, mu[n])*phi
+            iS, iE = (0, len(tmp)) if group is None else (nS*(group-1), nS*(group-1)+nS)
             y = tmp[iS:iE]
         return y

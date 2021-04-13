@@ -34,7 +34,7 @@ def time(obj, invv, fmt='csc'):
     if model == 'FD':
         t = FD.zero(obj, invv)
     elif model == 'FV':
-        t = FV.zero(obj, invv, meshtype='stag_mesh')
+        t = FV.zero(obj, invv, meshtype='centers')
     else:
         raise OSError('{} model not available for spatial variable!'.format(model))
 
@@ -69,7 +69,7 @@ def removal(obj, xs, fmt='csc'):
     if model == 'FD':
         r = FD.zero(obj, xs)
     elif model == 'FV':
-        r = FV.zero(obj, xs, meshtype='stag_mesh')
+        r = FV.zero(obj, xs, meshtype='centers')
     else:
         raise OSError('%s model not available for spatial variable!' % model)
 
@@ -107,29 +107,28 @@ def leakage(obj, fmt='csc'):
     # --- create sub-matrix
 
     # fill lower triangular matrix (mu > 0)
-    dim = obj.nS if model == 'FD' else obj.nS-1
     tmp = []
     tmpapp = tmp.append
-    for i in range(0, dim):
+    for i in range(0, obj.nS):
         coeff = 2/obj.dx
         if i == 0:
             if model == 'FD':
                 d = FD.zero(obj, coeff).T.flatten()
             elif model == 'FV':
-                d = FV.zero(obj, coeff, meshtype='stag_mesh').T.flatten()
+                d = FV.zero(obj, coeff, meshtype='centers').T.flatten()
             else:
                 raise OSError('{} model not available for spatial variable!'.format(model))
             tmpapp(list(d))
         else:
-            lst = list(-2*d[i:dim]) if i % 2 != 0 else list(2*d[i:dim])
+            lst = list(-2*d[i:obj.nS]) if i % 2 != 0 else list(2*d[i:obj.nS])
             tmpapp(lst)
 
-    trilpos = diags(tmp, np.arange(0, -dim, -1), (dim, dim), format=fmt)
+    trilpos = diags(tmp, np.arange(0, -obj.nS, -1), (obj.nS, obj.nS), format=fmt)
 
     # fill lower triangular matrix (mu < 0)
     tmp = []
     tmpapp = tmp.append
-    for i in range(0, dim):
+    for i in range(0, obj.nS):
         coeff = -2/np.flipud(obj.dx)
         if i == 0:
             if model == 'FD':
@@ -140,9 +139,9 @@ def leakage(obj, fmt='csc'):
                 raise OSError('{} model not available for spatial variable!'.format(model))
             tmpapp(list(d))
         else:
-            tmpapp(list(-2*d[i:dim])) if i % 2 != 0 else tmpapp(list(2*d[i:dim]))
+            tmpapp(list(-2*d[i:obj.nS])) if i % 2 != 0 else tmpapp(list(2*d[i:obj.nS]))
 
-    trilneg = diags(tmp, np.arange(0, -dim, -1), (dim, dim), format=fmt)
+    trilneg = diags(tmp, np.arange(0, -obj.nS, -1), (obj.nS, obj.nS), format=fmt)
 
     for order in range(0, N):
 
@@ -182,25 +181,31 @@ def scattering(obj, sm, fmt='csc'):
     w = obj.QW['w']
     PL = obj.QW['PL']
     C = obj.QW['C']
-    for order in range(0, N):  # loop over directions
+    for order in range(0, N):  # loop over directions (row sub-matrix)
         tmp = []
         tmpapp = tmp.append
         for n in range(0, N):  # loop over directions defining Leg. moment
             xs = sm[:, 0]*0
             for l in range(0, L):  # loop over Legendre expansion moments
-                if l <= n:
+                if l < N:
                     coeff = PL[l, order]*PL[l, n]*w[n]*C[l]
                     xs = xs+sm[:, l]*coeff
             # build sub-matrix for n-th order
             if model == 'FD':
                 s = FD.zero(obj, xs)
             elif model == 'FV':
-                s = FV.zero(obj, xs, meshtype='stag_mesh')
+                s = FV.zero(obj, xs, meshtype='centers')
             else:
                 raise OSError('{} model not available for spatial variable!'.format(model))
 
             m = s.shape[1]
-            tmpapp(diags(s, [0], (m, m), format=fmt))
+            d = diags(s, [0], (m, m), format=fmt)
+            # if directions are opposite, flip to match spatial discretisation
+            mu1, mu2 = obj.QW['mu'][order], obj.QW['mu'][n]
+            if mu1 == 0 and mu2 < 0 or mu1*mu2 < 0 or mu1 < 0 and mu2 == 0:
+                d = d[::-1]
+
+            tmpapp(d)
         appM(tmp)
 
     M = bmat((M), format=fmt)
@@ -239,14 +244,15 @@ def fission(obj, xs, fmt='csc'):
             if model == 'FD':
                 f = FD.zero(obj, 1/2*xs*w[n])
             elif model == 'FV':
-                f = FV.zero(obj, 1/2*xs*w[n], meshtype='stag_mesh')
+                f = FV.zero(obj, 1/2*xs*w[n], meshtype='centers')
             else:
                 raise OSError('{} model not available for spatial variable!'.format(model))
 
             m = f.shape[1]
             d = diags(f, [0], (m, m), format=fmt)
             # if directions are opposite, flip to match spatial discretisation
-            if mu[order]*mu[n] < 0:
+            mu1, mu2 = obj.QW['mu'][order], obj.QW['mu'][n]
+            if mu1 == 0 and mu2 < 0 or mu1*mu2 < 0 or mu1 < 0 and mu2 == 0:
                 d = d[::-1]
             tmpapp(d)
 
@@ -282,7 +288,7 @@ def delfission(obj, beta, xs, fmt='csc'):
         if model == 'FD':
             f = FD.zero(obj, beta[family, :]*xs)
         elif model == 'FV':
-            f = FV.zero(obj, beta[family, :]*xs, meshtype='stag_mesh')
+            f = FV.zero(obj, beta[family, :]*xs, meshtype='centers')
         else:
             raise OSError('{} model not available for spatial variable!'.format(model))
 

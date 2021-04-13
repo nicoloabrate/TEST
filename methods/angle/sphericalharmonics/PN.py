@@ -36,9 +36,9 @@ def time(obj, invv, fmt='csc'):
     for moment in range(0, N+1):
 
         if moment % 2 == 0:
-            meshtype = 'mesh'  # evaluate on standard mesh if even
+            meshtype = 'edges'  # evaluate on standard mesh if even
         else:
-            meshtype = 'stag_mesh'  # evaluate on staggered mesh if odd
+            meshtype = 'centers'  # evaluate on staggered mesh if odd
 
         if model == 'FD':
             t = FD.zero(obj, invv, meshtype)
@@ -82,9 +82,9 @@ def removal(obj, xs, fmt='csc'):
     for moment in range(0, N+1):
 
         if moment % 2 == 0:
-            meshtype = 'mesh'  # evaluate on standard mesh if even
+            meshtype = 'edges'  # evaluate on standard mesh if even
         else:
-            meshtype = 'stag_mesh'  # evaluate on staggered mesh if odd
+            meshtype = 'centers'  # evaluate on staggered mesh if odd
 
         if model == 'FD':
             r = FD.zero(obj, xs, meshtype)
@@ -137,9 +137,9 @@ def leakage(obj, fmt='csc'):
             coeffs = [moment/(2*moment+1), (moment+1)/(2*moment+1)]
 
         if moment % 2 == 0:
-            meshtype = 'mesh'  # evaluate on standard mesh if even
+            meshtype = 'edges'  # evaluate on standard mesh if even
         else:
-            meshtype = 'stag_mesh'  # evaluate on staggered mesh if odd
+            meshtype = 'centers'  # evaluate on staggered mesh if odd
 
         if coeffs[0] == 0:  # 0-th order moment
 
@@ -247,9 +247,9 @@ def scattering(obj, sm, fmt='csc'):
     for moment in range(0, N+1):
 
         if moment % 2 == 0:
-            meshtype = 'mesh'  # evaluate on staggered mesh if odd
+            meshtype = 'edges'  # evaluate on staggered mesh if odd
         else:
-            meshtype = 'stag_mesh'  # evaluate on standard mesh if even
+            meshtype = 'centers'  # evaluate on standard mesh if even
 
         if moment >= L:
             xs = np.zeros((obj.nLayers,))
@@ -297,9 +297,9 @@ def fission(obj, xs, fmt='csc'):
     for moment in range(0, N+1):
 
         if moment % 2 == 0:
-            meshtype = 'mesh'
+            meshtype = 'edges'
         else:
-            meshtype = 'stag_mesh'
+            meshtype = 'centers'
 
         if model == 'FD':
             f = FD.zero(obj, xs, meshtype)
@@ -342,7 +342,7 @@ def delfission(obj, beta, xs, fmt='csc'):
 
     for family in range(0, NPF):  # precursors
 
-        meshtype = 'mesh'
+        meshtype = 'edges'
 
         if model == 'FD':
             f = FD.zero(obj, beta[family, :]*xs, meshtype)

@@ -82,7 +82,7 @@ class Slab:
             else:
                 minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
         # assign mesh, ghost mesh and N
-        self.mesher(minmfp)
+        self.mesher(minmfp, spatial_scheme)
 
         self.regionmap = OrderedDict(zip(range(0, len(matlist)), matlist))
         self.AngOrd = AngOrd
@@ -90,9 +90,10 @@ class Slab:
         self.nE = G
         self.geometry = 'slab'
 
-    def mesher(self, minmfp):
+    def mesher(self, minmfp, spatial_scheme):
         """
-        Mesh the slab domain. A shadow-staggered grid is also generated.
+        Mesh the slab domain. Two meshes are generated: one refers to the cell
+        centers (FV), one to the cell edges (FD).
 
         Returns
         -------
@@ -143,10 +144,15 @@ class Slab:
             gridg[gridg == 0] = np.finfo(float).eps
 
         self.N = N
-        self.nS = int(sum(N))
         self.dx = dx
-        self.mesh = grid
-        self.stag_mesh = gridg
+        self.edges = grid
+        self.centers = gridg
+        if spatial_scheme == 'FV':
+            self.mesh = gridg
+            self.nS = int(sum(N))-1
+        else:
+            self.mesh = grid
+            self.nS = int(sum(N))
 
     def plotmesh(self, ax=None, yVals=None, xlabel=None):
         """Plot mesh grid."""
@@ -157,10 +163,10 @@ class Slab:
             ymin, ymax = np.min(yVals), np.max(yVals)
 
         ax = ax or gca()
-        ax.vlines(self.mesh, ymin, ymax, colors='k',
+        ax.vlines(self.edges, ymin, ymax, colors='k',
                   linestyles='solid')
 
-        ax.vlines(self.stag_mesh, ymin, ymax, colors='k',
+        ax.vlines(self.centers, ymin, ymax, colors='k',
                   linestyles='dashed')
 
         xlabel = xlabel if xlabel is not None else 'x coordinate [cm]'
