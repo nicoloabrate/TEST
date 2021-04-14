@@ -50,7 +50,7 @@ class eigenproblem():
         except AttributeError:
             raise OSError('{} eigenproblem not available!'.format(which))
 
-    def _petsc(self, verbosity=False, sigma=0, tol=1E-8, monitor=True):
+    def _petsc(self, verbosity=False, tol=1E-8, monitor=True):
 
         L, P = self.A, self.B
         start = t.time()
@@ -98,8 +98,8 @@ class eigenproblem():
                     E.setProblemType(SLEPc.EPS.ProblemType.NHEP)
 
                 E.setWhichEigenpairs(E.Which.TARGET_MAGNITUDE)
-                if sigma is not None:
-                    E.setTarget(sigma)
+                if self.sigma is not None:
+                    E.setTarget(self.sigma)
 
                 st = E.getST()
                 st.setType('sinvert')
@@ -233,6 +233,7 @@ class eigenproblem():
         self.B = T
         self.which = 'alpha'
         self.whichspectrum = 'SM'
+        self.sigma = 0
 
     def gamma(self):
         """
@@ -255,6 +256,7 @@ class eigenproblem():
         self.B = op.F + op.S  # multiplication operator
         self.which = 'gamma'
         self.whichspectrum = 'LM'
+        self.sigma = None
 
     def delta(self):
         """
@@ -270,6 +272,7 @@ class eigenproblem():
         self.B = op.F+op.S-op.R  # material operator
         self.which = 'delta'
         self.whichspectrum = 'SR'
+        self.sigma = 1
 
     def kappa(self):
         """
@@ -294,6 +297,7 @@ class eigenproblem():
         self.B = op.F  # multiplication operator
         self.which = 'kappa'
         self.whichspectrum = 'LM'
+        self.sigma = None
 
     def omega(self):
         """
@@ -364,9 +368,10 @@ class eigenproblem():
         self.B = T
         self.which = 'omega'
         self.whichspectrum = 'SM'
+        self.sigma = None
 
     def solve(self, algo='PETSc', verbosity=False,tol=1E-14, monitor=False,
-              sigma=None, normalisation='totalflux'):
+              normalisation='totalflux'):
 
         A = self.A
         B = self.B
@@ -388,15 +393,13 @@ class eigenproblem():
 
             if self.which in ['kappa', 'delta', 'gamma']:
                 self.whichspectrum = 'LR'
-                sigma = sigma
                 M1, M2 = B, A
             elif self.which in ['alpha', 'omega']:
                 self.whichspectrum = 'LM'
-                sigma = 0
                 M1, M2 = A, B
 
             start = t.time()
-            eigvals, eigvect = eigs(M1, M=M2, k=self.nev, sigma=sigma,
+            eigvals, eigvect = eigs(M1, M=M2, k=self.nev, sigma=self.sigma,
                                     which=self.whichspectrum)
             end = t.time()
 

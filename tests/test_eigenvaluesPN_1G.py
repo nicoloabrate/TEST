@@ -37,12 +37,19 @@ def test_Modak_kappa0_1G(H, N, ref, algo):
     G = 1
     bc = 'Mark'
     xlayers = [0, H]
-    # define geometry and mesh
-    myslab = Slab(M, xlayers, ['Modak'], [bc], G, N, 'FD')
-    myPN = NTE.PN(myslab, N, steady=True, fmt='csc')
-    k1 = eigenproblem(myPN, 'kappa', myslab, nev=nev)
-    k1.solve(verbosity=True, algo=algo)
-    assert abs(k1.solution.eigvals[0]-ref)*1E5 < 5
+    # define geometry and mesh for PN
+    myslabP = Slab(M, xlayers, ['Modak'], [bc], G, N, 'FD')
+    myPN = NTE.PN(myslabP, N, steady=True, fmt='csc')
+    kP = eigenproblem(myPN, 'kappa', myslabP, nev=nev)
+    kP.solve(verbosity=True, algo=algo)
+    assert abs(kP.solution.eigvals[0]-ref)*1E5 < 5
+
+    # define geometry and mesh for SN
+    myslabS = Slab(M, xlayers, ['Modak'], [bc], G, N+1, 'FV')
+    mySN = NTE.SN(myslabS, N+1, steady=True, fmt='csc')
+    kS = eigenproblem(mySN, 'kappa', myslabS, nev=nev)
+    kS.solve(verbosity=True, algo=algo)
+    assert abs(kS.solution.eigvals[0]-ref)*1E5 < 5
 
 @pytest.mark.parametrize("algo",['eigs', 'PETSc'])
 def test_Modak_kappa0_aniso_1G(algo):
@@ -65,12 +72,19 @@ def test_Modak_kappa0_aniso_1G(algo):
     N = 63
     bc = 'Mark'
     xlayers = [0, H]
-    # define geometry and mesh
+    # define geometry and mesh (PN)
     myslab = Slab(M, xlayers, ['ModakAni'], [bc], G, N, 'FD')
     myPN = NTE.PN(myslab, N, steady=True, fmt='csc')
     k1 = eigenproblem(myPN, 'kappa', myslab, nev=nev)
     k1.solve(verbosity=True, algo=algo)
     assert abs(k1.solution.eigvals[0]-ref)*1E5 < 5
+
+    # define geometry and mesh (SN)
+    myslabS = Slab(M, xlayers, ['ModakAni'], [bc], G, N+1, 'FD')
+    mySN = NTE.SN(myslabS, N+1, steady=True, fmt='csc')
+    kS = eigenproblem(mySN, 'kappa', myslabS, nev=nev)
+    kS.solve(verbosity=True, algo=algo)
+    assert abs(kS.solution.eigvals[0]-ref)*1E5 < 5
 
 @pytest.mark.parametrize("algo",['eigs', 'PETSc'])
 @pytest.mark.filterwarnings('ignore::DeprecationWarning:SparseEfficiencyWarning')
@@ -95,12 +109,20 @@ def test_Modak_kappa_higher_1G(algo):
     N = 63
     bc = 'Mark'
     xlayers = [0, H]
-    # define geometry and mesh
+    # define geometry and mesh (PN)
     myslab = Slab(M, xlayers, ['Modak'], [bc], G, N, 'FD')
     myPN = NTE.PN(myslab, N, steady=True, fmt='csc')
     k1 = eigenproblem(myPN, 'kappa', myslab, nev=nev)
     k1.solve(verbosity=True, algo=algo)
     for i, k in enumerate(k1.solution.eigvals[0::2]):
+        assert abs(k-ref[i])*1E5 < tol[i]
+
+    # define geometry and mesh (SN)
+    myslabS = Slab(M, xlayers, ['Modak'], [bc], G, N+1, 'FD')
+    mySN = NTE.SN(myslabS, N+1, steady=True, fmt='csc')
+    kS = eigenproblem(mySN, 'kappa', myslabS, nev=nev)
+    kS.solve(verbosity=True, algo=algo)
+    for i, k in enumerate(kS.solution.eigvals[0::2]):
         assert abs(k-ref[i])*1E5 < tol[i]
 
 @pytest.mark.parametrize("algo",['eigs', 'PETSc'])
@@ -135,6 +157,15 @@ def test_Modak_gamma_higher_1G(algo):
         g = 1/g*(1.8)  # c=(XS_S-NU*XS_F)/XS_T/gamma
         assert abs(g-ref[i])*1E5 < tol[i]
 
+    # define geometry and mesh (SN)
+    myslabS = Slab(M, xlayers, ['Modak'], [bc], G, N+1, 'FD')
+    mySN = NTE.SN(myslabS, N+1, steady=True, fmt='csc')
+    gS = eigenproblem(mySN, 'gamma', myslabS, nev=nev)
+    gS.solve(verbosity=True, algo=algo)
+    for i, g in enumerate(gS.solution.eigvals[0::2]):
+        g = 1/g*(1.8)  # c=(XS_S-NU*XS_F)/XS_T/gamma
+        assert abs(g-ref[i])*1E5 < tol[i]
+
 @pytest.mark.parametrize("algo",['eigs', 'PETSc'])
 @pytest.mark.parametrize("N, ref, tol",
                          [(7, [-2.53782E-02, -1.03353E-01, -2.38497E-01, -4.43506E-01],
@@ -163,6 +194,14 @@ def test_Modak_alpha_higher_1G(N, ref, tol, algo):
     myslab = Slab(M, xlayers, ['Dahl'], [bc], G, N, 'FD')
     myPN = NTE.PN(myslab, N, steady=False, prompt=True, fmt='csc')
     a1 = eigenproblem(myPN, 'alpha', myslab, nev=nev)
+    a1.solve(verbosity=True, algo=algo)
+    for i, a in enumerate(a1.solution.eigvals):
+        assert abs(a-ref[i])*1E5 < tol[i]
+
+    # define geometry and mesh (SN)
+    myslabS = Slab(M, xlayers, ['Dahl'], [bc], G, N+1, 'FD')
+    mySN = NTE.SN(myslabS, N+1, steady=False, prompt=True, fmt='csc')
+    a1 = eigenproblem(mySN, 'alpha', myslabS, nev=nev)
     a1.solve(verbosity=True, algo=algo)
     for i, a in enumerate(a1.solution.eigvals):
         assert abs(a-ref[i])*1E5 < tol[i]
