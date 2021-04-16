@@ -9,6 +9,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib.patches import ConnectionPatch
+from matplotlib import rc
+rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+rc('text', usetex=True)
+plt.rcParams['figure.dpi'] = 150
 
 
 class PhaseSpace:
@@ -187,7 +191,7 @@ class PhaseSpace:
                 self.eigvect[:, iv] = v/self.braket(self.operators.F.dot(v_adj), v)
 
     def plot(self, group, angle=0, mode=0, family=0, precursors=False,
-             ax=None, title=None, imag=False, **kwargs):
+             ax=None, title=None, imag=False, figname=None, **kwargs):
 
         yr, yi = self.get(group, angle=angle, mode=mode, family=family,
                           precursors=precursors)
@@ -202,12 +206,14 @@ class PhaseSpace:
         ax.set_xlim([min(self.geometry.layers), max(self.geometry.layers)])
         ax.xaxis.set_major_formatter(FormatStrFormatter('%g'))
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+        if figname is not None:
+            plt.savefig('{}.png'.format(figname))
 
-    def plotspectrum(self, loglog=False, gaussplane=True, geom=None,
+    def plotspectrum(self, loglog=False, gaussplane=True, figname=None,
                      grid=True, ylims=None, threshold=None, subplt=False):
 
-        if self.problem == 'omega' and geom is not None:
-            lambdas = geom.getxs('lambda')
+        if self.problem == 'omega':
+            lambdas = self.geom.getxs('lambda')
             subplt = False if subplt is False else True
         else:
             lambdas = None
@@ -318,6 +324,9 @@ class PhaseSpace:
             if grid is True:
                 sub2.grid(alpha=0.2)
             plt.tight_layout()
+
+        if figname is not None:
+            plt.savefig('{}.png'.format(figname))
 
     def polarspectrum(self, ax=None):
         ax = ax or plt.gca()

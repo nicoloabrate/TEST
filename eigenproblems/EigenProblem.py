@@ -411,6 +411,7 @@ class eigenproblem():
             start = t.time()
             eigvals, eigvect = eig(M1.todense(), M2.todense())
             end = t.time()
+            self.nev = len(eigvals)
 
             if self.which == 'delta':
                 eigvals = 1/eigvals
