@@ -18,15 +18,16 @@ import time as t
 import numpy as np
 from copy import copy
 from scipy.linalg import eig
-from scipy.sparse.linalg import eigs
+from scipy.sparse.linalg import eigs, inv
 from scipy.sparse import block_diag, bmat, csr_matrix, hstack, vstack
 from TEST.geometry.phasespace import PhaseSpace
+from TEST.models.NeutronPrecursorsEquation import NPE as npe
 from matplotlib.pyplot import spy
 
 
 class eigenproblem():
 
-    def __init__(self, nte, which, geom, nev=1):
+    def __init__(self, nte, which, geom, nev=1, generalisedTime=False):
 
         # --- problem settings
         self.nS = nte.nS
@@ -38,6 +39,9 @@ class eigenproblem():
         self.operators = nte
         self.geometry = geom
 
+        if which == 'omega':
+            self.operatorsPrec = npe(geom, fmt='csc')
+
         if 2*nev+1 >= self.operators.S.shape[0]:
             raise OSError('Too many eigenvalues required! 2*nev+1 should be < operator rank')
         else:
@@ -46,7 +50,10 @@ class eigenproblem():
         # --- call eigenvalue problem
         try:
             evp = getattr(self, which)
-            evp()
+            if which == 'alpha':
+                evp(generalised=generalisedTime)
+            else:
+                evp()
         except AttributeError:
             raise OSError('{} eigenproblem not available!'.format(which))
 
@@ -210,7 +217,7 @@ class eigenproblem():
         with open('tmp.txt', append_write) as f:
             np.savetxt(f, arr)
 
-    def alpha(self):
+    def alpha(self, generalised=False):
         """
         Cast operators into the prompt time eigenvalue problem "alpha".
 
@@ -227,13 +234,18 @@ class eigenproblem():
         else:
             B = op.S+op.F-op.R-op.L  # destruction operator
 
+
+        if generalised is False:
+            T = None
+            invT = inv(op.T)
+            B = invT.dot(B)
+        else:
         T = op.T
 
         self.A = B
         self.B = T
         self.which = 'alpha'
         self.whichspectrum = 'SM'
-        self.sigma = 0
 
     def gamma(self):
         """
@@ -299,7 +311,7 @@ class eigenproblem():
         self.whichspectrum = 'LM'
         self.sigma = None
 
-    def omega(self):
+    def omega(self, generalised=False):
         """
         Cast operators into the delayed time eigenvalue problem "omega".
 
@@ -337,23 +349,23 @@ class eigenproblem():
             skip = (Ne*nS+No*(nS-1))*g
             tmp[:, skip:nS+skip] = Fd1[:, nS*g:nS*(g+1)]
 
-        self.Fd = bmat([[A4, A3.T], [tmp.copy, A2]])
+        self.Fd = bmat([[A4, A3.T], [tmp.copy(), A2]])
         # --- scattering
         self.S = bmat([[self.operators.S, A1], [A1.T, A2]])
         # --- removal
         tmp1, tmp2 = hstack([self.operators.R, A1]), hstack([A1.T, A2])
-        self.R = vstack(([tmp1.copy, tmp2.copy]))
+        self.R = vstack(([tmp1.copy(), tmp2.copy()]))
         # --- leakage
         self.L = bmat([[self.operators.L, A1], [A1.T, A2]])
 
         # --- emission
-        tmp = copy(A1.T)
+        tmp = copy(A1)
         # loop over each group
         for gro in range(0, nE):
             skip = (No*(nS-1)+Ne*nS)*gro
             tmp[skip:nS+skip, :] = self.operatorsPrec.E[nS*gro:nS*(gro+1), :]
 
-        self.E = bmat([[A4, tmp.copy], [A1, A2]])
+        self.E = bmat([[A4, tmp.copy()], [A3, A2]])
         # --- decay
         self.D = block_diag(([A4, self.operatorsPrec.D]))
 
@@ -365,21 +377,29 @@ class eigenproblem():
         else:
             self.A = self.S+self.Fp+self.Fd+self.E-self.R-self.D-self.L
 
+        if generalised is False:
+            self.B = None
+            invT = inv(T)
+            self.A = invT.dot(self.A)
+        else:
         self.B = T
         self.which = 'omega'
         self.whichspectrum = 'SM'
         self.sigma = None
 
     def solve(self, algo='PETSc', verbosity=False,tol=1E-14, monitor=False,
-              normalisation='totalflux'):
+              normalisation='totalflux', shift=None):
 
         A = self.A
         B = self.B
         res = None
+        if shift is not None:
+            self.sigma = shift
         if algo == 'PETSc':
             try:
                 start = t.time()
-                eigvals, eigvect, res = self._petsc(tol=tol, monitor=monitor)
+                eigvals, eigvect, res = self._petsc(tol=tol, monitor=monitor,
+                                                    sigma=self.sigma)
                 end = t.time()
             except NameError:
                 print('PETSc/SLEPc packages not installed. Switching to scipy...')
@@ -388,14 +408,16 @@ class eigenproblem():
         if algo == 'eigs':
             if A.format != 'csc':
                 A = A.tocsc()
-            if B.format != 'csc':
-                B = B.tocsc()
+            if B is not None:
+                if B.format != 'csc':
+                    B = B.tocsc()
 
             if self.which in ['kappa', 'delta', 'gamma']:
                 self.whichspectrum = 'LR'
                 M1, M2 = B, A
             elif self.which in ['alpha', 'omega']:
                 self.whichspectrum = 'LM'
+                self.sigma = 0
                 M1, M2 = A, B
 
             start = t.time()

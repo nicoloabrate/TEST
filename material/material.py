@@ -114,7 +114,8 @@ class Material():
             self.NPF = (self.beta).size
         except AttributeError:
             print('Kinetic parameters not available!')
-        
+            self.NPF = None
+
         # --- complete data and perform sanity check
         L = 0
         datastr = list(self.__dict__.keys())
@@ -248,7 +249,7 @@ class Material():
 
     def perturb(self, what, howmuch, depgro=None):
         """
-        
+
         Perturb material composition.
 
         Parameters
@@ -334,7 +335,7 @@ class Material():
         elif 'Abs' in datavail:
             self.Capt = self.Abs-self.Fiss
         elif 'Tot' in datavail:
-            self.Capt = self.Tot-sTOT-self.Fiss    
+            self.Capt = self.Tot-sTOT-self.Fiss
             self.Abs = self.Fiss+self.Capt
 
         self.Remxs = self.Abs+sTOT-InScatt
@@ -365,13 +366,13 @@ class Material():
         if self.Fiss.max() > 0:
             if abs(self.Chit.sum() - 1) > 1E-5:
                 raise OSError('Total fission spectra in %s not normalised!' % self.UniName)
-    
+
             for s in kinetics:
                 if s in datavail:
                     kincons = True
                 else:
                     kincons = False
-    
+
             if kincons is True:
                 if len(self.Chid.shape) == 1:
                     # each family has same emission spectrum
@@ -384,4 +385,3 @@ class Material():
                     chit = (1-self.beta.sum())*self.Chip[g]+np.dot(self.beta, self.Chid[:, g])
                     if abs(self.Chit[g]-chit) > 1E-5:
                         raise OSError('Fission spectra or delayed fractions in %s not consistent!' % self.UniName)
-            
