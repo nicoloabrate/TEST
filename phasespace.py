@@ -55,6 +55,9 @@ class PhaseSpace:
             self.nE = operators.nE
             self.nS = operators.nS
 
+            if self.problem == 'omega':
+                self.nF = geometry.NPF
+
             if normalize is True:
                 self.normalize(which=whichnorm)
         else:
@@ -190,11 +193,11 @@ class PhaseSpace:
                 v_adj = self.solution.eigvect[:, iv]
                 self.eigvect[:, iv] = v/self.braket(self.operators.F.dot(v_adj), v)
 
-    def plot(self, group, angle=0, mode=0, family=0, precursors=False,
+    def plot(self, group, angle=0, mode=0, moment=0, family=0, precursors=False,
              ax=None, title=None, imag=False, figname=None, **kwargs):
 
-        yr, yi = self.get(group, angle=angle, mode=mode, family=family,
-                          precursors=precursors)
+        yr, yi = self.get(group, angle=angle, moment=moment, mode=mode,
+                          family=family, precursors=precursors)
         x = self.geometry.mesh if len(yr) == self.geometry.nS else self.geometry.stag_mesh
         ax = ax or plt.gca()
 
@@ -372,7 +375,9 @@ class PhaseSpace:
                     whichreal = np.where(reals_abs == reals_abs.max())
                 # blended
                 idx = np.where(self.eigvals == reals[whichreal])[0][0]
-            elif lambdas is not None:
+            elif self.problem == 'omega':
+                if lambdas is None:
+                    raise OSError('Decay constants arg. needed for omega case!')
                 # select real eigenvalues
                 choice = np.logical_and(np.greater_equal(self.eigvals.real,
                                                          min(-lambdas)),
@@ -387,7 +392,7 @@ class PhaseSpace:
         eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
         return eigenvalue, eigenvector
 
-    def get(self, group, angle=0, mode=0, family=0, normalise=True,
+    def get(self, group, angle=0, mode=0, moment=0, family=0, normalise=True,
             precursors=False):
         """
         Get spatial flux distribution for group, angle and spatial mode.
@@ -412,11 +417,12 @@ class PhaseSpace:
 
         """
         if self.model == 'PN' or self.model == 'Diffusion':
-            yr, yi = self._getPN(group, angle=0, mode=0, family=0, normalise=True,
-                                 precursors=False)
+            yr, yi = self._getPN(group, angle=angle, mode=mode, moment=moment,
+                                 family=family, normalise=normalise,
+                                 precursors=precursors)
             return yr, yi
 
-    def _getPN(self, group, angle=0, mode=0, family=0, normalise=True,
+    def _getPN(self, group, angle=0, moment=0, mode=0, family=0, normalise=True,
                precursors=False):
         """
         Get spatial flux distribution for group, angle and spatial mode.
@@ -440,6 +446,7 @@ class PhaseSpace:
             Imaginary part of the flux mode.
 
         """
+        # FIXME distinguish moment and angle
         nE, nA, nS = self.nE, self.nA, self.nS
 
         if precursors and self.problem == 'omega':

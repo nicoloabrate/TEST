@@ -114,7 +114,8 @@ class Material():
             self.NPF = (self.beta).size
         except AttributeError:
             print('Kinetic parameters not available!')
-        
+            self.NPF = None
+
         # --- complete data and perform sanity check
         L = 0
         datastr = list(self.__dict__.keys())

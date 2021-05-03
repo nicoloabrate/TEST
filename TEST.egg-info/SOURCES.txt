@@ -16,9 +16,12 @@ geometry/__init__.py
 geometry/geometry.py
 material/__init__.py
 material/material.py
-methods/BCs.py
 methods/GPT.py
 methods/__init__.py
+methods/BCs/DiffusionBCs.py
+methods/BCs/PNBCs.py
+methods/BCs/SNBCs.py
+methods/BCs/__init__.py
 methods/angle/Diffusion.py
 methods/angle/__init__.py
 methods/angle/discreteordinates/SN.py

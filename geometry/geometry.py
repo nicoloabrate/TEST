@@ -71,13 +71,12 @@ class Slab:
                 self.regions[uniName] = Material(uniName, G, datapath=path)
 
             # consistency check precursor families
-            if 'NPF' in self.__dict__.keys():
-                if iLay == 0:
-                    self.NPF = self.regions[uniName].NPF
-                else:
-                    if self.NPF != self.regions[uniName].NPF:
-                        raise OSError('Number of precursor families in %s not' +
-                                      ' consistent with other regions' % uniName)
+            if iLay == 0:
+                self.NPF = self.regions[uniName].NPF
+            else:
+                if self.NPF != self.regions[uniName].NPF:
+                    raise OSError('Number of precursor families in %s not' +
+                                  ' consistent with other regions' % uniName)
             if AngOrd > 0:
                 minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
             else:
@@ -253,6 +252,15 @@ class Slab:
                 # loop over regions
                 for ireg, reg in self.regionmap.items():
                     vals[:, ireg] = self.regions[reg].getxs(key, pos1, pos2)
+
+            elif key == 'Chid':
+
+                for ireg, reg in self.regionmap.items():
+                    NPF = self.regions[reg].NPF
+                vals = np.full((self.nE, NPF, self.nLayers), None)
+                # loop over regions
+                for ireg, reg in self.regionmap.items():
+                    vals[:, :, ireg] = self.regions[reg].getxs(key, pos1, pos2).T
 
             else:
                 vals = np.full((self.nE, self.nLayers), None)
