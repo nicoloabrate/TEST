@@ -57,7 +57,7 @@ class eigenproblem():
         except AttributeError:
             raise OSError('{} eigenproblem not available!'.format(which))
 
-    def _petsc(self, verbosity=False, tol=1E-8, monitor=True):
+    def _petsc(self, verbosity=False, tol=1E-8, monitor=True, sigma=None):
 
         L, P = self.A, self.B
         start = t.time()
@@ -240,7 +240,7 @@ class eigenproblem():
             invT = inv(op.T)
             B = invT.dot(B)
         else:
-        T = op.T
+            T = op.T
 
         self.A = B
         self.B = T
@@ -382,7 +382,7 @@ class eigenproblem():
             invT = inv(T)
             self.A = invT.dot(self.A)
         else:
-        self.B = T
+            self.B = T
         self.which = 'omega'
         self.whichspectrum = 'SM'
         self.sigma = None
