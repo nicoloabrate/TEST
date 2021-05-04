@@ -187,10 +187,6 @@ def MarshakCoeffs(PN):
     try:
         path = os.path.join(os.path.dirname(__file__), 'Marshak.txt')
         coeffs = np.loadtxt(path)
-        # r, c, coeffs = np.loadtxt(path, unpack=True,
-        #                           dtype={'names':
-        #                                  ('row', 'col', 'vals'),
-        #                                  'formats': (np.int, np.int, np.float)})
         rows, cols = coeffs.shape
 
         if rows >= (M+1)//2 and cols >= (PN+1)//2:
@@ -204,6 +200,7 @@ def MarshakCoeffs(PN):
     except OSError:
 
         x = Symbol('x')
+        print('WARNING: coefficients not found. It could take a while for large PN orders!')
         for row in range(0, (M+1)//2):
 
             for n in range(0, PN+1):

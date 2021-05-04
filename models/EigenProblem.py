@@ -395,6 +395,8 @@ class eigenproblem():
         res = None
         if shift is not None:
             self.sigma = shift
+        else:
+            self.sigma = None
         if algo == 'PETSc':
             try:
                 start = t.time()
@@ -433,7 +435,11 @@ class eigenproblem():
                 M1, M2 = A, B
 
             start = t.time()
-            eigvals, eigvect = eig(M1.todense(), M2.todense())
+            if M2 is not None:
+                eigvals, eigvect = eig(M1.todense(), M2.todense())
+            else:
+                eigvals, eigvect = eig(M1.todense())
+
             end = t.time()
             self.nev = len(eigvals)
 
