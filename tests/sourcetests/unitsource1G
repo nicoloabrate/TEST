@@ -22,9 +22,9 @@ bc = 'Mark'
 H = 0.1
 xlayers = [0, H]
 # define geometry and mesh
-myslab = Slab(M, xlayers, ['tmp2'], [bc], G, N, 'FD')
-myslabD = Slab(M, xlayers, ['tmp2'], ['zero'], G, 0, 'FD')
-myslab2 = Slab(M, xlayers, ['tmp2'], [bc], G, N+1, 'FD')
+myslab = Slab(M, xlayers, ['FullAbsorption'], [bc], G, N, 'FD')
+myslabD = Slab(M, xlayers, ['FullAbsorption'], ['zero'], G, 0, 'FD')
+myslab2 = Slab(M, xlayers, ['FullAbsorption'], [bc], G, N+1, 'FD')
 
 myDiff = NTE.Diffusion(myslabD, steady=True, fmt='csc', BC=True)
 myPN = NTE.PN(myslab, N, steady=True, fmt='csc', BC=True)

@@ -218,12 +218,16 @@ class PhaseSpace:
             for iv, v in enumerate(self.eigvect.T):
                 v_adj = self.solution.eigvect[:, iv]
                 self.eigvect[:, iv] = v/self.braket(self.operators.F.dot(v_adj), v)
+        else:
+            print('Normalisation failed. {} not available as normalisation mode'.format(which))
 
-    def plot(self, group, angle=0, mode=0, family=0, precursors=False,
-             ax=None, title=None, imag=False, **kwargs):
 
-        yr, yi = self.get(group, angle=angle, mode=mode, family=family,
-                          precursors=precursors)
+    def plot(self, group, angle=None, mode=0, moment=0, family=0, precursors=False,
+             ax=None, title=None, imag=False, normalise=True, **kwargs):
+
+        y = self.get(group, angle=angle, mode=mode, family=family,
+                     precursors=precursors, moment=moment, normalise=normalise)
+        yr, yi = y.real, y.imag
         x = self.geometry.mesh if len(yr) == self.geometry.nS else self.geometry.stag_mesh
         ax = ax or plt.gca()
 
@@ -231,8 +235,8 @@ class PhaseSpace:
         plt.plot(x, y, **kwargs)
 
         ax.locator_params(nbins=8)
-        ax.set_ylim(y.min())
-        ax.set_xlim([min(self.geometry.layers), max(self.geometry.layers)])
+        # ax.set_ylim(y.min())
+        # ax.set_xlim([min(self.geometry.layers), max(self.geometry.layers)])
         ax.xaxis.set_major_formatter(FormatStrFormatter('%g'))
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
 
@@ -412,7 +416,7 @@ class PhaseSpace:
         return eigenvalue, eigenvector
 
     def get(self, group=None, angle=None, moment=0, mode=0, family=0,
-            normalise=True, precursors=False):
+            normalise=False, precursors=False):
         """
         Get spatial flux distribution for group, angle/moment and spatial mode.
 
@@ -442,18 +446,20 @@ class PhaseSpace:
             Imaginary part of the flux mode.
 
         """
+        if normalise is not False:
+            which = 'phasespace' if normalise is True else normalise
+            self.normalize(which=which)
+
         if self.model == 'PN' or self.model == 'Diffusion':
             y = self._getPN(group=group, angle=angle, moment=moment, mode=mode,
-                            family=family, normalise=normalise,
-                            precursors=precursors)
+                            family=family, precursors=precursors)
         elif self.model == 'SN':
             y = self._getSN(group=group, angle=angle, moment=moment, mode=mode,
-                            family=family, normalise=normalise,
-                            precursors=precursors)
+                            family=family, precursors=precursors)
         return y
 
     def _getPN(self, group=None, angle=None, moment=0, mode=0, family=0,
-               normalise=True, precursors=False):
+               precursors=False):
         """
         Get spatial flux distribution for group, angle and spatial mode.
 
@@ -532,7 +538,7 @@ class PhaseSpace:
         return y
 
     def _getSN(self, group=None, angle=None, moment=0, mode=0, family=0,
-               normalise=True, precursors=False):
+               precursors=False):
         """
         Get spatial flux distribution for group, angle and spatial mode.
 

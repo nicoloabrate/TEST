@@ -22,8 +22,8 @@ bc = 'Mark'
 H = 0.1
 xlayers = [0, H]
 # define geometry and mesh
-myslabS = Slab(M, xlayers, ['tmp2'], [bc], G, N+1, 'FD')
-myslabP = Slab(M, xlayers, ['tmp'], [bc], G, N, 'FD')
+myslabS = Slab(M, xlayers, ['FullAbsorption'], [bc], G, N+1, 'FD')
+myslabP = Slab(M, xlayers, ['FullAbsorption'], [bc], G, N, 'FD')
 
 myPN = NTE.PN(myslabP, N, steady=True, fmt='csc', BC=True)
 mySN = NTE.SN(myslabS, N+1, steady=True, fmt='csc', BC=True)
