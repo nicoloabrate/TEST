@@ -288,7 +288,7 @@ class Slab:
 
         return vals
 
-    def perturb(self, perturbation):
+    def perturb(self, perturbation, sanitycheck=True):
         """
         Add perturbations to an unperturbed, reference system.
 
@@ -364,7 +364,7 @@ class Slab:
                             regs.insert(idx+1, 'Perturbation%d' % iP)
 
                         self.regions['Perturbation%d' % iP] = cp(self.regions[oldreg])
-                        self.regions['Perturbation%d' % iP].perturb(k, hw, dg)
+                        self.regions['Perturbation%d' % iP].perturb(k, hw, dg, sanitycheck=sanitycheck)
                     # perturbation between two or more regions
                     elif x1 < l and x2 > l:
                         raise OSError('Perturbations can be applied one region at a time!')
@@ -386,7 +386,7 @@ class Slab:
                 else:
                     minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
 
-            self.mesher(minmfp)
+            self.mesher(minmfp, spatial_scheme=self.spatial_scheme)
 
     def computeQW(self):
         """

@@ -55,6 +55,9 @@ def setBCs(op, geometry):
                     op.F[[skip, skip+op.nS-1], :] = 0
                     op.R[[skip, skip+op.nS-1], :] = 0
                     op.S[[skip, skip+op.nS-1], :] = 0
+                    op.S0[[skip, skip+op.nS-1], :] = 0
+                    op.F0[[skip, skip+op.nS-1], :] = 0
+                    op.C[[skip, skip+op.nS-1], :] = 0
 
     op.L = L
     return op

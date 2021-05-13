@@ -229,10 +229,10 @@ class eigenproblem():
         op = self.operators
         # define alpha prompt eigenproblem operators
         if self.nev == 0 or self.BC is False:  # alpha infinite
-            B = op.S+op.F-op.R  # no leakage, infinite medium
+            B = op.S+op.F-op.F0-op.S0-op.C  # no leakage, infinite medium
             self.nev = 1
         else:
-            B = op.S+op.F-op.R-op.L  # destruction operator
+            B = op.S+op.F-op.F0-op.S0-op.C-op.L  # destruction operator
 
 
         if generalised is False:
@@ -259,13 +259,13 @@ class eigenproblem():
         op = self.operators
         if self.nev == 0 or self.BC is False:  # gamma infinite
             if self.model != 'Diffusion':
-                self.A = op.Linf+op.R  # no leakage, infinite medium
+                self.A = op.Linf+op.C+op.S0+op.F0  # no leakage, infinite medium
             else:
                 self.A = op.R  # no leakage, infinite medium
         else:
-            self.A = op.L + op.R  # destruction operator
+            self.A = op.L+op.C+op.S0+op.F0  # destruction operator
 
-        self.B = op.F + op.S  # multiplication operator
+        self.B = op.F+op.S  # multiplication operator
         self.which = 'gamma'
         self.whichspectrum = 'LM'
         self.sigma = None
@@ -281,7 +281,7 @@ class eigenproblem():
         """
         op = self.operators
         self.A = op.L  # leakage operator
-        self.B = op.F+op.S-op.R  # material operator
+        self.B = op.F+op.S-op.F0-op.S0-op.C  # material operator
         self.which = 'delta'
         self.whichspectrum = 'SR'
         self.sigma = 1
@@ -299,12 +299,12 @@ class eigenproblem():
         # define kappa eigenproblem operators
         if self.nev == 0 or self.BC is False:  # kappa infinite
             if self.model != 'Diffusion':
-                self.A = op.Linf+op.R-op.S  # no leakage, infinite medium
+                self.A = op.Linf+op.C+op.S0+op.F0-op.S  # no leakage, infinite medium
             else:
-                self.A = op.R-op.S  # no leakage, infinite medium
+                self.A = op.C+op.S0+op.F0-op.S  # no leakage, infinite medium
             self.nev = 1
         else:
-            self.A = op.L+op.R-op.S  # destruction operator
+            self.A = op.L+op.C+op.S0+op.F0-op.S  # destruction operator
 
         self.B = op.F  # multiplication operator
         self.which = 'kappa'
@@ -355,6 +355,16 @@ class eigenproblem():
         # --- removal
         tmp1, tmp2 = hstack([self.operators.R, A1]), hstack([A1.T, A2])
         self.R = vstack(([tmp1.copy(), tmp2.copy()]))
+        # --- total fission
+        tmp1, tmp2 = hstack([self.operators.F0, A1]), hstack([A1.T, A2])
+        self.F0 = vstack(([tmp1.copy(), tmp2.copy()]))
+        # --- total scattering
+        tmp1, tmp2 = hstack([self.operators.S0, A1]), hstack([A1.T, A2])
+        self.S0 = vstack(([tmp1.copy(), tmp2.copy()]))
+        # --- capture
+        tmp1, tmp2 = hstack([self.operators.C, A1]), hstack([A1.T, A2])
+        self.C = vstack(([tmp1.copy(), tmp2.copy()]))
+        
         # --- leakage
         self.L = bmat([[self.operators.L, A1], [A1.T, A2]])
 
@@ -371,11 +381,11 @@ class eigenproblem():
 
         # define alpha delayed eigenproblem operators
         if self.nev == 0 or self.BC is False:  # omega infinite S+Fp+Fd+E-(R+D)
-            self.A = self.S+self.Fp+self.Fd+self.E-self.R-self.D  # no leakage, inf medium
+            self.A = self.S+self.Fp+self.Fd+self.E-self.C-self.F0-self.S0-self.D  # no leakage, inf medium
             self.nev = 1
 
         else:
-            self.A = self.S+self.Fp+self.Fd+self.E-self.R-self.D-self.L
+            self.A = self.S+self.Fp+self.Fd+self.E-self.C-self.F0-self.S0-self.D-self.L
 
         if generalised is False:
             self.B = None

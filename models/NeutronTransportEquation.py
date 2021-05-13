@@ -24,24 +24,27 @@ class Diffusion():
         # geom.AngOrd = 1
         # assign operators
         self.R = MG.removal(geom, self.model, fmt=fmt)
+        self.S0 = MG.scatteringTot(geom, self.model, fmt=fmt)
+        self.F0 = MG.fission(geom, self.model, fmt=fmt)
+        self.C = MG.capture(geom, self.model, fmt=fmt)
         self.S = MG.scattering(geom, self.model, prod=prod, fmt=fmt)
 
         if allope is True:
             self.Fp = MG.promptfiss(geom, self.model, fmt=fmt)
             self.Fd = MG.delfiss(geom, self.model, fmt=fmt)
-            self.F = MG.fission(geom, self.model, fmt=fmt)
+            self.F = MG.fissionprod(geom, self.model, fmt=fmt)
             self.T = MG.time(geom, self.model, fmt=fmt)
 
         else:
             if steady is True:
-                self.F = MG.fission(geom, self.model, fmt=fmt)
+                self.F = MG.fissionprod(geom, self.model, fmt=fmt)
                 self.state = 'steady'
 
             else:
                 self.T = MG.time(geom, self.model, fmt=fmt)
 
                 if prompt is True:
-                    self.F = MG.fission(geom, self.model, fmt=fmt)
+                    self.F = MG.fissionprod(geom, self.model, fmt=fmt)
                 else:
                     self.Fd = MG.delfiss(geom, self.model, fmt=fmt)
                     self.Fp = MG.promptfiss(geom, self.model, fmt=fmt)
@@ -74,23 +77,26 @@ class PN():
         # assign operators
         self.R = MG.removal(geom, self.model, fmt=fmt)
         self.S = MG.scattering(geom, self.model, prod=prod, fmt=fmt)
+        self.F0 = MG.fission(geom, self.model, prod=prod, fmt=fmt)
+        self.S0 = MG.scatteringTot(geom, self.model, prod=prod, fmt=fmt)
+        self.C = MG.capture(geom, self.model, prod=prod, fmt=fmt)
 
         if allope is True:
             self.Fp = MG.promptfiss(geom, self.model, fmt=fmt)
             self.Fd = MG.delfiss(geom, self.model, fmt=fmt)
-            self.F = MG.fission(geom, self.model, fmt=fmt)
+            self.F = MG.fissionprod(geom, self.model, fmt=fmt)
             self.T = MG.time(geom, self.model, fmt=fmt)
 
         else:
             if steady is True:
-                self.F = MG.fission(geom, self.model, fmt=fmt)
+                self.F = MG.fissionprod(geom, self.model, fmt=fmt)
                 self.state = 'steady'
 
             else:
                 self.T = MG.time(geom, self.model, fmt=fmt)
 
                 if prompt is True:
-                    self.F = MG.fission(geom, self.model, fmt=fmt)
+                    self.F = MG.fissionprod(geom, self.model, fmt=fmt)
                 else:
                     self.Fd = MG.delfiss(geom, self.model, fmt=fmt)
                     self.Fp = MG.promptfiss(geom, self.model, fmt=fmt)
@@ -125,23 +131,26 @@ class SN():
         # assign operators
         self.R = MG.removal(geom, self.model, fmt=fmt)
         self.S = MG.scattering(geom, self.model, prod=prod, fmt=fmt)
+        self.S0 = MG.scatteringTot(geom, self.model, prod=prod, fmt=fmt)
+        self.F0 = MG.fission(geom, self.model, prod=prod, fmt=fmt)
+        self.C = MG.capture(geom, self.model, prod=prod, fmt=fmt)
 
         if allope is True:
             self.Fp = MG.promptfiss(geom, self.model, fmt=fmt)
             self.Fd = MG.delfiss(geom, self.model, fmt=fmt)
-            self.F = MG.fission(geom, self.model, fmt=fmt)
+            self.F = MG.fissionprod(geom, self.model, fmt=fmt)
             self.T = MG.time(geom, self.model, fmt=fmt)
 
         else:
             if steady is True:
-                self.F = MG.fission(geom, self.model, fmt=fmt)
+                self.F = MG.fissionprod(geom, self.model, fmt=fmt)
                 self.state = 'steady'
 
             else:
                 self.T = MG.time(geom, self.model, fmt=fmt)
 
                 if prompt is True:
-                    self.F = MG.fission(geom, self.model, fmt=fmt)
+                    self.F = MG.fissionprod(geom, self.model, fmt=fmt)
                 else:
                     self.Fd = MG.delfiss(geom, self.model, fmt=fmt)
                     self.Fp = MG.promptfiss(geom, self.model, fmt=fmt)

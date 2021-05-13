@@ -84,6 +84,114 @@ def removal(obj, model, fmt='csc'):
     return RMG
 
 
+def capture(obj, model, fmt='csc'):
+    """
+    Assemble multi-group capture operator sub-matrix.
+
+    Parameters
+    ----------
+    obj : object
+        Geometry object.
+    meshtype : string, optional
+        Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
+        mesh. The default is 'mesh'.
+
+    Returns
+    -------
+    None.
+
+    """
+    CMG = []
+    CMGapp = CMG.append
+    captxs = obj.getxs('Capt')   # if model != 'Diffusion' else obj.getxs('Abs')
+
+    for gro in range(0, obj.nE):
+
+        if model == 'PN':
+            CMGapp(PN.time(obj, captxs[gro, :], fmt=fmt))
+        elif model == 'SN':
+            CMGapp(SN.time(obj, captxs[gro, :], fmt=fmt))
+        elif model == 'Diffusion':
+            CMGapp(PN.time(obj, captxs[gro, :], fmt=fmt))
+        else:
+            raise OSError('%s model not available!' % model)
+
+    CMG = block_diag((CMG), format=fmt)
+    return CMG
+
+
+def fission(obj, model, fmt='csc'):
+    """
+    Assemble multi-group fission operator sub-matrix.
+
+    Parameters
+    ----------
+    obj : object
+        Geometry object.
+    meshtype : string, optional
+        Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
+        mesh. The default is 'mesh'.
+
+    Returns
+    -------
+    None.
+
+    """
+    FMG = []
+    FMGapp = FMG.append
+    fissxs = obj.getxs('Fiss')   # if model != 'Diffusion' else obj.getxs('Abs')
+
+    for gro in range(0, obj.nE):
+
+        if model == 'PN':
+            FMGapp(PN.time(obj, fissxs[gro, :], fmt=fmt))
+        elif model == 'SN':
+            FMGapp(SN.time(obj, fissxs[gro, :], fmt=fmt))
+        elif model == 'Diffusion':
+            FMGapp(PN.time(obj, fissxs[gro, :], fmt=fmt))
+        else:
+            raise OSError('%s model not available!' % model)
+
+    FMG = block_diag((FMG), format=fmt)
+    return FMG
+
+
+def scatteringTot(obj, model, fmt='csc'):
+    """
+    Assemble multi-group total scattering operator sub-matrix.
+
+    Parameters
+    ----------
+    obj : object
+        Geometry object.
+    meshtype : string, optional
+        Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
+        mesh. The default is 'mesh'.
+
+    Returns
+    -------
+    None.
+
+    """
+    SMG = []
+    SMGapp = SMG.append
+    scatxs = obj.getxs('S0').sum(axis=1)
+    
+    for gro in range(0, obj.nE):
+
+        if model == 'PN':
+            SMGapp(PN.time(obj, scatxs[gro, :], fmt=fmt))
+        elif model == 'SN':
+            SMGapp(SN.time(obj, scatxs[gro, :], fmt=fmt))
+        elif model == 'Diffusion':
+            SMGapp(PN.time(obj, scatxs[gro, :], fmt=fmt))
+        else:
+            raise OSError('%s model not available!' % model)
+
+    SMG = block_diag((SMG), format=fmt)
+    return SMG
+
+
 def leakage(obj, model, fmt='csc'):
     """
     Assemble multi-group leakage operator sub-matrix.
@@ -179,7 +287,7 @@ def scattering(obj, model, prod=True, fmt='csc', adjoint=False):
     return SMG
 
 
-def fission(obj, model, fmt='csc', adjoint=False):
+def fissionprod(obj, model, fmt='csc', adjoint=False):
     """
     Assemble multi-group total fission operator sub-matrix.
 

@@ -247,7 +247,7 @@ class Material():
 
         return vals
 
-    def perturb(self, what, howmuch, depgro=None):
+    def perturb(self, what, howmuch, depgro=None, sanitycheck=True):
         """
 
         Perturb material composition.
@@ -264,6 +264,7 @@ class Material():
         None.
 
         """
+        depgro = depgro-1 if depgro is not None else depgro
         for g in range(0, self.nE):
             # no perturbation
             if howmuch[g] == 0:
@@ -276,8 +277,8 @@ class Material():
                    delta = mydic[what][g]*howmuch[g]
                    mydic[what][g] = mydic[what][g]+delta
                else:  # select departure group for scattering matrix
-                   delta = mydic[what][depgro][g]*howmuch[g]
-                   mydic[what][depgro][g] = mydic[what][depgro][g]+delta
+                   delta = mydic[what][depgro]*howmuch[depgro]
+                   mydic[what][depgro] = mydic[what][depgro]+delta
 
                # select case to ensure data consistency
                if what == 'Fiss':
@@ -301,13 +302,25 @@ class Material():
                        mydic[key][depgro][g] = mydic[key][depgro][g]*R
 
             else:
-               raise OSError('%s cannot be perturbed directly!' % what)
+                if sanitycheck:
+                    raise OSError('%s cannot be perturbed directly!' % what)
+                else:
+                    # update perturbed parameter
+                    if depgro is None:
+                        delta = mydic[what][g]*howmuch[g]
+                        mydic[what][g] = mydic[what][g]+delta
+                    else:  # select departure group for scattering matrix
+                        delta = mydic[what][depgro]*howmuch[g]
+                        mydic[what][depgro] = mydic[what][depgro]+delta
+   
 
-        # force normalisation
-        if abs(self.Chit.sum() - 1) > 1E-5:
-            self.Chit = self.Chit/self.Chit.sum()
 
-        self.datacheck()
+        if sanitycheck:
+            # force normalisation
+            if abs(self.Chit.sum() - 1) > 1E-5:
+                self.Chit = self.Chit/self.Chit.sum()
+    
+            self.datacheck()
 
     def datacheck(self):
         """
