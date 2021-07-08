@@ -17,8 +17,9 @@ import TEST.methods.space.FV as FV
 class PhaseSpace:
     """Define phase space object."""
 
-    def __init__(self, geometry, solution, energygrid=None, source=False,
-                 normalize=False, whichnorm='phasespace', operators=None):
+    def __init__(self, geometry, solution, operators, 
+                 energygrid=None, source=False,
+                 normalize=False, whichnorm='phasespace'):
         """
         Initialise phase space object.
 
@@ -43,27 +44,24 @@ class PhaseSpace:
 
         """
         self.geometry = geometry
-
+        self.model = operators.model
+        self.nA = operators.nA
+        self.nE = operators.nE
+        self.nS = operators.nS
+        
         if energygrid is not None:
             self.energygrid = energygrid
 
         if isinstance(solution, dict):
-            if operators is not None:
-                self.model = operators.model
+            if source:
+                self.flux = solution['solution']
+                self.problem = solution['problem']
             else:
-                raise OSError('Numerical operators object is needed!')
-            self.eigvals = solution['eigenvalues']
-            self.eigvect = solution['eigenvectors']
-            self.problem = solution['problem']
-
-            self.nA = operators.nA
-            self.nE = operators.nE
-            self.nS = operators.nS
-
-            if normalize is True:
-                self.normalize(which=whichnorm)
-        elif isinstance(solution, (np.ndarray)) and source is True:
-            self.flux = solution
+                self.eigvals = solution['eigenvalues']
+                self.eigvect = solution['eigenvectors']
+                self.problem = solution['problem']
+                if normalize is True:
+                    self.normalize(which=whichnorm)
         else:
             raise OSError('Type {} cannot be handled by phase space!'.format(type(solution)))
 
@@ -87,7 +85,7 @@ class PhaseSpace:
         """
         # if self.geometry.AngOrd > 0:
         #     raise OSError('Braket cannot be applied yet to transport solutions!')
-
+        # FIXME braket on transport solutions does not work properly
         v1v2 = np.multiply(v1, v2) if v2 is not None else v1
         geom = self.geometry
         G = geom.nE
@@ -165,7 +163,8 @@ class PhaseSpace:
         if which == 'phasespace':
             # normalise on the inner product over the phase space
             for iv, v in enumerate(self.eigvect.T):
-                C = self.braket(self.eigvect[:, iv], self.eigvect[:, iv])
+                y = self.get(moment=0, mode=iv)
+                C = self.braket(y, y)
                 self.eigvect[:, iv] = v/np.sqrt(C)
         elif which == 'norm2':
             # normalise to have unitary euclidean norm
@@ -483,13 +482,15 @@ class PhaseSpace:
 
         """
         nE, nA, nS = self.nE, self.nA, self.nS
-        lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
 
-        # take eigenvector
-        if mode == 0:
-            _, vect = self.getfundamental(lambdas)
-        else:
-            vect = self.eigvect[:, mode]
+        if self.problem in ['static', 'delayed', 'prompt']:  # source problem
+            vect = self.flux
+        else:  # eigenvalue problem
+            if mode == 0:
+                lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
+                _, vect = self.getfundamental(lambdas)
+            else:
+                vect = self.eigvect[:, mode]
 
         if angle is None:
             if precursors and self.problem == 'omega':
@@ -566,13 +567,14 @@ class PhaseSpace:
         mu = self.geometry.QW['mu']
         w = self.geometry.QW['w']
 
-        lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
-
-        # take eigenvector
-        if mode == 0:
-            _, vect = self.getfundamental(lambdas)
-        else:
-            vect = self.eigvect[:, mode]
+        if self.problem in ['static', 'delayed', 'prompt']:  # source problem
+            vect = self.flux
+        else:  # eigenvalue problem
+            if mode == 0:
+                lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
+                _, vect = self.getfundamental(lambdas)
+            else:
+                vect = self.eigvect[:, mode]
 
         if angle is not None:
 
