@@ -29,15 +29,23 @@ def test_Diffusion_kappa0(H, R, G, matrefl, ref, algo):
 
     """
     nev = 1
-    M = 50
+    M = -5
     N = 0
     bc = 'zero'
     xlayers = [-R, -H, H, R]
-    # define geometry and mesh
+    # Diffusion
     myslab = Slab(M, xlayers, [matrefl, 'MontagniniFuel', matrefl], [bc], G, N, 'FD')
     myPN = NTE.Diffusion(myslab, steady=True, fmt='csc')
     k1 = eigenproblem(myPN, 'kappa', myslab, nev=nev)
-    k1.solve()
+    k1.solve(algo=algo)
+    assert abs(k1.solution.eigvals[0]-ref)*1E5 < 1
+    # P1
+    N = 1
+    bc = 'Mark'
+    myslab = Slab(M, xlayers, [matrefl, 'MontagniniFuel', matrefl], [bc], G, N, 'FD')
+    myPN = NTE.PN(myslab, N, steady=True, fmt='csc')
+    k1 = eigenproblem(myPN, 'kappa', myslab, nev=nev)
+    k1.solve(algo=algo)
     assert abs(k1.solution.eigvals[0]-ref)*1E5 < 1
 
 

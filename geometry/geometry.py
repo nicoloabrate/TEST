@@ -18,7 +18,7 @@ class Slab:
     """Define slab geometry object."""
 
     def __init__(self, NMFP, layers, matlist, BCs, G, AngOrd, spatial_scheme,
-                 datapath=None):
+                 datapath=None, verbosity=True):
 
         # assign number of layers
         self.nLayers = len(layers)-1
@@ -33,9 +33,10 @@ class Slab:
         self.layers = layers
 
         # set number of mean free path
-        if isinstance(NMFP, (int, float)):
-            self._NMFP = NMFP*np.ones((self.nLayers))
-
+        if isinstance(NMFP, int):
+            self._NMFP = NMFP*np.ones((self.nLayers), dtype=int)
+        elif isinstance(NMFP, float):
+            self._NMFP = NMFP*np.ones((self.nLayers), dtype=float)
         elif isinstance(NMFP, (list, np.ndarray)):
 
             if len(NMFP) == self.nLayers:
@@ -63,19 +64,26 @@ class Slab:
             if uniName not in self.regions.keys():
 
                 if datapath is not None:
-                    path = datapath[iLay]
+                    for (filename, mats) in datapath.items():
+                        if uniName in mats: path = filename
                 else:
                     path = None
 
                 self.regions[uniName] = Material(uniName, G, datapath=path)
 
-            # consistency check precursor families
+            # consistency check precursor families and decay constants
             if iLay == 0:
                 self.NPF = self.regions[uniName].NPF
+                lambdas = self.regions[uniName].__dict__['lambda']
             else:
                 if self.NPF != self.regions[uniName].NPF:
-                    raise OSError('Number of precursor families in %s not' +
-                                  ' consistent with other regions' % uniName)
+                    raise OSError('Number of precursor families in %s not consistent with other regions' % uniName)
+                if not np.allclose(lambdas, self.regions[uniName].__dict__['lambda']):
+                    self.regions[uniName].__dict__['lambda'] = lambdas
+                    if verbosity:
+                        print('Warning: Forcing decay constants consistency in {}...'.format(uniName))
+
+
             if AngOrd > 0:
                 minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
             else:
@@ -101,30 +109,43 @@ class Slab:
         """
         # preallocation
         dx = np.zeros((self.nLayers,))
-        N = np.zeros((self.nLayers,))
+        N = np.zeros((self.nLayers,), dtype=int)
         old_grid = np.empty(0)
         old_grid_stag = np.empty(0)
 
         for iLay in range(0, self.nLayers):
             # compute grid spacing
             if max(self._NMFP) < 0:  # assign user-defined number of points
+                if abs(max(self._NMFP)) < 3:
+                    raise OSError('Number of meshes must be >2!')
                 deltalay = self.layers[iLay+1]-self.layers[iLay]
                 dx[iLay] = deltalay/abs(self._NMFP[iLay])
-                N[iLay] = int(np.ceil(deltalay/dx[iLay]))
+                N[iLay] = np.ceil(deltalay/dx[iLay])
+                uselinsp = True
 
-            elif (np.round(self._NMFP) != self._NMFP).any():  # user-defined dx
+            elif sum([isinstance(s, float) for s in self._NMFP]) == len(self._NMFP):  # user-defined dx
                 deltalay = self.layers[iLay+1]-self.layers[iLay]
-                dx[iLay] = self._NMFP
-                N[iLay] = int(np.ceil(deltalay/dx[iLay]))
+                dx[iLay] = self._NMFP[iLay]
+                N[iLay] = np.ceil(deltalay/dx[iLay])
+                uselinsp = False
 
             else:
                 deltalay = self.layers[iLay+1]-self.layers[iLay]
                 dx[iLay] = minmfp[iLay]/self._NMFP[iLay]
-                N[iLay] = int(np.ceil(deltalay/dx[iLay]))
+                N[iLay] = np.ceil(deltalay/dx[iLay])
+                uselinsp = True
 
             # grid
-            ngrid = np.linspace(self.layers[iLay], self.layers[iLay+1],
-                                int(N[iLay]))
+            if uselinsp:
+                ngrid = np.linspace(self.layers[iLay], self.layers[iLay+1], N[iLay])
+            else:
+                if iLay == self.nLayers-1:
+                    ngrid = np.arange(self.layers[iLay], self.layers[iLay+1], dx[iLay])
+                    ngrid = np.append(ngrid, self.layers[iLay+1])
+                    N[iLay] = N[iLay]+1
+                else:
+                    ngrid = np.arange(self.layers[iLay], self.layers[iLay+1], dx[iLay])
+
             grid = np.concatenate((old_grid, ngrid))
             old_grid = grid
             # ghost grid
@@ -181,19 +202,20 @@ class Slab:
              'darkviolet']
 
         c = dict(zip(self.regions.keys(), c))
+        if labels is None:
+            labels = []
         for i in range(0, self.nLayers):
             which = self.regionmap[i]
             col = c[which]
             ax.axvspan(self.layers[i], self.layers[i+1],
-                       alpha=0.5, color=col, label=which)
+                       alpha=0.5, color=col)
+            if which not in labels:
+                labels.append(which)
 
         xlabel = xlabel if xlabel is not None else 'x coordinate [cm]'
         ax.set_xlabel(xlabel)
         ax.set_xticks(self.layers)
-        if labels is None:
-            ax.legend(bbox_to_anchor=(1.05, 1))
-        else:
-            ax.legend(labels, bbox_to_anchor=(1.05, 1))
+        ax.legend(labels, bbox_to_anchor=(1.05, 1))
 
     def getxs(self, key, pos1=None, pos2=None, region=None):
         """

@@ -10,6 +10,8 @@ from os import path
 from pathlib import Path
 from serpentTools import read
 from serpentTools.settings import rc
+from copy import deepcopy as copy
+
 
 rc['xs.reshapeScatter'] = True
 rc['xs.getB1XS'] = False
@@ -97,8 +99,12 @@ class Material():
 
             # kinetics parameters
             self.beta = res.resdata['fwdAnaBetaZero'][::2]
+            self.beta_tot = self.beta[0]
+            self.beta = self.beta[1:]
             # this to avoid confusion with python lambda function
             selfdic['lambda'] = res.resdata['fwdAnaLambda'][::2]
+            selfdic['lambda_tot'] = selfdic['lambda'][0]
+            selfdic['lambda'] = selfdic['lambda'][1:]
             self.nE = nE
             self.UniName = uniName
 
@@ -312,14 +318,14 @@ class Material():
                     else:  # select departure group for scattering matrix
                         delta = mydic[what][depgro]*howmuch[g]
                         mydic[what][depgro] = mydic[what][depgro]+delta
-   
+
 
 
         if sanitycheck:
             # force normalisation
             if abs(self.Chit.sum() - 1) > 1E-5:
                 self.Chit = self.Chit/self.Chit.sum()
-    
+
             self.datacheck()
 
     def datacheck(self):
@@ -332,7 +338,7 @@ class Material():
 
         """
         datadic = self.__dict__
-        datavail = datadic.keys()
+        datavail = copy(list(datadic.keys()))
         # check basic reactions existence
         for s in basicdata:
             if s not in datavail:
@@ -358,7 +364,7 @@ class Material():
         # --- compute mean of scattering cosine
         if 'S1' in datavail:
             sTOT1 = self.S1.sum(axis=1) if len(self.S1.shape) > 1 else self.S1
-            self.mu0 = sTOT1/sTOT
+            self.mu0 = 0*self.Tot if np.isnan((sTOT1/sTOT).sum()) else sTOT1/sTOT
         elif 'Diffcoef' in datavail:
             tmp = 1/(3*self.Diffcoef)
             self.mu0 = (self.Tot-tmp)/sTOT
@@ -366,7 +372,7 @@ class Material():
             self.mu0 = np.zeros((self.nE, ))
         # check consistency
         if abs(self.mu0).max() > 1:
-            raise OSError('Average cosine larger than 1! Check input data!')
+            raise OSError('Average cosine larger than 1! Check {} data!'.format(self.UniName))
         # --- compute transport xs
         self.Transpxs = self.Tot-self.mu0*sTOT
         # --- compute diffusion coefficient

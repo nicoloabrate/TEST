@@ -36,11 +36,11 @@ def time(obj, model, fmt='csc'):
     for gro in range(0, obj.nE):
 
         if model == 'PN':
-            TMGapp(PN.time(obj, invv[gro, :], fmt=fmt))
+            TMGapp(PN.removal(obj, invv[gro, :], fmt=fmt))
         elif model == 'SN':
-            TMGapp(SN.time(obj, invv[gro, :], fmt=fmt))
+            TMGapp(SN.removal(obj, invv[gro, :], fmt=fmt))
         elif model == 'Diffusion':
-            TMGapp(PN.time(obj, invv[gro, :], fmt=fmt))
+            TMGapp(PN.removal(obj, invv[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available for angular variable!' % model)
 
@@ -72,11 +72,11 @@ def removal(obj, model, fmt='csc'):
     for gro in range(0, obj.nE):
 
         if model == 'PN':
-            RMGapp(PN.time(obj, totxs[gro, :], fmt=fmt))
+            RMGapp(PN.removal(obj, totxs[gro, :], fmt=fmt))
         elif model == 'SN':
-            RMGapp(SN.time(obj, totxs[gro, :], fmt=fmt))
+            RMGapp(SN.removal(obj, totxs[gro, :], fmt=fmt))
         elif model == 'Diffusion':
-            RMGapp(PN.time(obj, totxs[gro, :], fmt=fmt))
+            RMGapp(PN.removal(obj, totxs[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available!' % model)
 
@@ -108,11 +108,11 @@ def capture(obj, model, fmt='csc'):
     for gro in range(0, obj.nE):
 
         if model == 'PN':
-            CMGapp(PN.time(obj, captxs[gro, :], fmt=fmt))
+            CMGapp(PN.removal(obj, captxs[gro, :], fmt=fmt))
         elif model == 'SN':
-            CMGapp(SN.time(obj, captxs[gro, :], fmt=fmt))
+            CMGapp(SN.removal(obj, captxs[gro, :], fmt=fmt))
         elif model == 'Diffusion':
-            CMGapp(PN.time(obj, captxs[gro, :], fmt=fmt))
+            CMGapp(PN.removal(obj, captxs[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available!' % model)
 
@@ -144,11 +144,11 @@ def fission(obj, model, fmt='csc'):
     for gro in range(0, obj.nE):
 
         if model == 'PN':
-            FMGapp(PN.time(obj, fissxs[gro, :], fmt=fmt))
+            FMGapp(PN.removal(obj, fissxs[gro, :], fmt=fmt))
         elif model == 'SN':
-            FMGapp(SN.time(obj, fissxs[gro, :], fmt=fmt))
+            FMGapp(SN.removal(obj, fissxs[gro, :], fmt=fmt))
         elif model == 'Diffusion':
-            FMGapp(PN.time(obj, fissxs[gro, :], fmt=fmt))
+            FMGapp(PN.removal(obj, fissxs[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available!' % model)
 
@@ -180,11 +180,11 @@ def scatteringTot(obj, model, fmt='csc'):
     for gro in range(0, obj.nE):
 
         if model == 'PN':
-            SMGapp(PN.time(obj, scatxs[gro, :], fmt=fmt))
+            SMGapp(PN.removal(obj, scatxs[gro, :], fmt=fmt))
         elif model == 'SN':
-            SMGapp(SN.time(obj, scatxs[gro, :], fmt=fmt))
+            SMGapp(SN.removal(obj, scatxs[gro, :], fmt=fmt))
         elif model == 'Diffusion':
-            SMGapp(PN.time(obj, scatxs[gro, :], fmt=fmt))
+            SMGapp(PN.removal(obj, scatxs[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available!' % model)
 

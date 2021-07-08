@@ -55,7 +55,7 @@ class sourceproblem():
         self.model = nte.model
         self.operators = nte
         self.geometry = geom
-
+        ss = self.geometry.spatial_scheme
         # --- compute source dimensions
         if self.model == 'PN':
             No = (self.nA+1)//2 if self.nA % 2 != 0 else self.nA//2
@@ -64,7 +64,7 @@ class sourceproblem():
             NS = 1
             mu = np.linspace(-1, 1, NS)
         elif self.model == 'SN':
-            nx = self.nS if self.geometry.spatial_scheme == 'FD' else self.nS-1
+            nx = self.nS
             dim = nx*self.nA*self.nE
         elif self.model == 'Diffusion':
             dim = self.nS*self.nE
@@ -78,11 +78,11 @@ class sourceproblem():
             f = np.zeros((dim,))
             sig = signature(source)
             if 'x' in sig.parameters:
-                x = self.geometry.mesh
-                xs = self.geometry.stag_mesh
+                x = self.geometry.edges if ss == 'FD' else self.geometry.centers
+                xs = self.geometry.centers if ss == 'FD' else self.geometry.edges
             else:
-                x = np.ones((self.nS, ))
-                xs = np.ones((self.nS-1, ))                
+                x = np.ones((self.nS, )) if ss == 'FD' else np.ones((self.nS-1, ))
+                xs = np.ones((self.nS-1, )) if ss == 'FD' else np.ones((self.nS, ))             
             isotropic = False if 'mu' in sig.parameters else True
             uniformE = False if 'E' in sig.parameters else True
 
@@ -322,10 +322,10 @@ class sourceproblem():
         None.
 
         """
-        A = self.A
-        if sourceproblem.nonsingular(A):
-            phi =spsolve(A, self.source[:, np.newaxis])
-            self.solution = PhaseSpace(self.geometry, phi, source=True)
+        if sourceproblem.nonsingular(self.A):
+            phi = spsolve(self.A, self.source[:, np.newaxis])
+            self.solution = PhaseSpace(self.geometry, {'solution': phi, 'problem':self.problem},
+                                       self.operators, source=True)
         else:
             print('The transport operator is singular!')
 

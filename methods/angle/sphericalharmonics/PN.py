@@ -10,55 +10,9 @@ from TEST.methods.space import FD, FV
 from scipy.sparse import diags, block_diag, bmat, vstack
 
 
-def time(obj, invv, fmt='csc'):
-    """
-    Assemble spherical harmonics approximation time operator.
-
-    Parameters
-    ----------
-    obj : object
-        Geometry object.
-    N : int
-        Spherical harmonics approximation order.
-
-    Returns
-    -------
-    None.
-
-    """
-    N = obj.AngOrd
-    if N < 0:
-        raise OSError('Cannot build P_{}'.format(N))
-    model = obj.spatial_scheme
-    M = []
-    appM = M.append
-
-    for moment in range(0, N+1):
-
-        if moment % 2 == 0:
-            meshtype = 'edges'  # evaluate on standard mesh if even
-        else:
-            meshtype = 'centers'  # evaluate on staggered mesh if odd
-
-        if model == 'FD':
-            t = FD.zero(obj, invv, meshtype)
-        elif model == 'FV':
-            t = FV.zero(obj, invv, meshtype)
-        else:
-            raise OSError('%s model not available for spatial variable!' % model)
-
-        m = t.shape[1]
-        n = m
-
-        appM(diags(t, [0], (m, n), format=fmt))
-
-    M = block_diag((M))
-    return M
-
-
 def removal(obj, xs, fmt='csc'):
     """
-    Assemble spherical harmonics approximation removal operator.
+    Assemble spherical harmonics approximation for time/rem/capt/... operator.
 
     Parameters
     ----------

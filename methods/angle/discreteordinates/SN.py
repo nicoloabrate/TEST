@@ -10,9 +10,9 @@ from TEST.methods.space import FD, FV
 from scipy.sparse import diags, block_diag, bmat, vstack
 
 
-def time(obj, invv, fmt='csc'):
+def removal(obj, data, fmt='csc'):
     """
-    Assemble discrete ordinates approximation time operator.
+    Assemble discrete ordinates approximation for time/rem/capt/... operator.
 
     Parameters
     ----------
@@ -30,53 +30,27 @@ def time(obj, invv, fmt='csc'):
     if N <= 1:
         raise OSError('Cannot build S_{}'.format(N))
     model = obj.spatial_scheme
+    mu = obj.QW['mu']
+    M = []
+    appM = M.append
+    for order in range(0, N):
+        if model == 'FD':
+            t = FD.zero(obj, data)*1/2  # DD scheme
+            if mu[order] < 0: t = np.flip(t)
+            m = t.shape[1]
+            dia, pos = [t, t], [0, -1]
+        elif model == 'FV':
+            t = FV.zero(obj, data, meshtype='centers')
+            if mu[order] < 0: t = np.flip(t)
+            dia, pos = t, [0]
+        else:
+            raise OSError('{} model not available for spatial variable!'.format(model))
 
-    if model == 'FD':
-        t = FD.zero(obj, invv)
-    elif model == 'FV':
-        t = FV.zero(obj, invv, meshtype='centers')
-    else:
-        raise OSError('{} model not available for spatial variable!'.format(model))
+        m = t.shape[1]
+        tmp = diags(dia, pos, (m, m), format=fmt)
+        appM(tmp)
 
-    m = t.shape[1]
-
-    M = diags(t, [0], (m, m), format=fmt)
-    M = block_diag(([M]*N))
-    return M
-
-
-def removal(obj, xs, fmt='csc'):
-    """
-    Assemble discrete ordinates approximation removal operator.
-
-    Parameters
-    ----------
-    obj : object
-        Geometry object.
-    N : int
-        Number of discrete ordinates.
-
-    Returns
-    -------
-    None.
-
-    """
-    N = obj.AngOrd
-    if N <= 1:
-        raise OSError('Cannot build S_{}'.format(N))
-    model = obj.spatial_scheme
-
-    if model == 'FD':
-        r = FD.zero(obj, xs)
-    elif model == 'FV':
-        r = FV.zero(obj, xs, meshtype='centers')
-    else:
-        raise OSError('%s model not available for spatial variable!' % model)
-
-    m = r.shape[1]
-
-    M = diags(r, [0], (m, m), format=fmt)
-    M = block_diag(([M]*N))
+    M = block_diag((M))
     return M
 
 
@@ -107,41 +81,35 @@ def leakage(obj, fmt='csc'):
     # --- create sub-matrix
 
     # fill lower triangular matrix (mu > 0)
-    tmp = []
-    tmpapp = tmp.append
-    for i in range(0, obj.nS):
-        coeff = 2/obj.dx
-        if i == 0:
-            if model == 'FD':
-                d = FD.zero(obj, coeff).T.flatten()
-            elif model == 'FV':
-                d = FV.zero(obj, coeff, meshtype='centers').T.flatten()
+    if model == 'FD':
+        d = FD.zero(obj, 1/obj.dx).T.flatten()
+        trilpos = diags([-d[1:], d], (-1, 0), (obj.nS, obj.nS), format=fmt)
+        trilneg = -trilpos
+    elif model == 'FV':
+        tmp = []
+        tmpapp = tmp.append
+        for i in range(0, obj.nS):
+            if i == 0:
+                d = FV.zero(obj, 2/obj.dx, meshtype='centers').T.flatten()
+                lst = list(d)
             else:
-                raise OSError('{} model not available for spatial variable!'.format(model))
-            tmpapp(list(d))
-        else:
-            lst = list(-2*d[i:obj.nS]) if i % 2 != 0 else list(2*d[i:obj.nS])
+                lst = list(-2*d[i:obj.nS]) if i % 2 != 0 else list(2*d[i:obj.nS])  #
             tmpapp(lst)
-
-    trilpos = diags(tmp, np.arange(0, -obj.nS, -1), (obj.nS, obj.nS), format=fmt)
-
-    # fill lower triangular matrix (mu < 0)
-    tmp = []
-    tmpapp = tmp.append
-    for i in range(0, obj.nS):
-        coeff = -2/np.flipud(obj.dx)
-        if i == 0:
-            if model == 'FD':
-                d = FD.zero(obj, coeff).T.flatten()
-            elif model == 'FV':
-                d = FV.zero(obj, coeff).T.flatten()
+    
+        trilpos = diags(tmp, np.arange(0, -obj.nS, -1), (obj.nS, obj.nS), format=fmt)
+        # fill lower triangular matrix (mu < 0)
+        tmp = []
+        tmpapp = tmp.append
+        for i in range(0, obj.nS):
+            if i == 0:
+                d = FD.zero(obj, -2/np.flipud(obj.dx)).T.flatten()
+                lst = list(d)
             else:
-                raise OSError('{} model not available for spatial variable!'.format(model))
-            tmpapp(list(d))
-        else:
-            tmpapp(list(-2*d[i:obj.nS])) if i % 2 != 0 else tmpapp(list(2*d[i:obj.nS]))
-
-    trilneg = diags(tmp, np.arange(0, -obj.nS, -1), (obj.nS, obj.nS), format=fmt)
+                lst = list(-2*d[i:obj.nS]) if i % 2 != 0 else list(2*d[i:obj.nS])
+            tmpapp(lst)
+        trilneg = diags(tmp, np.arange(0, -obj.nS, -1), (obj.nS, obj.nS), format=fmt)
+    else:
+        raise OSError('{} model not available for spatial variable!'.format(model))
 
     for order in range(0, N):
 
@@ -173,12 +141,14 @@ def scattering(obj, sm, fmt='csc'):
     None.
 
     """
+    # TODO fix heterogeneous problem
     N = obj.AngOrd
     model = obj.spatial_scheme
     L = sm.shape[1]
     M = []
     appM = M.append
     w = obj.QW['w']
+    mu = obj.QW['mu']
     PL = obj.QW['PL']
     C = obj.QW['C']
     for order in range(0, N):  # loop over directions (row sub-matrix)
@@ -192,18 +162,24 @@ def scattering(obj, sm, fmt='csc'):
                     xs = xs+sm[:, l]*coeff
             # build sub-matrix for n-th order
             if model == 'FD':
-                s = FD.zero(obj, xs)
+                s = FD.zero(obj, xs)/2  # DD scheme
+                if mu[n] < 0: s = np.flip(s)
+                m = s.shape[1]
+                d = diags([s, s], [0, -1], (m, m), format=fmt)
             elif model == 'FV':
                 s = FV.zero(obj, xs, meshtype='centers')
+                if mu[n] < 0: s = np.flip(s)
+                m = s.shape[1]
+                d = diags(s, [0], (m, m), format=fmt)
             else:
                 raise OSError('{} model not available for spatial variable!'.format(model))
-
-            m = s.shape[1]
-            d = diags(s, [0], (m, m), format=fmt)
             # if directions are opposite, flip to match spatial discretisation
             mu1, mu2 = obj.QW['mu'][order], obj.QW['mu'][n]
             if mu1 == 0 and mu2 < 0 or mu1*mu2 < 0 or mu1 < 0 and mu2 == 0:
-                d = d[::-1]
+                if model == 'FD':
+                    d = d[:, ::-1] # FIXME
+                elif model == 'FV':
+                    d = d[::-1]
 
             tmpapp(d)
         appM(tmp)
@@ -242,18 +218,25 @@ def fission(obj, xs, fmt='csc'):
         for n in range(0, N):  # loop over directions defining total flux
             # build sub-matrix for n-th order
             if model == 'FD':
-                f = FD.zero(obj, 1/2*xs*w[n])
+                f = FD.zero(obj, 1/2*xs*w[n])/2  # DD scheme
+                if mu[n] < 0: f = np.flip(f)
+                m = f.shape[1]
+                d = diags([f, f], [0, -1], (m, m), format=fmt)
             elif model == 'FV':
                 f = FV.zero(obj, 1/2*xs*w[n], meshtype='centers')
+                if mu[n] < 0: f = np.flip(f)
+                m = f.shape[1]
+                d = diags(f, [0], (m, m), format=fmt)
             else:
                 raise OSError('{} model not available for spatial variable!'.format(model))
 
-            m = f.shape[1]
-            d = diags(f, [0], (m, m), format=fmt)
             # if directions are opposite, flip to match spatial discretisation
             mu1, mu2 = obj.QW['mu'][order], obj.QW['mu'][n]
             if mu1 == 0 and mu2 < 0 or mu1*mu2 < 0 or mu1 < 0 and mu2 == 0:
-                d = d[::-1]
+                if model == 'FD':
+                    d = d[:,::-1]
+                elif model == 'FV':
+                    d = d[::-1]
             tmpapp(d)
 
         appM(tmp)
@@ -278,6 +261,8 @@ def delfission(obj, beta, xs, fmt='csc'):
     None.
 
     """
+    # TODO adapt this to SN
+    print('Warning: delayed fission does not work now!')
     model = obj.spatial_scheme
     NPF = beta.shape[0]
     MPF = []

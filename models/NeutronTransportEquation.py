@@ -21,6 +21,7 @@ class Diffusion():
         self.nA = 0
         self.nE = geom.nE
         self.geometry = geom.geometry
+        self.spatial_scheme = geom.spatial_scheme
         # geom.AngOrd = 1
         # assign operators
         self.R = MG.removal(geom, self.model, fmt=fmt)
@@ -74,12 +75,13 @@ class PN():
         self.nA = N
         self.nE = geom.nE
         self.geometry = geom.geometry
+        self.spatial_scheme = geom.spatial_scheme
         # assign operators
         self.R = MG.removal(geom, self.model, fmt=fmt)
-        self.S = MG.scattering(geom, self.model, prod=prod, fmt=fmt)
-        self.F0 = MG.fission(geom, self.model, prod=prod, fmt=fmt)
-        self.S0 = MG.scatteringTot(geom, self.model, prod=prod, fmt=fmt)
-        self.C = MG.capture(geom, self.model, prod=prod, fmt=fmt)
+        self.S = MG.scattering(geom, self.model, fmt=fmt)
+        self.F0 = MG.fission(geom, self.model, fmt=fmt)
+        self.S0 = MG.scatteringTot(geom, self.model, fmt=fmt)
+        self.C = MG.capture(geom, self.model, fmt=fmt)
 
         if allope is True:
             self.Fp = MG.promptfiss(geom, self.model, fmt=fmt)
@@ -125,15 +127,16 @@ class SN():
         self.nS = geom.nS
         self.nA = N
         self.nE = geom.nE
+        self.spatial_scheme = geom.spatial_scheme
         # compute Quadrature Weights
         geom.computeQW()
         self.geometry = geom.geometry
         # assign operators
         self.R = MG.removal(geom, self.model, fmt=fmt)
-        self.S = MG.scattering(geom, self.model, prod=prod, fmt=fmt)
-        self.S0 = MG.scatteringTot(geom, self.model, prod=prod, fmt=fmt)
-        self.F0 = MG.fission(geom, self.model, prod=prod, fmt=fmt)
-        self.C = MG.capture(geom, self.model, prod=prod, fmt=fmt)
+        self.S = MG.scattering(geom, self.model, fmt=fmt)
+        self.S0 = MG.scatteringTot(geom, self.model, fmt=fmt)
+        self.F0 = MG.fission(geom, self.model, fmt=fmt)
+        self.C = MG.capture(geom, self.model, fmt=fmt)
 
         if allope is True:
             self.Fp = MG.promptfiss(geom, self.model, fmt=fmt)

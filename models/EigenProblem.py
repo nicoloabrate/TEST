@@ -488,8 +488,8 @@ class eigenproblem():
         myeigpair = {'eigenvalues': eigvals[0:self.nev],
                      'eigenvectors' : ev,
                      'problem': self.which}
-        self.solution = PhaseSpace(self.geometry, myeigpair, normalize=True,
-                                   whichnorm=normalisation, operators=self.operators)
+        self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
+                                   normalize=True, whichnorm=normalisation)
 
     def spy(self, what, markersize=2):
         spy(self.__dict__[what], markersize=markersize)
