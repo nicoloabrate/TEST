@@ -16,21 +16,35 @@ from TEST.models.EigenProblem import eigenproblem
 # import matplotlib.pyplot as plt
 import time as t
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 # H, R, G, matrefl, ref = (30, 70, 2, 'MontagniniFuel', 1.004241348107076)
-H, R, G, matrefl, ref = (5, 10, 1, 'Pu239a_noS', 1.004241348107076)  # Absorber_0L
+H, R, G, matrefl, ref = (2, 5, 1, 'Absorber_0L', 1.004241348107076)  # Absorber_0L
 matfuel = 'Pu239'
 G = 1
-xlayers = [-R, R] # [-R, -H, 0, H, R]
-mats = [matfuel]*(len(xlayers)-1) # [matrefl, matfuel, matrefl]
+xlayers = [-R, -H, H, R] # [-R, R] # 
+mats = [matrefl, matfuel, matrefl]  # [matfuel]*(len(xlayers)-1) # 
 #(40, 100, 2, 'MontagniniReflector2', 1.045766651960480),
 # (40, 100, 2, 'MontagniniReflector3', 1.020903109926185)])
 algo = 'eig'
 nev = 1
 M = [-10]*(len(xlayers)-1)
+
+# Diffusion
 N = 0
 bc = 'zero'
+myslabD = Slab(M, xlayers, mats, [bc], G, N, 'FD')
+
+t0 = t.time()
+myDiff = NTE.Diffusion(myslabD, steady=True, fmt='csc')
+kD = eigenproblem(myDiff, 'kappa', myslabD, nev=nev)
+print('Elapsed time to setup PN FD: {} s'.format(t.time()-t0))
+
+t0 = t.time()
+kD.solve(algo=algo)
+print('Elapsed time, diffusion: {} s'.format(t.time()-t0))
+print('kD={:5f}'.format(kD.solution.eigvals[0]))
 
 # P1
 N = 1
@@ -77,31 +91,42 @@ print('Elapsed time by SN FV: {} s'.format(t.time()-t0))
 print('kS2 FV={:5f}'.format(kS2FV.solution.eigvals[0]))
 
 
+phiD_g1 = kD.solution.get(group=1, moment=0, mode=0, normalise='peaktotalflux')
 phiP1_g1 = kP1.solution.get(group=1, moment=0, mode=0, normalise='peaktotalflux')
 phiS2FD_g1 = kS2FD.solution.get(group=1, moment=0, mode=0, normalise='peaktotalflux')
 phiS2FV_g1 = kS2FV.solution.get(group=1, moment=0, mode=0, normalise='peaktotalflux')
 
 
-# plt.plot(myslabP.mesh, phiP1_g1, label='P1')
-# plt.plot(myslabSFV.mesh, phiS2FV_g1, label='S2 FV', linestyle=':')
-# plt.plot(myslabSFD.mesh, phiS2FD_g1, label='S2 FD', linestyle='--')
-#
-# if G > 1:
-#     phiP1_g2 = kP1.solution.get(group=2, moment=0, mode=0, normalise='peaktotalflux')
-#     phiS2FD_g2 = kS2FD.solution.get(group=2, moment=0, mode=0, normalise='peaktotalflux')
-#     phiS2FV_g2 = kS2FV.solution.get(group=2, moment=0, mode=0, normalise='peaktotalflux')
-#
-#
-#     plt.plot(myslabP.mesh, phiP1_g2, label='P1 g=2')
-#     plt.plot(myslabSFV.mesh, phiS2FV_g2, label='S2 FV g=2', linestyle=':')
-#     plt.plot(myslabSFD.mesh, phiS2FD_g2, label='S2 FD g=2', linestyle='--')
-#
-# # plt.plot(myslabSFD.mesh, phiSN1_FD, label='SN-FD', linestyle=':')
-# plt.axvline(x=0)
-# plt.legend()
-# plt.show()
+plt.plot(myslabP.mesh, phiD_g1, label='D')
+plt.plot(myslabP.mesh, phiP1_g1, label='P1')
+plt.plot(myslabSFV.mesh, phiS2FV_g1, label='S2 FV', linestyle=':')
+plt.plot(myslabSFD.mesh, phiS2FD_g1, label='S2 FD', linestyle='--')
+
+if G > 1:
+    phiD_g2 = kD.solution.get(group=2, moment=0, mode=0, normalise='peaktotalflux')
+    phiP1_g2 = kP1.solution.get(group=2, moment=0, mode=0, normalise='peaktotalflux')
+    phiS2FD_g2 = kS2FD.solution.get(group=2, moment=0, mode=0, normalise='peaktotalflux')
+    phiS2FV_g2 = kS2FV.solution.get(group=2, moment=0, mode=0, normalise='peaktotalflux')
+
+    plt.plot(myslabP.mesh, phiD_g2, label='P1 g=2')
+    plt.plot(myslabP.mesh, phiP1_g2, label='P1 g=2')
+    plt.plot(myslabSFV.mesh, phiS2FV_g2, label='S2 FV g=2', linestyle=':')
+    plt.plot(myslabSFD.mesh, phiS2FD_g2, label='S2 FD g=2', linestyle='--')
+
+# plt.plot(myslabSFD.mesh, phiSN1_FD, label='SN-FD', linestyle=':')
+plt.axvline(x=0, c='k')
+plt.legend()
+plt.show()
 
 # get operators
+L_diff=np.asarray(myDiff.L.todense())
+S_diff=np.asarray(myDiff.S.todense())
+F_diff=np.asarray(myDiff.F.todense())
+R_diff=np.asarray(myDiff.R.todense())
+C_diff=np.asarray(myDiff.C.todense())
+S0_diff=np.asarray(myDiff.S0.todense())
+F0_diff=np.asarray(myDiff.F0.todense())
+
 Lp1=np.asarray(myPN.L.todense())
 Sp1=np.asarray(myPN.S.todense())
 Fp1=np.asarray(myPN.F.todense())

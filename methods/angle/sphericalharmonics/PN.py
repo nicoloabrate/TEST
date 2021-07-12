@@ -33,7 +33,7 @@ def removal(obj, xs, fmt='csc'):
     M = []
     appM = M.append
 
-    for moment in range(0, N+1):
+    for moment in range(N+1):
 
         if moment % 2 == 0:
             meshtype = 'edges'  # evaluate on standard mesh if even
@@ -79,14 +79,12 @@ def leakage(obj, fmt='csc'):
     M = []
     appM = M.append
 
-    for moment in range(0, N+1):
+    for moment in range(N+1):
 
         if moment == 0:
             coeffs = [0, 1]
-
         elif moment == N:
             coeffs = [moment/(2*moment+1), 0]
-
         else:
             coeffs = [moment/(2*moment+1), (moment+1)/(2*moment+1)]
 
@@ -98,13 +96,15 @@ def leakage(obj, fmt='csc'):
         if coeffs[0] == 0:  # 0-th order moment
 
             if model == 'FD':
-                upp = FD.first(obj, coeffs[1], meshtype)
+                u1, u2 = FD.first(obj, coeffs[1], meshtype)
+                n = u2.shape[0]
+                upp = [u1[1:], u2]
             elif model == 'FV':
                 upp = FV.first(obj, coeffs[1], meshtype)
+                m, n = upp.shape
             else:
                 raise OSError('%s model not available for spatial variable!' % model)
 
-            m, n = upp.shape
             pos = np.array([-1, 0])
             UP = diags(upp, pos, (n, n-1), format=fmt)
             LO = []
@@ -120,11 +120,13 @@ def leakage(obj, fmt='csc'):
 
             m, n = low.shape
 
-            if moment % 2 != 0:
+            if moment % 2:  # odd moments
                 pos = np.array([0, 1])
                 LO = diags(low, pos, (n, n+1), format=fmt)
             else:
                 pos = np.array([-1, 0])
+                l1, l2 = low
+                low = [l1[1::], l2]
                 LO = diags(low, pos, (n, n-1), format=fmt)
             UP = []
 
@@ -148,6 +150,10 @@ def leakage(obj, fmt='csc'):
                 LO = diags(low, pos, (m, m+1), format=fmt)
             else:
                 pos = np.array([-1, 0])
+                u1, u2 = upp
+                l1, l2 = low
+                upp = [u1[1:], u2]
+                low = [l1[1:], l2]
                 UP = diags(upp, pos, (n, n-1), format=fmt)
                 LO = diags(low, pos, (m, m-1), format=fmt)
 
@@ -198,7 +204,7 @@ def scattering(obj, sm, fmt='csc'):
     M = []
     appM = M.append
 
-    for moment in range(0, N+1):
+    for moment in range(N+1):
 
         if moment % 2 == 0:
             meshtype = 'edges'  # evaluate on staggered mesh if odd
@@ -208,7 +214,7 @@ def scattering(obj, sm, fmt='csc'):
         if moment >= L:
             xs = np.zeros((obj.nLayers,))
         else:
-            xs = sm[ :, moment]
+            xs = sm[:, moment]
 
         if model == 'FD':
             s = FD.zero(obj, xs, meshtype)
@@ -248,7 +254,7 @@ def fission(obj, xs, fmt='csc'):
     M = []
     appM = M.append
 
-    for moment in range(0, N+1):
+    for moment in range(N+1):
 
         if moment % 2 == 0:
             meshtype = 'edges'
@@ -294,7 +300,7 @@ def delfission(obj, beta, xs, fmt='csc'):
     MPF = []
     MPFapp = MPF.append
 
-    for family in range(0, NPF):  # precursors
+    for family in range(NPF):  # precursors
 
         meshtype = 'edges'
 

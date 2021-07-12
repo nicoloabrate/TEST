@@ -227,7 +227,7 @@ class PhaseSpace:
         y = self.get(group, angle=angle, mode=mode, family=family,
                      precursors=precursors, moment=moment, normalise=normalise)
         yr, yi = y.real, y.imag
-        x = self.geometry.mesh if len(yr) == self.geometry.nS else self.geometry.stag_mesh
+        x = self.geometry.mesh if len(yr) == self.geometry.nS else self.geometry.ghostmesh
         ax = ax or plt.gca()
 
         y = yr if imag is False else yi
@@ -482,6 +482,10 @@ class PhaseSpace:
 
         """
         nE, nA, nS = self.nE, self.nA, self.nS
+
+        if group: 
+            if group > self.nE:
+                raise OSError('Cannot plot group {} for {}-group data!'.format(group, self.nE))
 
         if self.problem in ['static', 'delayed', 'prompt']:  # source problem
             vect = self.flux

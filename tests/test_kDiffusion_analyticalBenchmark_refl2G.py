@@ -29,7 +29,7 @@ def test_Diffusion_kappa0(H, R, G, matrefl, ref, algo):
 
     """
     nev = 1
-    M = -5
+    M = 50
     N = 0
     bc = 'zero'
     xlayers = [-R, -H, H, R]

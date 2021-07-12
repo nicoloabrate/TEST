@@ -24,7 +24,7 @@ class Slab:
         self.nLayers = len(layers)-1
         # check input consistency
         if self.nLayers != len(matlist):
-            raise OSError('{} regions but only {} materials specified!'.format(self.nLayers, len(matlist)))
+            raise OSError('{} regions but {} materials specified!'.format(self.nLayers, len(matlist)))
 
         # assign "test" path for data library
         self.datapath = datapath
@@ -72,17 +72,17 @@ class Slab:
                 self.regions[uniName] = Material(uniName, G, datapath=path)
 
             # consistency check precursor families and decay constants
-            if iLay == 0:
-                self.NPF = self.regions[uniName].NPF
-                lambdas = self.regions[uniName].__dict__['lambda']
-            else:
-                if self.NPF != self.regions[uniName].NPF:
-                    raise OSError('Number of precursor families in %s not consistent with other regions' % uniName)
-                if not np.allclose(lambdas, self.regions[uniName].__dict__['lambda']):
-                    self.regions[uniName].__dict__['lambda'] = lambdas
-                    if verbosity:
-                        print('Warning: Forcing decay constants consistency in {}...'.format(uniName))
-
+            if 'lambda' in self.regions[uniName].__dict__.keys():
+                if iLay == 0:
+                    self.NPF = self.regions[uniName].NPF
+                    lambdas = self.regions[uniName].__dict__['lambda']
+                else:
+                    if self.NPF != self.regions[uniName].NPF:
+                        raise OSError('Number of precursor families in %s not consistent with other regions' % uniName)
+                    if not np.allclose(lambdas, self.regions[uniName].__dict__['lambda']):
+                        self.regions[uniName].__dict__['lambda'] = lambdas
+                        if verbosity:
+                            print('Warning: Forcing decay constants consistency in {}...'.format(uniName))
 
             if AngOrd > 0:
                 minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
@@ -113,7 +113,7 @@ class Slab:
         old_grid = np.empty(0)
         old_grid_stag = np.empty(0)
 
-        for iLay in range(0, self.nLayers):
+        for iLay in range(self.nLayers):
             # compute grid spacing
             if max(self._NMFP) < 0:  # assign user-defined number of points
                 if abs(max(self._NMFP)) < 3:
@@ -169,9 +169,11 @@ class Slab:
         self.centers = gridg
         if spatial_scheme == 'FV':
             self.mesh = gridg
+            self.ghostmesh = grid
             self.nS = int(sum(N))-1
         else:
             self.mesh = grid
+            self.ghostmesh = gridg
             self.nS = int(sum(N))
 
     def plotmesh(self, ax=None, yVals=None, xlabel=None):

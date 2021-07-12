@@ -35,18 +35,19 @@ def removal(obj, data, fmt='csc'):
     appM = M.append
     for order in range(0, N):
         if model == 'FD':
-            t = FD.zero(obj, data)*1/2  # DD scheme
+            t = FD.zero(obj, data, meshtype='centers')*1/2  # DD scheme
             if mu[order] < 0: t = np.flip(t)
+            t = np.insert(t, 0, t[0, 0], axis=1)
             m = t.shape[1]
-            dia, pos = [t, t], [0, -1]
+            dia, pos = [t, t[:, 1:]], [0, -1]
         elif model == 'FV':
             t = FV.zero(obj, data, meshtype='centers')
             if mu[order] < 0: t = np.flip(t)
             dia, pos = t, [0]
+            m = t.shape[1]
         else:
             raise OSError('{} model not available for spatial variable!'.format(model))
 
-        m = t.shape[1]
         tmp = diags(dia, pos, (m, m), format=fmt)
         appM(tmp)
 
@@ -162,10 +163,11 @@ def scattering(obj, sm, fmt='csc'):
                     xs = xs+sm[:, l]*coeff
             # build sub-matrix for n-th order
             if model == 'FD':
-                s = FD.zero(obj, xs)/2  # DD scheme
+                s = FD.zero(obj, xs, meshtype='centers')/2  # DD scheme
                 if mu[n] < 0: s = np.flip(s)
+                s = np.insert(s, 0, 0, axis=1)
                 m = s.shape[1]
-                d = diags([s, s], [0, -1], (m, m), format=fmt)
+                d = diags([s, s[:, 1:]], [0, -1], (m, m), format=fmt)
             elif model == 'FV':
                 s = FV.zero(obj, xs, meshtype='centers')
                 if mu[n] < 0: s = np.flip(s)
@@ -218,10 +220,11 @@ def fission(obj, xs, fmt='csc'):
         for n in range(0, N):  # loop over directions defining total flux
             # build sub-matrix for n-th order
             if model == 'FD':
-                f = FD.zero(obj, 1/2*xs*w[n])/2  # DD scheme
+                f = FD.zero(obj, 1/2*xs*w[n], meshtype='centers')/2  # DD scheme
                 if mu[n] < 0: f = np.flip(f)
+                f = np.insert(f, 0, 0, axis=1)
                 m = f.shape[1]
-                d = diags([f, f], [0, -1], (m, m), format=fmt)
+                d = diags([f, f[:, 1:]], [0, -1], (m, m), format=fmt)
             elif model == 'FV':
                 f = FV.zero(obj, 1/2*xs*w[n], meshtype='centers')
                 if mu[n] < 0: f = np.flip(f)
@@ -271,7 +274,7 @@ def delfission(obj, beta, xs, fmt='csc'):
     for family in range(0, NPF):  # precursors
 
         if model == 'FD':
-            f = FD.zero(obj, beta[family, :]*xs)
+            f = FD.zero(obj, beta[family, :]*xs, meshtype='centers')
         elif model == 'FV':
             f = FV.zero(obj, beta[family, :]*xs, meshtype='centers')
         else:
