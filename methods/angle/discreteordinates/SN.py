@@ -33,7 +33,7 @@ def removal(obj, data, fmt='csc'):
     mu = obj.QW['mu']
     M = []
     appM = M.append
-    for order in range(0, N):
+    for order in range(N):
         if model == 'FD':
             t = FD.zero(obj, data, meshtype='centers')*1/2  # DD scheme
             if mu[order] < 0: t = np.flip(t)
@@ -83,27 +83,28 @@ def leakage(obj, fmt='csc'):
 
     # fill lower triangular matrix (mu > 0)
     if model == 'FD':
-        d = FD.zero(obj, 1/obj.dx).T.flatten()
+        d = FD.zero(obj, 1/obj.dx, meshtype='centers').T.flatten()
+        d = np.insert(d, 0, 0)
         trilpos = diags([-d[1:], d], (-1, 0), (obj.nS, obj.nS), format=fmt)
         trilneg = -trilpos
     elif model == 'FV':
         tmp = []
         tmpapp = tmp.append
-        for i in range(0, obj.nS):
+        for i in range(obj.nS):
             if i == 0:
                 d = FV.zero(obj, 2/obj.dx, meshtype='centers').T.flatten()
                 lst = list(d)
             else:
                 lst = list(-2*d[i:obj.nS]) if i % 2 != 0 else list(2*d[i:obj.nS])  #
             tmpapp(lst)
-    
+
         trilpos = diags(tmp, np.arange(0, -obj.nS, -1), (obj.nS, obj.nS), format=fmt)
         # fill lower triangular matrix (mu < 0)
         tmp = []
         tmpapp = tmp.append
-        for i in range(0, obj.nS):
+        for i in range(obj.nS):
             if i == 0:
-                d = FD.zero(obj, -2/np.flipud(obj.dx)).T.flatten()
+                d = FD.zero(obj, -2/np.flipud(obj.dx), meshtype='centers').T.flatten()
                 lst = list(d)
             else:
                 lst = list(-2*d[i:obj.nS]) if i % 2 != 0 else list(2*d[i:obj.nS])
@@ -112,7 +113,7 @@ def leakage(obj, fmt='csc'):
     else:
         raise OSError('{} model not available for spatial variable!'.format(model))
 
-    for order in range(0, N):
+    for order in range(N):
 
         mat = mu[order]*trilpos if mu[order] >= 0 else mu[order]*trilneg
         appM(mat)
@@ -152,12 +153,12 @@ def scattering(obj, sm, fmt='csc'):
     mu = obj.QW['mu']
     PL = obj.QW['PL']
     C = obj.QW['C']
-    for order in range(0, N):  # loop over directions (row sub-matrix)
+    for order in range(N):  # loop over directions (row sub-matrix)
         tmp = []
         tmpapp = tmp.append
-        for n in range(0, N):  # loop over directions defining Leg. moment
+        for n in range(N):  # loop over directions defining Leg. moment
             xs = sm[:, 0]*0
-            for l in range(0, L):  # loop over Legendre expansion moments
+            for l in range(L):  # loop over Legendre expansion moments
                 if l < N:
                     coeff = PL[l, order]*PL[l, n]*w[n]*C[l]
                     xs = xs+sm[:, l]*coeff
@@ -214,10 +215,10 @@ def fission(obj, xs, fmt='csc'):
     appM = M.append
     w = obj.QW['w']
     mu = obj.QW['mu']
-    for order in range(0, N):  # loop over directions
+    for order in range(N):  # loop over directions
         tmp = []
         tmpapp = tmp.append
-        for n in range(0, N):  # loop over directions defining total flux
+        for n in range(N):  # loop over directions defining total flux
             # build sub-matrix for n-th order
             if model == 'FD':
                 f = FD.zero(obj, 1/2*xs*w[n], meshtype='centers')/2  # DD scheme
@@ -271,7 +272,7 @@ def delfission(obj, beta, xs, fmt='csc'):
     MPF = []
     MPFapp = MPF.append
 
-    for family in range(0, NPF):  # precursors
+    for family in range(NPF):  # precursors
 
         if model == 'FD':
             f = FD.zero(obj, beta[family, :]*xs, meshtype='centers')
