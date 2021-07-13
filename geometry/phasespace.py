@@ -17,7 +17,7 @@ import TEST.methods.space.FV as FV
 class PhaseSpace:
     """Define phase space object."""
 
-    def __init__(self, geometry, solution, operators, 
+    def __init__(self, geometry, solution, operators,
                  energygrid=None, source=False,
                  normalize=False, whichnorm='phasespace'):
         """
@@ -28,14 +28,14 @@ class PhaseSpace:
         geometry : object
             Geometry object containing the material data and the spatial mesh.
         solution : dict or ndarray
-            Solution living in the phase space. If it is a dict, it is treated 
+            Solution living in the phase space. If it is a dict, it is treated
             as the solution of an eigenvalue problem. If it is an ndarray and
             ``source`` is True, it is treated as the solution of a source-driven
             problem.
         energygrid : ndarray, optional
             Multi-group energy grid structure. The default is None.
         source : bool, optional
-            If ``True``, the solution is not normalised. 
+            If ``True``, the solution is not normalised.
             The default is ``False``.
 
         Returns
@@ -48,7 +48,7 @@ class PhaseSpace:
         self.nA = operators.nA
         self.nE = operators.nE
         self.nS = operators.nS
-        
+
         if energygrid is not None:
             self.energygrid = energygrid
 
@@ -93,14 +93,14 @@ class PhaseSpace:
         grid = geom.mesh
         I = 0
         # TODO consider integration over non-group energy grid
-        for g in range(0, G):
+        for g in range(G):
             skip = g*S
             I = I+np.trapz(v1v2[skip:skip+S], x=grid)
         return I
 
     def interp(self, yp, xx, isref=True):
         """
-        Interpolate linearly vector yp on a different phase space geometrical 
+        Interpolate linearly vector yp on a different phase space geometrical
         grid.
 
         Parameters
@@ -130,14 +130,14 @@ class PhaseSpace:
 
         if isref is True:
             x = self.geometry.mesh
-            xp = xx            
+            xp = xx
         else:
             x = xx
             xp = self.geometry.mesh
 
         n, N = len(xp), len(x)
         y = np.zeros((G*N,), dtype=complex)
-        for g in range(0, G):
+        for g in range(G):
             y[g*N:(g+1)*N] = np.interp(x, xp, yp[g*n:(g+1)*n])
 
         return y
@@ -422,11 +422,11 @@ class PhaseSpace:
         Parameters
         ----------
         group : int, optional
-            Group number. If ``None``, all groups are displayed. Default is 
+            Group number. If ``None``, all groups are displayed. Default is
             ``None``.
         angle : int or float, optional
-            Angle to be displayed. If ``int``, the direction matching the 
-            number will be provided, if ``float`` the direction closest to 
+            Angle to be displayed. If ``int``, the direction matching the
+            number will be provided, if ``float`` the direction closest to
             this number will be provided. Default is None.
         moment : int
             Flux moment number. Default is 0.
@@ -445,6 +445,8 @@ class PhaseSpace:
             Imaginary part of the flux mode.
 
         """
+        if self.problem == 'static':
+            normalise = False
         if normalise is not False:
             which = 'phasespace' if normalise is True else normalise
             self.normalize(which=which)
@@ -483,9 +485,9 @@ class PhaseSpace:
         """
         nE, nA, nS = self.nE, self.nA, self.nS
 
-        if group: 
+        if group:
             if group > self.nE:
-                raise OSError('Cannot plot group {} for {}-group data!'.format(group, self.nE))
+                raise OSError('Cannot get group {} for {}-group data!'.format(group, self.nE))
 
         if self.problem in ['static', 'delayed', 'prompt']:  # source problem
             vect = self.flux
@@ -511,11 +513,10 @@ class PhaseSpace:
             G = self.geometry.nE
             dim = self.geometry.nS if moment % 2 == 0 else self.geometry.nS-1
             # preallocation for group-wise moments
-            gro = np.arange(1, self.geometry.nE+1) if group is None else [group]
+            gro = [group] if group else np.arange(1, self.geometry.nE+1)
             y = np.zeros((dim*len(gro), ))
 
             for ig, g in enumerate(gro):
-
                 if precursors is False:
                     # compute No and Ne for the requested moment/angle
                     skip = (Ne*nS+No*(nS-1))*(g-1)
@@ -524,7 +525,6 @@ class PhaseSpace:
                     M = nS if moment % 2 == 0 else nS-1
                     iS = skip+NE*nS+NO*(nS-1)
                     iE = skip+NE*nS+NO*(nS-1)+M
-    
                 else:
                     iS = (Ne*nS+No*(nS-1))*nE+(g-1)*nF+iF
                     iE = (Ne*nS+No*(nS-1))*nE+(g-1)*nF+iF+nS
@@ -533,12 +533,12 @@ class PhaseSpace:
         else:
             # build angular flux and evaluate in angle
             tmp = np.zeros((dim*G))
-            for n in range(0, self.nA):
+            for n in range(self.nA):
                 # interpolate to have consistent PN moments
                 y = vect if n % 2 == 0 else self.interp(vect, self.geometry.stag_mesh)
                 tmp = tmp+(2*n+1)/2*eval_legendre(n, angle)*y
             # get values for requested groups
-            iS, iE = (0, -1) if group is None else (nS*(group-1), nS*(group-1)+nS)
+            iS, iE = (nS*(group-1), nS*(group-1)+nS)if group else (0, -1) 
             y = y[iS:iE]
         return y
 
@@ -580,7 +580,9 @@ class PhaseSpace:
             else:
                 vect = self.eigvect[:, mode]
 
-        if angle is not None:
+        gro = [group] if group else np.arange(1, self.geometry.nE+1)
+
+        if angle:
 
             if isinstance(angle, int):
                 idx = angle
@@ -597,33 +599,29 @@ class PhaseSpace:
                 iF = 0
 
             # preallocation for group-wise moments
-            gro = np.arange(0, self.geometry.nE) if group is None else [group]
             y = np.zeros((nS*len(gro), ))
 
             for ig, g in enumerate(gro):
-
-                if precursors is False:
-                    # compute No and Ne for the requested moment/angle
-                    iS = (nS*idx)*(g-1)
-                    iE = (nS*idx)*(g-1)+nS
-                else:
+                if precursors:
                     iS = len(mu)*nS*nE+g*nF+iF
                     iE = len(mu)*nS*nE+g*nF+iF+nS
+                else:
+                    iS = idx*nS+nS*(g-1)*self.nA
+                    iE = idx*nS+nS*(g-1)*self.nA+nS
                 # store slices
-                y[ig*nS:(ig+1)*nS] = vect[iS:iE]
-
+                y[ig*nS:(ig+1)*nS] = vect[iS:iE] if angle >= 0 else np.flipud(vect[iS:iE])
+                
         else:
-            # build angular flux and evaluate in angle
-            tmp = np.zeros((nS*nE, ))
-            for n in range(0, self.nA):
-                phi = np.zeros((nE*nS, ))  # allocate group-wise angular flux
-                for g in range(0, nE):
-                    iS = nS*n*g+n*nS
-                    iE = nS*n*g+n*nS+nS
+            # compute flux moments
+            y = np.zeros((nS*len(gro), ))
+            for n in range(self.nA):
+                phi = np.zeros((nS*len(gro), ))  # allocate group-wise angular flux
+                for ig, g in enumerate(gro):
+                    iS = n*nS+nS*(g-1)*self.nA
+                    iE = n*nS+nS*(g-1)*self.nA+nS
                     # get group-wise angular flux
-                    phi[g*nS:(g+1)*nS] = vect[iS:iE] if mu[n] >= 0 else np.flipud(vect[iS:iE])
+                    phi[ig*nS:(ig+1)*nS] = vect[iS:iE] if mu[n] >= 0 else np.flipud(vect[iS:iE])
                 # compute flux moment contribution
-                tmp = tmp+w[n]*eval_legendre(moment, mu[n])*phi
-            iS, iE = (0, len(tmp)) if group is None else (nS*(group-1), nS*(group-1)+nS)
-            y = tmp[iS:iE]
+                y = y+w[n]*eval_legendre(moment, mu[n])*phi
+
         return y

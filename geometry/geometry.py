@@ -18,7 +18,7 @@ class Slab:
     """Define slab geometry object."""
 
     def __init__(self, NMFP, layers, matlist, BCs, G, AngOrd, spatial_scheme,
-                 datapath=None, verbosity=True):
+                 datapath=None, verbosity=True, energygrid=None):
 
         # assign number of layers
         self.nLayers = len(layers)-1
@@ -31,6 +31,14 @@ class Slab:
 
         # assign layers coordinates
         self.layers = layers
+
+        if energygrid is None:
+            if G == 1:
+                self.energygrid = [1E-11, 20]
+            if G == 2:
+                self.energygrid = [1E-11, 0.0625, 20]
+        else:
+            self.energygrid = energygrid
 
         # set number of mean free path
         if isinstance(NMFP, int):
