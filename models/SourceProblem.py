@@ -78,18 +78,22 @@ class sourceproblem():
             f = np.zeros((dim,))
             sig = signature(source)
             if 'x' in sig.parameters:
-                x = self.geometry.edges if ss == 'FD' else self.geometry.centers
-                xs = self.geometry.centers if ss == 'FD' else self.geometry.edges
+                if ss == 'FD' and self.model != 'SN':
+                    x = self.geometry.edges
+                    xs = self.geometry.centers
+                else:
+                    x = self.geometry.centers
+                    xs = self.geometry.edges
             else:
                 x = np.ones((self.nS, )) if ss == 'FD' else np.ones((self.nS-1, ))
-                xs = np.ones((self.nS-1, )) if ss == 'FD' else np.ones((self.nS, ))             
+                xs = np.ones((self.nS-1, )) if ss == 'FD' else np.ones((self.nS, ))
             isotropic = False if 'mu' in sig.parameters else True
             uniformE = False if 'E' in sig.parameters else True
 
             for g in range(0, self.nE):
                 # check energy integration
                 if 'energygrid' in self.geometry.__dict__.keys():
-                    E = self.geometry.energygrid[g, g+1]
+                    E = self.geometry.energygrid[g:g+2]
                 elif self.nE == 1:
                     E = np.array([1E-11 , 20])
                 else:
@@ -127,9 +131,10 @@ class sourceproblem():
                                 mysource = lambda mu, E: sourceproblem.mysrc(source, xv, mu, E)*eval_legendre(moment, mu)
                                 # integrate on energy and angle
                                 # FIXME: this has to be tested
+                                f[iS], err = dblquad(mysource, -1, 1, lambda E: E[0], lambda E: E[1])*coeff
                                 if err > 1E-5:
                                     print('Source projection failed! Integration error={}'.format(err))
-                                f[iS], err = dblquad(mysource, -1, 1, lambda E: E[0], lambda E: E[1])*coeff
+
                             iS = iS+1
                         if isotropic:
                             break  # compute only 0-th moment
@@ -148,6 +153,13 @@ class sourceproblem():
                                 if err > 1E-5:
                                     print('Source projection failed! Integration error={}'.format(err))
                             iS = iS+1
+                    # impose BCs
+                    if self.geometry.spatial_scheme == 'FD':
+                        for gro in range(self.nE):
+                            idg = gro*self.nS*self.nA
+                            for order in range(self.nA):
+                                skip = self.nS*order+idg
+                                f[skip] = 0
 
         else:
             raise OSError('Source cannot be of type {}'.format(type(source)))
@@ -184,7 +196,7 @@ class sourceproblem():
         sig = signature(source)
         # assign arguments according to the original function args order
         NP = len(sig.parameters.keys())
-        args = [[]]*NP            
+        args = [[]]*NP
         for ip, p in enumerate(sig.parameters.keys()):
             if p == 'x':
                 args[ip] = x
@@ -311,7 +323,7 @@ class sourceproblem():
 
     def solve(self):
         """
-        Solve the source-driven problem.        
+        Solve the source-driven problem.
 
         Parameters
         ----------
