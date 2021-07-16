@@ -29,7 +29,7 @@ serp_keys = [*scatt_keys, *xsdf_keys, *ene_keys]
 sumxs = ['Tot', 'Abs', 'Remxs']
 indepdata = ['Capt', 'Fiss', 'S0', 'Nubar', 'Diffcoef', 'Chid', 'Chip']
 basicdata = ['Fiss', 'Nubar', 'S0', 'Chit']
-kinetics = ['lambda', 'beta', 'Chid', 'Chip']
+kinetics = ['lambda', 'beta']
 
 # FIXME read energy grid from data
 class Material():
@@ -393,14 +393,23 @@ class Material():
                     kincons = False
 
             if kincons is True:
-                if len(self.Chid.shape) == 1:
-                    # each family has same emission spectrum
-                    self.Chid = np.asarray([self.Chid]*self.NPF)
-                elif self.Chid.shape != (self.NPF, self.nE):
-                    raise OSError('Delayed fiss. spectrum should be (%d, %d)'
-                                  % (self.NPF, self.nE))
+                try:
+                    if len(self.Chid.shape) == 1:
+                        # each family has same emission spectrum
+                        self.Chid = np.asarray([self.Chid]*self.NPF)
+                    elif self.Chid.shape != (self.NPF, self.nE):
+                        raise OSError('Delayed fiss. spectrum should be (%d, %d)'
+                                      % (self.NPF, self.nE))
+    
+                    for g in range(0, self.nE):
+                        chit = (1-self.beta.sum())*self.Chip[g]+np.dot(self.beta, self.Chid[:, g])
+                        if abs(self.Chit[g]-chit) > 1E-5:
+                            raise OSError('Fission spectra or delayed fractions in %s not consistent!' % self.UniName)
 
-                for g in range(0, self.nE):
-                    chit = (1-self.beta.sum())*self.Chip[g]+np.dot(self.beta, self.Chid[:, g])
-                    if abs(self.Chit[g]-chit) > 1E-5:
-                        raise OSError('Fission spectra or delayed fractions in %s not consistent!' % self.UniName)
+                except AttributeError as err:
+                    if "'Material' object has no attribute 'Chid'" in str(err):
+                        self.Chid = self.Chit
+                        self.Chip = self.Chit
+                    else:
+                        print(err)
+                    
