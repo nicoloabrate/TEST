@@ -1,10 +1,9 @@
 """
 Author: N. Abrate.
 
-File: test_kDiffusion_analyticalBenchmark_refl2G.py
+File: test_ANL_6A1_reflected.py
 
-Description: Analytical benchmark for a reflected 2G slab. Both forward and
-            adjoint models are executed.
+Description: Numerical benchmark for a reflected 2G slab.
 """
 import sys
 sys.path.append('../../')
@@ -166,9 +165,9 @@ plt.show()
 # S0_FD=np.asarray(mySNFD.S0.todense())
 # F0_FD=np.asarray(mySNFD.F0.todense())
 
-L_FV=np.asarray(mySNFV.L.todense())
-S_FV=np.asarray(mySNFV.S.todense())
-F_FV=np.asarray(mySNFV.F.todense())
-R_FV=np.asarray(mySNFV.R.todense())
-S0_FV=np.asarray(mySNFV.S0.todense())
-F0_FV=np.asarray(mySNFV.F0.todense())
+# L_FV=np.asarray(mySNFV.L.todense())
+# S_FV=np.asarray(mySNFV.S.todense())
+# F_FV=np.asarray(mySNFV.F.todense())
+# R_FV=np.asarray(mySNFV.R.todense())
+# S0_FV=np.asarray(mySNFV.S0.todense())
+# F0_FV=np.asarray(mySNFV.F0.todense())

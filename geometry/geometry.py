@@ -12,19 +12,19 @@ from TEST.material import Material
 from collections import OrderedDict
 from copy import deepcopy as cp
 from scipy.special import roots_legendre, eval_legendre
-
+from copy import deepcopy as copy
 
 class Slab:
     """Define slab geometry object."""
 
-    def __init__(self, NMFP, layers, matlist, BCs, G, AngOrd, spatial_scheme,
+    def __init__(self, split, layers, regions, BCs, G, AngOrd, spatial_scheme,
                  datapath=None, verbosity=True, energygrid=None):
 
         # assign number of layers
         self.nLayers = len(layers)-1
         # check input consistency
-        if self.nLayers != len(matlist):
-            raise OSError('{} regions but {} materials specified!'.format(self.nLayers, len(matlist)))
+        if self.nLayers != len(regions):
+            raise OSError('{} regions but {} materials specified!'.format(self.nLayers, len(regions)))
 
         # assign "test" path for data library
         self.datapath = datapath
@@ -41,22 +41,22 @@ class Slab:
             self.energygrid = energygrid
 
         # set number of mean free path
-        if isinstance(NMFP, int):
-            self._NMFP = NMFP*np.ones((self.nLayers), dtype=int)
-        elif isinstance(NMFP, float):
-            self._NMFP = NMFP*np.ones((self.nLayers), dtype=float)
-        elif isinstance(NMFP, (list, np.ndarray)):
+        if isinstance(split, int):
+            self._split = split*np.ones((self.nLayers), dtype=int)
+        elif isinstance(split, float):
+            self._split = split*np.ones((self.nLayers), dtype=float)
+        elif isinstance(split, (list, np.ndarray)):
 
-            if len(NMFP) == self.nLayers:
-                self._NMFP = NMFP
+            if len(split) == self.nLayers:
+                self._split = split
 
             else:
-                raise OSError('NMFP specified are not consistent with' +
+                raise OSError('split specified are not consistent with' +
                               ' the number of regions. Please provide one'
-                              + ' NMFP or as many NMFP as the number of' +
+                              + ' split or as many split as the number of' +
                               'layers.')
         else:
-            raise TypeError('Cannot read type %s for NMFP!' % type(NMFP))
+            raise TypeError('Cannot read type %s for split!' % type(split))
 
         # set Boundary Conditions
         self.BC = BCs if isinstance(BCs, list) else [BCs]
@@ -67,7 +67,7 @@ class Slab:
 
         for iLay in range(0, self.nLayers):
 
-            uniName = matlist[iLay]
+            uniName = regions[iLay]
 
             if uniName not in self.regions.keys():
 
@@ -99,7 +99,8 @@ class Slab:
         # assign mesh, ghost mesh and N
         self.mesher(minmfp, spatial_scheme)
 
-        self.regionmap = OrderedDict(zip(range(0, len(matlist)), matlist))
+        self.regionwhere = OrderedDict(zip(range(0, len(regions)), zip(self.layers[:-1], self.layers[1:])))
+        self.regionmap = OrderedDict(zip(range(0, len(regions)), regions))
         self.AngOrd = AngOrd
         self.spatial_scheme = spatial_scheme
         self.nE = G
@@ -123,23 +124,23 @@ class Slab:
 
         for iLay in range(self.nLayers):
             # compute grid spacing
-            if max(self._NMFP) < 0:  # assign user-defined number of points
-                if abs(max(self._NMFP)) < 3:
+            if max(self._split) < 0:  # assign user-defined number of points
+                if abs(max(self._split)) < 3:
                     raise OSError('Number of meshes must be >2!')
                 deltalay = self.layers[iLay+1]-self.layers[iLay]
-                dx[iLay] = deltalay/abs(self._NMFP[iLay])
+                dx[iLay] = deltalay/abs(self._split[iLay])
                 N[iLay] = np.ceil(deltalay/dx[iLay])
                 uselinsp = True
 
-            elif sum([isinstance(s, float) for s in self._NMFP]) == len(self._NMFP):  # user-defined dx
+            elif sum([isinstance(s, float) for s in self._split]) == len(self._split):  # user-defined dx
                 deltalay = self.layers[iLay+1]-self.layers[iLay]
-                dx[iLay] = self._NMFP[iLay]
+                dx[iLay] = self._split[iLay]
                 N[iLay] = np.ceil(deltalay/dx[iLay])
                 uselinsp = False
 
             else:
                 deltalay = self.layers[iLay+1]-self.layers[iLay]
-                dx[iLay] = minmfp[iLay]/self._NMFP[iLay]
+                dx[iLay] = minmfp[iLay]/self._split[iLay]
                 N[iLay] = np.ceil(deltalay/dx[iLay])
                 uselinsp = True
 
@@ -321,25 +322,7 @@ class Slab:
         return vals
 
     def perturb(self, perturbation, sanitycheck=True):
-        """
-        Add perturbations to an unperturbed, reference system.
 
-        Parameters
-        ----------
-        what : str
-            DESCRIPTION.
-        where : ndarray
-            DESCRIPTION.
-        howmuch : float
-            DESCRIPTION.
-        system : object
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
-
-        """
         # parse file content
         if isinstance(perturbation, str):
             if '.json' not in perturbation:
@@ -348,6 +331,9 @@ class Slab:
                 perturbation = json.load(f)
 
         iP = 0  # perturbation counter
+        for p in list(self.regions.keys()):
+            if 'Perturbation' in p:
+                iP += 1
         regs = list(self.regionmap.values())
         for k, v in perturbation.items():
             # check perturbation consistency
@@ -367,9 +353,11 @@ class Slab:
             if isinstance(x, tuple):
                 x = [x]
 
+            nlayers_old = len(self.layers)-1+0
             for x1, x2 in x:  # loop over perturbation coordinates
                 coo = zip(self.layers[:-1], self.layers[1:])
                 iP = iP + 1
+                # FIXME: right and left are swapped!
                 for r, l in coo:  # loop to identify regions involved
                     # perturbation inside region
                     if x1 >= r and x2 <= l:
@@ -378,7 +366,8 @@ class Slab:
                             idx = self.layers.index(r)
                             self.layers.insert(idx+1, x1)
                         if x2 not in self.layers:
-                            self.layers.insert(idx+2, x2)
+                            idx = self.layers.index(l)
+                            self.layers.insert(idx, x2)
                         # add new region
                         if x1 == r and x2 < l:  # on the right
                             oldreg = regs[idx]
@@ -402,23 +391,60 @@ class Slab:
                         raise OSError('Perturbations can be applied one region at a time!')
 
             self.nLayers = len(self.layers)-1
-            self.regionmap = OrderedDict(zip(range(0, self.nLayers), regs))
+            self.regionwhere = OrderedDict(zip(range(self.nLayers), zip(self.layers[:-1], self.layers[1:])))
+            self.regionmap = OrderedDict(zip(range(self.nLayers), regs))
             # update mesh to take into account new layers
-            if list(set(self._NMFP.tolist())) == self._NMFP.tolist():
-                self._NMFP = self._NMFP*np.ones((self.nLayers))
+            tmp = self._split if isinstance(self._split, list) else self._split.tolist()
+
+            if list(set(tmp)) == tmp:
+                self._split = self._split*np.ones((self.nLayers))
+
+            if max(tmp) < 0 and nlayers_old != self.nLayers:  # user defined points
+                idy = np.argmax(tmp)
+                scaling_fact = (x2-x1)/(self.layers[idy+1]-self.layers[idy])
+                minmfp = self._split.insert(idx, int(scaling_fact*max(tmp)))
+                self.mesher(minmfp, spatial_scheme=self.spatial_scheme)
             else:
-                raise OSError('Number of MFP must be the same for all regions for perturbation!')
+                minmfp = np.zeros((self.nLayers, ))
 
-            minmfp = np.zeros((self.nLayers, ))
+                for iLay in range(0, self.nLayers):
+                    uniName = self.regionmap[iLay]
+                    if self.AngOrd > 0:
+                        minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
+                    else:
+                        minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
 
-            for iLay in range(0, self.nLayers):
-                uniName = self.regionmap[iLay]
-                if self.AngOrd > 0:
-                    minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
-                else:
-                    minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
+                self.mesher(minmfp, spatial_scheme=self.spatial_scheme)
 
-            self.mesher(minmfp, spatial_scheme=self.spatial_scheme)
+    def replace(self, replacement, sanitycheck=True):
+        # TODO: finish the implementation and test it
+        regs = list(self.regionmap.values())
+        for k, v in replacement.items():
+            # check perturbation consistency
+            if 'which' not in v.keys():
+                raise OSError('Material to be replaced is missing')
+            if 'where' not in v.keys():
+                raise OSError('Replacement coordinates are missing')
+            if 'with' not in v.keys():
+                raise OSError('New material for replacement missing')
+            if 'datapath' not in v.keys():
+                raise OSError('New material file path missing')
+            if 'name' in v.keys():
+                new_mat_name = v['name']
+            else:
+                iR = 0
+                for r in regs:
+                    if 'Replacement' in r:
+                        iR += 1
+
+        old_mat_name = v['which']
+        coord = v['where']
+        new_mat = v['with']
+        new_mat_name = 'Replacement{}'.format(iR)
+        # look for position where to replace
+        idx = np.argwhere(self.layers==min(coord))
+        self.regionmap[len(regs)+1] = new_mat_name
+        self.regions[new_mat_name] = new_mat
 
     def computeQW(self):
         """
