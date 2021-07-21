@@ -366,6 +366,10 @@ class PhaseSpace:
     def getfundamental(self, lambdas=None):
         if self.problem in ['kappa', 'gamma']:
             idx = 0
+        elif self.problem == 'theta':
+            reals = self.eigvals[self.eigvals.imag == 0]
+            reals = reals[reals != 0]
+            idx = np.argwhere([self.eigvals == reals.max()])[0][1]
         elif self.problem == 'delta':
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
@@ -538,7 +542,7 @@ class PhaseSpace:
                 y = vect if n % 2 == 0 else self.interp(vect, self.geometry.stag_mesh)
                 tmp = tmp+(2*n+1)/2*eval_legendre(n, angle)*y
             # get values for requested groups
-            iS, iE = (nS*(group-1), nS*(group-1)+nS)if group else (0, -1) 
+            iS, iE = (nS*(group-1), nS*(group-1)+nS)if group else (0, -1)
             y = y[iS:iE]
         return y
 
@@ -610,7 +614,7 @@ class PhaseSpace:
                     iE = idx*nS+nS*(g-1)*self.nA+nS
                 # store slices
                 y[ig*nS:(ig+1)*nS] = vect[iS:iE] if angle >= 0 else np.flipud(vect[iS:iE])
-                
+
         else:
             # compute flux moments
             y = np.zeros((nS*len(gro), ))

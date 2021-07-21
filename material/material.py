@@ -30,6 +30,7 @@ sumxs = ['Tot', 'Abs', 'Remxs']
 indepdata = ['Capt', 'Fiss', 'S0', 'Nubar', 'Diffcoef', 'Chid', 'Chip']
 basicdata = ['Fiss', 'Nubar', 'S0', 'Chit']
 kinetics = ['lambda', 'beta']
+alldata = list(set([*sumxs, *indepdata, *basicdata, *kinetics]))
 
 # FIXME read energy grid from data
 class Material():
@@ -400,7 +401,7 @@ class Material():
                     elif self.Chid.shape != (self.NPF, self.nE):
                         raise OSError('Delayed fiss. spectrum should be (%d, %d)'
                                       % (self.NPF, self.nE))
-    
+
                     for g in range(0, self.nE):
                         chit = (1-self.beta.sum())*self.Chip[g]+np.dot(self.beta, self.Chid[:, g])
                         if abs(self.Chit[g]-chit) > 1E-5:
@@ -412,4 +413,42 @@ class Material():
                         self.Chip = self.Chit
                     else:
                         print(err)
-                    
+    def void(self, excludeXS=None, sanitycheck=True):
+        """
+        Make region void except for some group-wise user-specified reaction
+
+        Parameters
+        ----------
+        what : str
+            DESCRIPTION.
+        where : ndarray
+            DESCRIPTION.
+        howmuch : float
+            DESCRIPTION.
+        system : object
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        for l in range(0, self.L):
+            new = 'S{}'.format(l)
+            newP = 'Sp{}'.format(l)
+            if new not in alldata:
+                alldata.append(new)
+            if newP not in alldata:
+                alldata.append(newP)
+
+        for g in range(0, self.nE):
+            mydic = self.__dict__
+            for what in mydic.keys():
+                if what in alldata:
+                    if excludeXS is not None:
+                        if what in excludeXS.keys() and g+1 in excludeXS[what]:
+                            continue  # keep this data
+                        else:
+                            mydic[what][g] = 0
+                    else:
+                        mydic[what][g] = 0
