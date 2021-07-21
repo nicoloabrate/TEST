@@ -42,7 +42,7 @@ def zero(obj, f, meshtype='edges'):
         fx[0, inner_pts[0]:inner_pts[-1]+1] = f[i]*np.ones((1, len(inner_pts)))
         if meshtype == 'edges':
             if NL > 1 and i < NL-1 and obj.mesh[inner_pts[-1]] <= obj.layers[i+1]:
-                fx[0, inner_pts[-1]] = avg(f[i], f[i+1], obj.dx[i], obj.dx[i+1])
+                fx[0, inner_pts[-1]] = avg(f[i], f[i+1], obj.dx[i]/2, obj.dx[i+1]/2)
     return fx
 
 
