@@ -45,6 +45,7 @@ class GET():
             self.nev = nev
 
         # --- define new operators
+        self.LHS = deepcopy(self.operators)
         if material is not None:
             voidgeom = deepcopy(geom)
             # set other regions to void except in the phasespace region of interest
@@ -52,23 +53,34 @@ class GET():
                 if reg not in material.keys():
                     voidgeom.regions[reg].void()
                 else:
+                    voidgeom.regions[reg].void(excludeXS=material[reg])
                     if isinstance(material[reg], dict):
-                        voidgeom.regions[reg].void(excludeXS=material[reg])
+                        self.eigenpos = list(material[reg].keys())
+                    elif isinstance(material[reg], list):
+                        self.eigenpos = material[reg]
 
             if self.model == 'PN':
                 self.RHS = NTE.PN(voidgeom, self.nA, steady=True, fmt='csc')
             elif self.model == 'SN':
-                self.RHS = NTE.PN(voidgeom, self.nA, steady=True, fmt='csc')
+                self.RHS = NTE.SN(voidgeom, self.nA, steady=True, fmt='csc')
             elif self.model == 'Diffusion':
                 self.RHS = NTE.Diffusion(voidgeom, steady=True, fmt='csc')
 
             # subtract new operators to keep balance
-            self.LHS = deepcopy(self.operators)
             self.LHS.F = self.operators.F-self.RHS.F
             self.LHS.S = self.operators.S-self.RHS.S
             self.LHS.S0 = self.operators.S0-self.RHS.S0
             self.LHS.F0 = self.operators.F0-self.RHS.F0
             self.LHS.C = self.operators.C-self.RHS.C
+        else:
+            # FIXME: do this in a more efficient way
+            self.RHS = deepcopy(self.operators)
+            self.RHS.F = self.RHS.F*0
+            self.RHS.F0 = self.RHS.F0*0
+            self.RHS.S = self.RHS.S*0
+            self.RHS.S0 = self.RHS.S0*0
+            self.RHS.R = self.RHS.R*0
+            self.RHS.Linf = self.RHS.Linf*0
 
         # --- call eigenvalue problem
         try:
@@ -263,7 +275,7 @@ class GET():
 
         """
         RHS, LHS = self.RHS, self.LHS
-        # define kappa eigenproblem operators
+        # define theta eigenproblem operators
         if self.nev == 0 or self.BC is False:  # infinite medium
             if self.model != 'Diffusion':
                 self.A = LHS.Linf+LHS.C+LHS.S0+LHS.F0-LHS.S-LHS.F  # no leakage, infinite medium
@@ -273,11 +285,18 @@ class GET():
         else:
             self.A = LHS.L+LHS.C+LHS.S0+LHS.F0-LHS.S-LHS.F  # destruction operator
 
-        self.B = -RHS.C  # multiplication operator
+        if 'Fiss' in self.eigenpos:
+            self.B = -RHS.F0
+        elif 'Capt' in self.eigenpos:
+            self.B = -RHS.C
+        elif 'S0' in self.eigenpos:
+            self.B = -RHS.S0
+        else:
+            raise OSError('Theta eigenvalue does not support {} reaction!'.format(self.eigenpos))
+
         self.which = 'theta'
         self.whichspectrum = 'SR'
         self.sigma = 0
-
 
     def solve(self, algo='PETSc', verbosity=False,tol=1E-14, monitor=False,
               normalisation='totalflux', shift=None):
