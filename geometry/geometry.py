@@ -20,6 +20,8 @@ class Slab:
     def __init__(self, split, layers, regions, BCs, G, AngOrd, spatial_scheme,
                  datapath=None, verbosity=True, energygrid=None):
 
+        if isinstance(regions, str):
+            regions = [regions]
         # assign number of layers
         self.nLayers = len(layers)-1
         # check input consistency
