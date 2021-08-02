@@ -60,6 +60,7 @@ class PhaseSpace:
                 self.eigvals = solution['eigenvalues']
                 self.eigvect = solution['eigenvectors']
                 self.problem = solution['problem']
+                self.nev = len(self.eigvals)
                 if normalize is True:
                     self.normalize(which=whichnorm)
         else:
@@ -238,8 +239,10 @@ class PhaseSpace:
         # ax.set_xlim([min(self.geometry.layers), max(self.geometry.layers)])
         ax.xaxis.set_major_formatter(FormatStrFormatter('%g'))
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+        ax.set_title(title)
 
-    def plotspectrum(self, loglog=False, gaussplane=True, geom=None,
+
+    def plotspectrum(self, loglog=False, gaussplane=True, geom=None, ax=None,
                      grid=True, ylims=None, threshold=None, subplt=False):
 
         if self.problem == 'omega' and geom is not None:
@@ -253,9 +256,12 @@ class PhaseSpace:
             sub1 = fig.add_subplot(1, 2, 1)
             sub2 = fig.add_subplot(1, 2, 2)
         else:
-            fig = plt.figure()
-            sub1 = fig.add_subplot(1, 1, 1)
             subplt = False
+            if ax:
+                sub1 = ax
+            else:
+                fig = plt.figure()
+                sub1 = fig.add_subplot(1, 1, 1)
 
         val, vect = self.getfundamental(lambdas)
         evals = np.delete(self.eigvals, np.where(self.eigvals == val))
@@ -365,11 +371,28 @@ class PhaseSpace:
 
     def getfundamental(self, lambdas=None):
         if self.problem in ['kappa', 'gamma']:
-            idx = 0
+            for i in range(self.nev):
+                # get total flux
+                v = self.get(moment=0, nEv=i)
+                # fix almost zero points to avoid sign issues
+                v[np.abs(v) < np.finfo(float).eps] = 0
+                if np.all(v >= 0) if v[0] >= 0 else np.all(v < 0):
+                    idx = i
+                    break
         elif self.problem == 'theta':
             reals = self.eigvals[self.eigvals.imag == 0]
             reals = reals[reals != 0]
-            idx = np.argwhere([self.eigvals == reals.max()])[0][1]
+            # select real eigenvalue with positive total flux
+            for i in range(len(reals)):
+                # get total flux
+                idx = np.argwhere(self.eigvals==reals[i])[0][0]
+                v = self.get(moment=0, nEv=idx)
+                # fix almost zero points to avoid sign issues
+                v[np.abs(v) < np.finfo(float).eps] = 0
+                if np.all(v >= 0) if v[0] >= 0 else np.all(v < 0):
+                    break
+
+            # idx = np.argwhere([self.eigvals == reals.max()])[0][1]
         elif self.problem == 'delta':
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
@@ -419,7 +442,7 @@ class PhaseSpace:
         return eigenvalue, eigenvector
 
     def get(self, group=None, angle=None, moment=0, mode=0, family=0,
-            normalise=False, precursors=False):
+            nEv=None, normalise=False, precursors=False):
         """
         Get spatial flux distribution for group, angle/moment and spatial mode.
 
@@ -457,14 +480,14 @@ class PhaseSpace:
 
         if self.model == 'PN' or self.model == 'Diffusion':
             y = self._getPN(group=group, angle=angle, moment=moment, mode=mode,
-                            family=family, precursors=precursors)
+                            family=family, precursors=precursors, nEv=nEv)
         elif self.model == 'SN':
             y = self._getSN(group=group, angle=angle, moment=moment, mode=mode,
-                            family=family, precursors=precursors)
+                            family=family, precursors=precursors, nEv=nEv)
         return y
 
     def _getPN(self, group=None, angle=None, moment=0, mode=0, family=0,
-               precursors=False):
+               nEv=None, precursors=False):
         """
         Get spatial flux distribution for group, angle and spatial mode.
 
@@ -496,11 +519,14 @@ class PhaseSpace:
         if self.problem in ['static', 'delayed', 'prompt']:  # source problem
             vect = self.flux
         else:  # eigenvalue problem
-            if mode == 0:
-                lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
-                _, vect = self.getfundamental(lambdas)
+            if nEv is not None:  # take eigenvector in nEv-th column
+                vect = self.eigvect[:, nEv]
             else:
-                vect = self.eigvect[:, mode]
+                if mode == 0:
+                    lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
+                    _, vect = self.getfundamental(lambdas)
+                else:
+                    vect = self.eigvect[:, mode]
 
         if angle is None:
             if precursors and self.problem == 'omega':
@@ -547,7 +573,7 @@ class PhaseSpace:
         return y
 
     def _getSN(self, group=None, angle=None, moment=0, mode=0, family=0,
-               precursors=False):
+               nEv=None, precursors=False):
         """
         Get spatial flux distribution for group, angle and spatial mode.
 
@@ -578,11 +604,14 @@ class PhaseSpace:
         if self.problem in ['static', 'delayed', 'prompt']:  # source problem
             vect = self.flux
         else:  # eigenvalue problem
-            if mode == 0:
-                lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
-                _, vect = self.getfundamental(lambdas)
+            if nEv is not None:
+                vect = self.eigvect[:, nEv]
             else:
-                vect = self.eigvect[:, mode]
+                if mode == 0:
+                    lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
+                    _, vect = self.getfundamental(lambdas)
+                else:
+                    vect = self.eigvect[:, mode]
 
         gro = [group] if group else np.arange(1, self.geometry.nE+1)
 
