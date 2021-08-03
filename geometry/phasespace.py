@@ -221,7 +221,6 @@ class PhaseSpace:
         else:
             print('Normalisation failed. {} not available as normalisation mode'.format(which))
 
-
     def plot(self, group, angle=None, mode=0, moment=0, family=0, precursors=False,
              ax=None, title=None, imag=False, normalise=True, **kwargs):
 
@@ -241,9 +240,8 @@ class PhaseSpace:
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
         ax.set_title(title)
 
-
     def plotspectrum(self, loglog=False, gaussplane=True, geom=None, ax=None,
-                     grid=True, ylims=None, threshold=None, subplt=False,
+                     grid=True, ylims=None, xlims=None, threshold=None, subplt=False,
                      fundmark='*', fundcol='blue', mymark='o', mycol='red',
                      markerfull=True, mysize=80, alpha=0.5, label=None):
 
@@ -314,6 +312,9 @@ class PhaseSpace:
             sub1.set_ylim([min(self.eigvals.imag)*1.1, max(self.eigvals.imag)*1.1])
         else:
             sub1.set_ylim(ylims)
+
+        if xlims is not None:
+            sub1.set_xlim(xlims)
 
         if loglog is True:
             sub1.set_yscale('symlog')
@@ -410,22 +411,34 @@ class PhaseSpace:
         elif self.problem == 'delta':
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
-            # FIXME clean spurious big eigenvalues (temporary patch)
-            reals = reals[abs(reals) < 1E3]
+            # # FIXME clean spurious big eigenvalues (temporary patch)
+            # reals = reals[abs(reals) < 1E3]
 
-            if np.all(reals <= 0):
-                reals = reals[reals != 0]
-                fund = min(reals)
-                idx = np.where(self.eigvals == fund)[0][0]
-            elif np.all(reals > 0):
-                fund = min(reals)
-                idx = np.where(self.eigvals == fund)[0][0]
-            else:
-                # FIXME patch to find delta
-                reals = reals[reals > 0]
-                reals = reals[reals < 10]
-                minreal = np.where(reals == reals.max())
-                idx = np.where(self.eigvals == reals[minreal])[0][0]
+            reals = reals[reals != 0]
+            # select real eigenvalue with positive total flux
+            for i in range(len(reals)):
+                # get total flux
+                idx = np.argwhere(self.eigvals==reals[i])[0][0]
+                v = self.get(moment=0, nEv=idx)
+                # fix almost zero points to avoid sign issues
+                v[np.abs(v) < np.finfo(float).eps] = 0
+                ispositive = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
+                if ispositive:
+                    break
+
+            # if np.all(reals <= 0):
+            #     reals = reals[reals != 0]
+            #     fund = min(reals)
+            #     idx = np.where(self.eigvals == fund)[0][0]
+            # elif np.all(reals > 0):
+            #     fund = min(reals)
+            #     idx = np.where(self.eigvals == fund)[0][0]
+            # else:
+            #     # FIXME patch to find delta
+            #     reals = reals[reals > 0]
+            #     reals = reals[reals < 10]
+            #     minreal = np.where(reals == reals.max())
+            #     idx = np.where(self.eigvals == reals[minreal])[0][0]
 
         else:
             if self.problem == 'alpha':
