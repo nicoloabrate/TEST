@@ -243,7 +243,9 @@ class PhaseSpace:
 
 
     def plotspectrum(self, loglog=False, gaussplane=True, geom=None, ax=None,
-                     grid=True, ylims=None, threshold=None, subplt=False):
+                     grid=True, ylims=None, threshold=None, subplt=False,
+                     fundmark='*', fundcol='blue', mymark='o', mycol='red',
+                     markerfull=True, mysize=80, alpha=0.5, label=None):
 
         if self.problem == 'omega' and geom is not None:
             lambdas = geom.getxs('lambda')
@@ -271,16 +273,28 @@ class PhaseSpace:
         if threshold is not None:
             evals = evals[abs(evals) < threshold]
 
+        markerfull = mycol if markerfull else 'none'
+        mymark = 'o' if mymark is None else mymark
+        mycol = 'red' if mycol is None else mycol
+        mysize = 80 if mysize is None else mysize
+
+        fundmark = '*' if fundmark is None else fundmark
+        fundcol = 'blue' if fundcol is None else fundcol
+
         if gaussplane is True:
-            sub1.scatter(evals.real, evals.imag, marker='o', color='red')
+            sub1.scatter(evals.real, evals.imag, marker=mymark, color=mycol,
+                         facecolors=markerfull, s=mysize, alpha=alpha, label=label)
             # plot fundamental
-            sub1.scatter(show*val.real, show*val.imag, marker='*', s=100,
-                         color='blue')
+            sub1.scatter(show*val.real, show*val.imag, marker=fundmark,
+                         facecolors=markerfull, s=mysize, color=fundcol, alpha=alpha)
         else:
+
             sub1.scatter(np.arange(0, len(evals.real)-1), evals.real,
-                         marker='o', color='red')
+                         marker=mymark, color=mycol, facecolors=markerfull,
+                         s=mysize)
             # plot fundamental
-            sub1.scatter(0, show*val, marker='*', s=100, color='blue')
+            sub1.scatter(0, show*val, marker=fundmark, facecolors=markerfull,
+                         s=mysize, color=fundcol)
 
         if self.problem == 'alpha':
             label = 'alpha'
