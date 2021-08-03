@@ -59,7 +59,10 @@ class eigenproblem():
 
     def _petsc(self, verbosity=False, tol=1E-8, monitor=True, sigma=None):
 
-        L, P = self.A, self.B
+        if self.which!= 'theta':
+            L, P = self.A, self.B
+        else:
+            L, P = self.B, self.A
         start = t.time()
         # BUG: set to 0 explicitly diagonal terms that does not appear (and thus are null)
         if L.format != 'csr':
@@ -88,7 +91,7 @@ class eigenproblem():
             # PC.setFactorShift(shift_type='nonzero', amount=0)
             # P.reorderForNonzeroDiagonal(atol=1E-12)
 
-        if self.which in ['alpha', 'delta', 'omega']:
+        if self.which in ['alpha', 'delta', 'omega', 'theta']:
 
             if self.whichspectrum in ['SM', 'SR']:
                 # E settings
@@ -286,6 +289,32 @@ class eigenproblem():
         self.whichspectrum = 'SR'
         self.sigma = 1
 
+    def theta(self):
+        """
+        Cast operators into the capture eigenvalue problem "theta".
+
+        Returns
+        -------
+        None.
+
+        """
+        op = self.operators
+        # define theta eigenproblem operators
+        if self.nev == 0 or self.BC is False:  # infinite medium
+            if self.model != 'Diffusion':
+                self.A = op.Linf+op.S0+op.F0-op.S-op.F  # no leakage, infinite medium
+            else:
+                self.A = op.S0+op.F0-op.S-op.F  # no leakage, infinite medium
+            self.nev = 1
+        else:
+            self.A = op.L+op.S0+op.F0-op.S-op.F  # destruction operator
+
+        self.B = -op.C
+
+        self.which = 'theta'
+        self.whichspectrum = 'SR'
+        self.sigma = 0
+
     def kappa(self):
         """
         Cast operators into the criticality eigenvalue problem "kappa".
@@ -427,6 +456,10 @@ class eigenproblem():
             if self.which in ['kappa', 'delta', 'gamma']:
                 self.whichspectrum = 'LR'
                 M1, M2 = B, A
+            elif self.which == 'theta':
+                self.whichspectrum = 'SR'
+                self.sigma = 0
+                M1, M2 = A, B
             elif self.which in ['alpha', 'omega']:
                 self.whichspectrum = 'LM'
                 self.sigma = 0
@@ -441,7 +474,7 @@ class eigenproblem():
 
             if self.which in ['kappa', 'gamma']:
                 M1, M2 = B, A
-            elif self.which in ['alpha', 'delta', 'omega']:
+            elif self.which in ['alpha', 'delta', 'omega', 'theta']:
                 M1, M2 = A, B
 
             start = t.time()
@@ -453,7 +486,7 @@ class eigenproblem():
             end = t.time()
             self.nev = len(eigvals)
 
-            if self.which == 'delta':
+            if self.which in ['delta', 'theta']:
                 eigvals = 1/eigvals
 
         else:
