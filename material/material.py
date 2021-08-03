@@ -271,56 +271,58 @@ class Material():
         None.
 
         """
-        depgro = depgro-1 if depgro is not None else depgro
-        for g in range(0, self.nE):
-            # no perturbation
-            if howmuch[g] == 0:
-               continue
-
-            mydic = self.__dict__
-            if what in indepdata:
-               # update perturbed parameter
-               if depgro is None:
-                   delta = mydic[what][g]*howmuch[g]
-                   mydic[what][g] = mydic[what][g]+delta
-               else:  # select departure group for scattering matrix
-                   delta = mydic[what][depgro]*howmuch[depgro]
-                   mydic[what][depgro] = mydic[what][depgro]+delta
-
-               # select case to ensure data consistency
-               if what == 'Fiss':
-                   self.Nsf[g] = self.Nubar[g]*mydic[what][g]
-               elif what == 'Nubar':
-                   self.Nsf[g] = self.Fiss[g]*mydic[what][g]
-                   # computesumxs = False
-               elif what.startswith('Chi'):
-                   if what in ['Chit']:
-                       mydic[what] = mydic[what]*(1+delta)
-                   else:
-                       raise OSError('Delayed/prompt spectra perturbation still missing!')
-               elif what == 'Diffcoef':
-                   # Hp: change in diffcoef implies change in capture
-                   delta = 1/(3*mydic[what][g])-self.Transpxs[g]
-               elif what == 'S0':
-                   # change higher moments, if any
-                   for l in range(0, self.L):
-                       R = (mydic[what][g]/mydic[what][g]-delta)
-                       key = 'S%d' % l
-                       mydic[key][depgro][g] = mydic[key][depgro][g]*R
-
-            else:
-                if sanitycheck:
-                    raise OSError('%s cannot be perturbed directly!' % what)
+        if what == 'density':
+            for xs in ['S0', 'Capt', 'Fiss']:
+                self.__dict__[xs][:] = self.__dict__[xs][:]*howmuch
+        else:
+            depgro = depgro-1 if depgro is not None else depgro
+            for g in range(0, self.nE):
+                # no perturbation
+                if howmuch[g] == 0:
+                   continue
+    
+                mydic = self.__dict__
+                if what in indepdata:
+                   # update perturbed parameter
+                   if depgro is None:
+                       delta = mydic[what][g]*howmuch[g]
+                       mydic[what][g] = mydic[what][g]+delta
+                   else:  # select departure group for scattering matrix
+                       delta = mydic[what][depgro]*howmuch[depgro]
+                       mydic[what][depgro] = mydic[what][depgro]+delta
+    
+                   # select case to ensure data consistency
+                   if what == 'Fiss':
+                       self.Nsf[g] = self.Nubar[g]*mydic[what][g]
+                   elif what == 'Nubar':
+                       self.Nsf[g] = self.Fiss[g]*mydic[what][g]
+                       # computesumxs = False
+                   elif what.startswith('Chi'):
+                       if what in ['Chit']:
+                           mydic[what] = mydic[what]*(1+delta)
+                       else:
+                           raise OSError('Delayed/prompt spectra perturbation still missing!')
+                   elif what == 'Diffcoef':
+                       # Hp: change in diffcoef implies change in capture
+                       delta = 1/(3*mydic[what][g])-self.Transpxs[g]
+                   elif what == 'S0':
+                       # change higher moments, if any
+                       for l in range(0, self.L):
+                           R = (mydic[what][g]/mydic[what][g]-delta)
+                           key = 'S%d' % l
+                           mydic[key][depgro][g] = mydic[key][depgro][g]*R
+    
                 else:
-                    # update perturbed parameter
-                    if depgro is None:
-                        delta = mydic[what][g]*howmuch[g]
-                        mydic[what][g] = mydic[what][g]+delta
-                    else:  # select departure group for scattering matrix
-                        delta = mydic[what][depgro]*howmuch[g]
-                        mydic[what][depgro] = mydic[what][depgro]+delta
-
-
+                    if sanitycheck:
+                        raise OSError('%s cannot be perturbed directly!' % what)
+                    else:
+                        # update perturbed parameter
+                        if depgro is None:
+                            delta = mydic[what][g]*howmuch[g]
+                            mydic[what][g] = mydic[what][g]+delta
+                        else:  # select departure group for scattering matrix
+                            delta = mydic[what][depgro]*howmuch[g]
+                            mydic[what][depgro] = mydic[what][depgro]+delta
 
         if sanitycheck:
             # force normalisation
