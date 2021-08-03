@@ -349,8 +349,9 @@ class Slab:
             x = v['where']
             hw = v['howmuch']
             dg = v['depgro']
-            if len(hw) != self.nE:
-                raise OSError('The perturbation intensities required should be %d' % self.nE)
+            if k != 'density':
+                if len(hw) != self.nE:
+                    raise OSError('The perturbation intensities required should be %d' % self.nE)
 
             if isinstance(x, tuple):
                 x = [x]
