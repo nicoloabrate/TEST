@@ -8,6 +8,7 @@ Description: Class for simplified 1D geometries.
 import json
 import numpy as np
 from matplotlib.pyplot import gca
+from matplotlib import rcParams
 from TEST.material import Material
 from collections import OrderedDict
 from copy import deepcopy as cp
@@ -212,14 +213,17 @@ class Slab:
         ax = ax or gca()
         c = ['royalblue', 'firebrick',
              'forestgreen', 'gold', 'darkorange',
-             'darkviolet']
+             'darkviolet']+rcParams['axes.prop_cycle'].by_key()['color']
 
         c = dict(zip(self.regions.keys(), c))
         if labels is None:
             labels = []
         for i in range(0, self.nLayers):
             which = self.regionmap[i]
-            col = c[which]
+            try:
+                col = c[which]
+            except KeyError:
+                col = np.random.rand(3,1)
             ax.axvspan(self.layers[i], self.layers[i+1],
                        alpha=0.5, color=col)
             if which not in labels:

@@ -271,7 +271,6 @@ class PhaseSpace:
         if threshold is not None:
             evals = evals[abs(evals) < threshold]
 
-        markerfull = mycol if markerfull else 'none'
         mymark = 'o' if mymark is None else mymark
         mycol = 'red' if mycol is None else mycol
         mysize = 80 if mysize is None else mysize
@@ -280,9 +279,11 @@ class PhaseSpace:
         fundcol = 'blue' if fundcol is None else fundcol
 
         if gaussplane is True:
+            markerfull = mycol if markerfull else 'none'
             sub1.scatter(evals.real, evals.imag, marker=mymark, color=mycol,
                          facecolors=markerfull, s=mysize, alpha=alpha, label=label)
             # plot fundamental
+            markerfull = fundcol if markerfull else 'none'
             sub1.scatter(show*val.real, show*val.imag, marker=fundmark,
                          facecolors=markerfull, s=mysize, color=fundcol, alpha=alpha)
         else:
@@ -394,6 +395,8 @@ class PhaseSpace:
                 if np.all(v >= 0) if v[0] >= 0 else np.all(v < 0):
                     idx = i
                     break
+                else:
+                    idx = i
         elif self.problem == 'theta':
             reals = self.eigvals[self.eigvals.imag == 0]
             reals = reals[reals != 0]
