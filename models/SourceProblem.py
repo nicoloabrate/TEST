@@ -78,7 +78,7 @@ class sourceproblem():
             f = np.zeros((dim,))
             sig = signature(source)
             if 'x' in sig.parameters:
-                if ss == 'FD' and self.model != 'SN':
+                if ss == 'FD': # and self.model != 'SN'
                     x = self.geometry.edges
                     xs = self.geometry.centers
                 else:
