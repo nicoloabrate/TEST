@@ -476,3 +476,6 @@ class Slab:
         C = (2*np.arange(0, self.AngOrd)+1)/2
         QW = {'L': L, 'mu': mu, 'w': w, 'PL': PL, 'C': C}
         self.QW = QW
+
+    def updateN(self, N):
+        self.AngOrd = N
