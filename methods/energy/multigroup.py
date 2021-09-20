@@ -33,7 +33,7 @@ def time(obj, model, fmt='csc'):
     TMGapp = TMG.append
     invv = obj.getxs('Invv')
 
-    for gro in range(0, obj.nE):
+    for gro in range(obj.nE):
 
         if model == 'PN':
             TMGapp(PN.removal(obj, invv[gro, :], fmt=fmt))
@@ -69,7 +69,7 @@ def removal(obj, model, fmt='csc'):
     RMGapp = RMG.append
     totxs = obj.getxs('Tot')   # if model != 'Diffusion' else obj.getxs('Abs')
 
-    for gro in range(0, obj.nE):
+    for gro in range(obj.nE):
 
         if model == 'PN':
             RMGapp(PN.removal(obj, totxs[gro, :], fmt=fmt))
@@ -105,7 +105,7 @@ def capture(obj, model, fmt='csc'):
     CMGapp = CMG.append
     captxs = obj.getxs('Capt')   # if model != 'Diffusion' else obj.getxs('Abs')
 
-    for gro in range(0, obj.nE):
+    for gro in range(obj.nE):
 
         if model == 'PN':
             CMGapp(PN.removal(obj, captxs[gro, :], fmt=fmt))
@@ -141,7 +141,7 @@ def fission(obj, model, fmt='csc'):
     FMGapp = FMG.append
     fissxs = obj.getxs('Fiss')   # if model != 'Diffusion' else obj.getxs('Abs')
 
-    for gro in range(0, obj.nE):
+    for gro in range(obj.nE):
 
         if model == 'PN':
             FMGapp(PN.removal(obj, fissxs[gro, :], fmt=fmt))
@@ -177,7 +177,7 @@ def scatteringTot(obj, model, fmt='csc'):
     SMGapp = SMG.append
     scatxs = obj.getxs('S0').sum(axis=1)
     
-    for gro in range(0, obj.nE):
+    for gro in range(obj.nE):
 
         if model == 'PN':
             SMGapp(PN.removal(obj, scatxs[gro, :], fmt=fmt))
@@ -210,7 +210,7 @@ def leakage(obj, model, fmt='csc'):
     """
     LMG = []
     LMGapp = LMG.append
-    for gro in range(0, obj.nE):
+    for gro in range(obj.nE):
 
         if model == 'PN':
             LMGapp(PN.leakage(obj, fmt=fmt))
@@ -258,12 +258,12 @@ def scattering(obj, model, prod=True, fmt='csc', adjoint=False):
     key = 'Sp' if prod is True else 'S'
     sm = obj.getxs('%s' % key)
 
-    for dep_gro in range(0, obj.nE):  # departure group
+    for dep_gro in range(obj.nE):  # departure group
 
         M = []
         Mapp = M.append
 
-        for arr_gro in range(0, obj.nE):  # arrival group
+        for arr_gro in range(obj.nE):  # arrival group
 
             if model == 'PN':
                 Mapp(PN.scattering(obj, sm[arr_gro, dep_gro, :, :], fmt=fmt))
@@ -309,12 +309,12 @@ def fissionprod(obj, model, fmt='csc', adjoint=False):
     fxs = obj.getxs('Fiss')
     nub = obj.getxs('Nubar')
     chi = obj.getxs('Chit')
-    for emi_gro in range(0, obj.nE):  # emission
+    for emi_gro in range(obj.nE):  # emission
 
         M = []
         Mapp = M.append
 
-        for dep_gro in range(0, obj.nE):  # departure
+        for dep_gro in range(obj.nE):  # departure
 
             chinusf = chi[emi_gro, :]*nub[dep_gro, :]*fxs[dep_gro, :]
             if model == 'PN':
@@ -362,12 +362,12 @@ def promptfiss(obj, model, fmt='csc', adjoint=False):
     beta = obj.getxs('beta')
 
 
-    for emi_gro in range(0, obj.nE):  # emission
+    for emi_gro in range(obj.nE):  # emission
 
         M = []
         Mapp = M.append
 
-        for dep_gro in range(0, obj.nE):  # departure
+        for dep_gro in range(obj.nE):  # departure
 
             chinusf = chi[emi_gro, :]*nub[dep_gro, :]*fxs[dep_gro, :]
             if model == 'PN':
@@ -415,12 +415,12 @@ def delfiss(obj, model, fmt='csc'):
     MG = []
     MGapp = MG.append
 
-    for emi_gro in range(0, obj.nE):  # emission
+    for emi_gro in range(obj.nE):  # emission
 
         M = []
         Mapp = M.append
 
-        for dep_gro in range(0, obj.nE):  # departure
+        for dep_gro in range(obj.nE):  # departure
             # /2 for fission isotropic emission
             chinusf = chi[emi_gro, :]*nub[dep_gro, :]*fxs[dep_gro, :]/2
             if model == 'PN':
