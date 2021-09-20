@@ -45,18 +45,31 @@ def setBCs(op, geometry):
             op.L = L
         elif op.spatial_scheme == 'FD':
             op.L = L
-            for gro in range(0, op.nE):
-                idg = gro*op.nS*op.nA
-                for order in range(0, op.nA):
-                    skip = op.nS*order+idg
-                    op.L[skip, skip] = 1
-
-                    op.F[skip, :] = 0
-                    op.R[skip, :] = 0
-                    op.S[skip, :] = 0
-                    op.S0[skip, :] = 0
-                    op.F0[skip, :] = 0
-                    op.C[skip, :] = 0
+            # FIXME: no BCs needed if zero flux, as one eq. like "a*phi_m=0" is formed
+            # # op.L = op.L.tolil()
+            # # op.F = op.F.tolil()
+            # # op.R = op.R.tolil()
+            # # op.S = op.S.tolil()
+            # # op.S0 = op.S0.tolil()
+            # # op.F0 = op.F0.tolil()
+            # # op.C = op.C.tolil()
+            # for gro in range(op.nE):
+            #     idg = gro*op.nS*op.nA
+            #     for order in range(op.nA):
+            #         skip = op.nS*order+idg
+            #         op.L[skip, skip] = 1
+            #         # op.F[skip, :] = 0
+            #         op.R[skip, skip] = 0
+            #         # op.S[skip, :] = 0
+            #         op.S0[skip, skip] = 0
+            #         op.F0[skip, skip] = 0
+            #         op.C[skip, skip] = 0
+            #         # op.F[skip, :] = 0
+            #         # op.R[skip, :] = 0
+            #         # op.S[skip, :] = 0
+            #         # op.S0[skip, :] = 0
+            #         # op.F0[skip, :] = 0
+            #         # op.C[skip, :] = 0
         else:
             raise OSError('{} model not available for spatial variable!'.format(op.spatial_scheme))
 
