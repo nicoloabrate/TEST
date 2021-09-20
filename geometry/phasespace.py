@@ -409,7 +409,10 @@ class PhaseSpace:
                 v[np.abs(v) < np.finfo(float).eps] = 0
                 if np.all(v >= 0) if v[0] >= 0 else np.all(v < 0):
                     break
-
+                else:
+                    idx = i
+                    if idx == len(reals):
+                        print('WARNING: fundamental choice may be wrong!')
             # idx = np.argwhere([self.eigvals == reals.max()])[0][1]
         elif self.problem == 'delta':
             # select real eigenvalues
