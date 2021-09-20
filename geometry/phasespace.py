@@ -161,49 +161,58 @@ class PhaseSpace:
         None.
 
         """
+        nS, nE = self.geometry.nS, self.geometry.nE
         if which == 'phasespace':
             # normalise on the inner product over the phase space
             for iv, v in enumerate(self.eigvect.T):
                 y = self.get(moment=0, mode=iv)
                 C = self.braket(y, y)
                 self.eigvect[:, iv] = v/np.sqrt(C)
+
         elif which == 'norm2':
             # normalise to have unitary euclidean norm
             for iv, v in enumerate(self.eigvect.T):
                 self.eigvect[:, iv] = v/np.linalg.norm(v)
+
         elif which == 'power':
             # normalise to have fixed power
             power = 1 if power is None else power
-            KFiss = []
-            for g in range(self.geometry.nE):
-                fisxs = self.geometry.getxs('Fiss')
-                try:
-                    kappa = self.geometry.getxs('Kappa')
-                except KeyError:
-                    kappa = 200  # MeV
+
+            fisxs = self.geometry.getxs('Fiss')
+            try:
+                kappa = self.geometry.getxs('Kappa')*1.6E-13 # J
+            except KeyError:
+                kappa = 200*1.6E-13  # J
+
+            KFiss = np.zeros((nS*nE, ))
+            for g in range(nE):
                 if self.geometry.spatial_scheme == 'FV':
-                    KFiss.append(FV.zero(self.geometry, fisxs[g, :]*kappa[g, :]))
+                    KFiss[0+g*nS:nS+g*nS] = FV.zero(self.geometry, fisxs[g, :]*kappa[g, :], meshtype='centers')
                 elif self.geometry.spatial_scheme == 'FD':
-                    KFiss.append(FD.zero(self.geometry, fisxs[g, :]*kappa[g, :]))
-            KFiss = np.asarray(KFiss)
+                    KFiss[0+g*nS:nS+g*nS] = FD.zero(self.geometry, fisxs[g, :]*kappa[g, :])
+
+            y = self.get(moment=0, mode=0)
+            C = power/self.braket(KFiss*y)
             for iv, v in enumerate(self.eigvect.T):
-                y = self.get(moment=0, mode=iv)
-                C = power/self.braket(KFiss*y)
-                self.eigvect[:, iv] = v/C
+                self.eigvect[:, iv] = v*C
+
         elif which == 'totalflux':
             # normalise total flux
             for iv, v in enumerate(self.eigvect.T):
                 y = self.get(moment=0, mode=iv)
                 self.eigvect[:, iv] = v/self.braket(y)
+
         elif which == 'peaktotalflux':
             # normalise peak total flux
             for iv, v in enumerate(self.eigvect.T):
                 y = self.get(moment=0, mode=iv)
                 self.eigvect[:, iv] = v/y.max()
+
         elif which == 'reaction':
             # normalise to have unitary reaction rate
             for iv, v in enumerate(self.eigvect.T):
                 self.eigvect[:, iv] = v/self.braket(A.dot(v))
+
         elif which == 'biorthogonal':
             # normalise to have <phix, F*phi>=<FX*phix, phi>=1
             n, m = self.solution.eigvect.shape[1], self.eigvect.shape[1]
@@ -218,6 +227,7 @@ class PhaseSpace:
             for iv, v in enumerate(self.eigvect.T):
                 v_adj = self.solution.eigvect[:, iv]
                 self.eigvect[:, iv] = v/self.braket(self.operators.F.dot(v_adj), v)
+
         else:
             print('Normalisation failed. {} not available as normalisation mode'.format(which))
 
