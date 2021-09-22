@@ -415,6 +415,7 @@ class Material():
                         self.Chip = self.Chit
                     else:
                         print(err)
+
     def void(self, excludeXS=None, sanitycheck=True):
         """
         Make region void except for some group-wise user-specified reaction

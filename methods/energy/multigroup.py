@@ -270,7 +270,7 @@ def scattering(obj, model, prod=True, fmt='csc', adjoint=False):
             elif model == 'SN':
                 Mapp(SN.scattering(obj, sm[arr_gro, dep_gro, :, :], fmt=fmt))
             elif model == 'Diffusion':
-                # only isotropic scattering is handles
+                # only isotropic scattering is handled
                 Mapp(PN.scattering(obj, sm[arr_gro, dep_gro, :, 0, newaxis],
                                    fmt=fmt))
             else:
