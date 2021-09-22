@@ -275,13 +275,13 @@ class Slab:
                     shape = (self.nE, self.nE, self.nLayers)
                     allL = False
 
-                vals = np.full(shape, None)
+                vals = np.full(shape, -1000.)
                 # loop over regions
                 for ireg, reg in self.regionmap.items():
                     if allL is True:
                         old_key = 'S'
                         # get all scattering order matrices for each region
-                        for l in range(0, L):
+                        for l in range(L):
                             key = '%s%d' % (old_key, l)
                             vals[:, :, ireg, l] = self.regions[reg].getxs(key, pos1, pos2)
                     else:
