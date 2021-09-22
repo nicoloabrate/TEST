@@ -448,11 +448,11 @@ class eigenproblem():
                 algo = 'eigs'
 
         if algo == 'eigs':
-            # if A.format != 'csc':
-            #     A = A.tocsc()
-            # if B is not None:
-            #     if B.format != 'csc':
-            #         B = B.tocsc()
+            if A.format != 'csc':
+                A = A.tocsc()
+            if B is not None:
+                if B.format != 'csc':
+                    B = B.tocsc()
 
             if self.which in ['kappa', 'delta', 'gamma']:
                 self.whichspectrum = 'LR'
