@@ -7,7 +7,7 @@ Description: Class for discrete ordinates (SN) operators.
 """
 import numpy as np
 from TEST.methods.space import FD, FV
-from scipy.sparse import diags, block_diag, bmat, vstack
+from scipy.sparse import diags, block_diag, bmat, vstack, csr_matrix
 
 
 def removal(obj, data, fmt='csc'):
@@ -84,9 +84,11 @@ def leakage(obj, fmt='csc'):
     # fill lower triangular matrix (mu > 0)
     if model == 'FD':
         d = FD.zero(obj, 1/obj.dx, meshtype='centers').T.flatten()
+        d_neg = np.flip(d[:])
         d = np.insert(d, 0, 0)
+        d_neg = np.insert(d_neg, 0, 0)
         trilpos = diags([-d[1:], d], (-1, 0), (obj.nS, obj.nS), format=fmt)
-        trilneg = -trilpos
+        trilneg = diags([d_neg[1:], -d_neg], (-1, 0), (obj.nS, obj.nS), format=fmt)
     elif model == 'FV':
         tmp = []
         tmpapp = tmp.append
@@ -133,7 +135,7 @@ def scattering(obj, sm, fmt='csc'):
     N : int
         Number of discrete ordinates.
     L : int, optional
-        Scattering Legendre moment. Default is ``None``. In thi case, L is
+        Scattering Legendre moment. Default is ``None``. In this case, L is
         taken equal to ``N``.
     prod: bool, optional
         Scattering production flag. Default is ``True``.
@@ -143,7 +145,8 @@ def scattering(obj, sm, fmt='csc'):
     None.
 
     """
-    # TODO fix heterogeneous problem
+    # TODO: fix heterogeneous problem --> flip for negative directions
+    # TODO: if isotropic use smarter initialisation, if xs=0 preallocate block
     N = obj.AngOrd
     model = obj.spatial_scheme
     L = sm.shape[1]
@@ -153,6 +156,8 @@ def scattering(obj, sm, fmt='csc'):
     mu = obj.QW['mu']
     PL = obj.QW['PL']
     C = obj.QW['C']
+
+    # A1 = csr_matrix((n, m))
     for order in range(N):  # loop over directions (row sub-matrix)
         tmp = []
         tmpapp = tmp.append
@@ -207,43 +212,47 @@ def fission(obj, xs, fmt='csc'):
     None.
 
     """
+    # TODO: fix heterogeneous problem --> flip for negative directions
+    # TODO: if xs=0 preallocate empty block
     N = obj.AngOrd
     if N <= 1:
         raise OSError('Cannot build S_{}'.format(N))
     model = obj.spatial_scheme
-    M = []
-    appM = M.append
     w = obj.QW['w']
     mu = obj.QW['mu']
+
+    if model == 'FD':
+        f = FD.zero(obj, 1/2*xs, meshtype='centers')/2  # DD scheme
+        f = np.insert(f, 0, 0, axis=1)
+        m = f.shape[1]
+        d = diags([f, f[:, 1:]], [0, -1], (m, m), format=fmt)
+    elif model == 'FV':
+        f = FV.zero(obj, 1/2*xs, meshtype='centers')
+        m = f.shape[1]
+        d = diags(f, [0], (m, m), format=fmt)
+    else:
+        raise OSError('{} model not available for spatial variable!'.format(model))
+
+    M = []
+    appM = M.append
+
+    tmp = []
+    tmpapp = tmp.append
+    for n in range(N):  # loop over directions defining total flux
+        # build sub-matrix for n-th order
+        dmat = w[n]*d
+        if mu[n] < 0:
+             if model == 'FD':
+                 dmat = dmat[:,::-1]
+             else:
+                 dmat = dmat[::-1]
+        tmpapp(dmat)
+
     for order in range(N):  # loop over directions
-        tmp = []
-        tmpapp = tmp.append
-        for n in range(N):  # loop over directions defining total flux
-            # build sub-matrix for n-th order
-            if model == 'FD':
-                f = FD.zero(obj, 1/2*xs*w[n], meshtype='centers')/2  # DD scheme
-                if mu[n] < 0: f = np.flip(f)
-                f = np.insert(f, 0, 0, axis=1)
-                m = f.shape[1]
-                d = diags([f, f[:, 1:]], [0, -1], (m, m), format=fmt)
-            elif model == 'FV':
-                f = FV.zero(obj, 1/2*xs*w[n], meshtype='centers')
-                if mu[n] < 0: f = np.flip(f)
-                m = f.shape[1]
-                d = diags(f, [0], (m, m), format=fmt)
-            else:
-                raise OSError('{} model not available for spatial variable!'.format(model))
-
-            # if directions are opposite, flip to match spatial discretisation
-            mu1, mu2 = obj.QW['mu'][order], obj.QW['mu'][n]
-            if mu1 == 0 and mu2 < 0 or mu1*mu2 < 0 or mu1 < 0 and mu2 == 0:
-                if model == 'FD':
-                    d = d[:,::-1]
-                elif model == 'FV':
-                    d = d[::-1]
-            tmpapp(d)
-
-        appM(tmp)
+        if mu[order] > 0:
+            appM(tmp)
+        else:               
+            appM(tmp[::-1])
 
     M = bmat((M), format=fmt)
     return M
