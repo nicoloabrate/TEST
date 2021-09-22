@@ -7,7 +7,7 @@ Description: Class for discrete ordinates (SN) operators.
 """
 import numpy as np
 from TEST.methods.space import FD, FV
-from scipy.sparse import diags, block_diag, bmat, vstack, csr_matrix
+from scipy.sparse import diags, block_diag, bmat, vstack, csc_matrix
 
 
 def removal(obj, data, fmt='csc'):
@@ -145,54 +145,117 @@ def scattering(obj, sm, fmt='csc'):
     None.
 
     """
-    # TODO: fix heterogeneous problem --> flip for negative directions
-    # TODO: if isotropic use smarter initialisation, if xs=0 preallocate block
     N = obj.AngOrd
     model = obj.spatial_scheme
-    L = sm.shape[1]
-    M = []
-    appM = M.append
-    w = obj.QW['w']
-    mu = obj.QW['mu']
-    PL = obj.QW['PL']
-    C = obj.QW['C']
+    m = obj.nS
 
-    # A1 = csr_matrix((n, m))
-    for order in range(N):  # loop over directions (row sub-matrix)
-        tmp = []
-        tmpapp = tmp.append
-        for n in range(N):  # loop over directions defining Leg. moment
-            xs = sm[:, 0]*0
-            for l in range(L):  # loop over Legendre expansion moments
-                if l < N:
-                    coeff = PL[l, order]*PL[l, n]*w[n]*C[l]
-                    xs = xs+sm[:, l]*coeff
-            # build sub-matrix for n-th order
+    if sm.any() == 0:  # no interaction, empty operator
+        M = csc_matrix((m*N, m*N))
+    else:
+        L = sm.shape[1]
+        # data for scattering
+        w = obj.QW['w']
+        mu = obj.QW['mu']
+        PL = obj.QW['PL']
+        C = obj.QW['C']
+
+        ishet = ~np.all(sm == sm[0, 0])
+        M = []
+        appM = M.append
+
+        if L <= 1:  # isotropic scattering (faster algorithm)
+
+            l = 0
+            xs = sm[:, l]*C[l]
             if model == 'FD':
-                s = FD.zero(obj, xs, meshtype='centers')/2  # DD scheme
-                if mu[n] < 0: s = np.flip(s)
-                s = np.insert(s, 0, 0, axis=1)
-                m = s.shape[1]
-                d = diags([s, s[:, 1:]], [0, -1], (m, m), format=fmt)
+                f = FD.zero(obj, xs, meshtype='centers')/2  # DD scheme
+                if ishet:
+                    f_fl = np.flip(f[:])
+                    f_fl = np.insert(f_fl, 0, 0, axis=1)
+                    d_fl = diags([f_fl, f_fl[:, 1:]], [0, -1], (m, m), format=fmt)
+                f = np.insert(f, 0, 0, axis=1)
+                d = diags([f, f[:, 1:]], [0, -1], (m, m), format=fmt)
+    
             elif model == 'FV':
-                s = FV.zero(obj, xs, meshtype='centers')
-                if mu[n] < 0: s = np.flip(s)
-                m = s.shape[1]
-                d = diags(s, [0], (m, m), format=fmt)
+                f = FV.zero(obj, xs, meshtype='centers')
+                if ishet:
+                    f_fl = np.flip(f[:])
+                    d_fl = diags(f_fl, [0], (m, m), format=fmt)
+                d = diags(f, [0], (m, m), format=fmt)
             else:
                 raise OSError('{} model not available for spatial variable!'.format(model))
-            # if directions are opposite, flip to match spatial discretisation
-            mu1, mu2 = obj.QW['mu'][order], obj.QW['mu'][n]
-            if mu1 == 0 and mu2 < 0 or mu1*mu2 < 0 or mu1 < 0 and mu2 == 0:
-                if model == 'FD':
-                    d = d[:, ::-1] # FIXME
-                elif model == 'FV':
-                    d = d[::-1]
 
-            tmpapp(d)
-        appM(tmp)
+            tmp = []
+            tmpapp = tmp.append
+            if ishet:
+                tmp_fl = []
+                tmp_flapp = tmp_fl.append
+    
+            for n in range(N):  # loop over directions defining total flux
 
-    M = bmat((M), format=fmt)
+                # build sub-matrix for n-th order
+                dmat = w[n]*d
+                if ishet:
+                    dmat_fl = w[n]*d_fl[:, ::-1]
+    
+                if mu[n] < 0:
+                    dmat = dmat[:, ::-1]
+                    if ishet:
+                        dmat_fl = dmat_fl[:, ::-1]
+    
+                tmpapp(dmat)
+                if ishet:
+                    tmp_flapp(dmat_fl)
+    
+            for order in range(N):  # loop over discrete ordinates eqs
+                if mu[order] > 0:
+                    appM(tmp)
+                else:
+                    if ishet:
+                        appM(tmp_fl)
+                    else:
+                        appM(tmp[::-1])
+
+        else:  # anisotropic scattering
+            for order in range(N):  # loop over directions (row sub-matrix)
+                tmp = []
+                tmpapp = tmp.append
+
+                for n in range(N):  # loop over directions defining Leg. moment
+                    # evaluate coefficients
+                    xs = sm[:, 0]*0
+                    for l in range(L):  # loop over Legendre expansion moments
+                        if l < N:
+                            coeff = PL[l, order]*PL[l, n]*w[n]*C[l]
+                            xs = xs+sm[:, l]*coeff
+
+                    # build sub-matrix for n-th order
+                    if model == 'FD':
+                        s = FD.zero(obj, xs, meshtype='centers')/2  # DD scheme
+                        if mu[order] < 0:
+                            s_fl = np.flip(s[:])
+                            s_fl = np.insert(s_fl, 0, 0, axis=1)
+                            d = diags([s_fl, s_fl[:, 1:]], [0, -1], (m, m), format=fmt)
+                        else:
+                            s = np.insert(s, 0, 0, axis=1)
+                            d = diags([s, s[:, 1:]], [0, -1], (m, m), format=fmt)
+                    elif model == 'FV':
+                        s = FV.zero(obj, xs, meshtype='centers')
+                        if mu[order] < 0:
+                            s_fl = np.flip(s[:])
+                            d = diags(s_fl, [0], (m, m), format=fmt)
+                        else:
+                            d = diags(s, [0], (m, m), format=fmt)
+                    else:
+                        raise OSError('{} model not available for spatial variable!'.format(model))
+                    # if directions are opposite, flip to match spatial discretisation
+                    if (mu[order] > 0 and mu[n] <= 0) or mu[order] < 0 and mu[n] > 0:
+                        d = d[:, ::-1]
+                    tmpapp(d)
+                appM(tmp)
+    
+        M = bmat((M), format=fmt)
+
     return M
 
 
@@ -212,49 +275,71 @@ def fission(obj, xs, fmt='csc'):
     None.
 
     """
-    # TODO: fix heterogeneous problem --> flip for negative directions
-    # TODO: if xs=0 preallocate empty block
     N = obj.AngOrd
     if N <= 1:
         raise OSError('Cannot build S_{}'.format(N))
     model = obj.spatial_scheme
-    w = obj.QW['w']
-    mu = obj.QW['mu']
+    m = obj.nS
 
-    if model == 'FD':
-        f = FD.zero(obj, 1/2*xs, meshtype='centers')/2  # DD scheme
-        f = np.insert(f, 0, 0, axis=1)
-        m = f.shape[1]
-        d = diags([f, f[:, 1:]], [0, -1], (m, m), format=fmt)
-    elif model == 'FV':
-        f = FV.zero(obj, 1/2*xs, meshtype='centers')
-        m = f.shape[1]
-        d = diags(f, [0], (m, m), format=fmt)
+    if xs.any() == 0:  # empty operator
+        M = csc_matrix((m*N, m*N))
     else:
-        raise OSError('{} model not available for spatial variable!'.format(model))
+        w = obj.QW['w']
+        mu = obj.QW['mu']
 
-    M = []
-    appM = M.append
+        ishet = ~np.all(xs == xs[0])
 
-    tmp = []
-    tmpapp = tmp.append
-    for n in range(N):  # loop over directions defining total flux
-        # build sub-matrix for n-th order
-        dmat = w[n]*d
-        if mu[n] < 0:
-             if model == 'FD':
-                 dmat = dmat[:,::-1]
-             else:
-                 dmat = dmat[::-1]
-        tmpapp(dmat)
+        if model == 'FD':
+            f = FD.zero(obj, 1/2*xs, meshtype='centers')/2  # DD scheme
+            if ishet:
+                f_fl = np.flip(f[:])
+                f_fl = np.insert(f_fl, 0, 0, axis=1)
+                d_fl = diags([f_fl, f_fl[:, 1:]], [0, -1], (m, m), format=fmt)
+            f = np.insert(f, 0, 0, axis=1)
+            d = diags([f, f[:, 1:]], [0, -1], (m, m), format=fmt)
 
-    for order in range(N):  # loop over directions
-        if mu[order] > 0:
-            appM(tmp)
-        else:               
-            appM(tmp[::-1])
+        elif model == 'FV':
+            f = FV.zero(obj, 1/2*xs, meshtype='centers')
+            if ishet:
+                f_fl = np.flip(f[:])
+                d_fl = diags(f_fl, [0], (m, m), format=fmt)
+            d = diags(f, [0], (m, m), format=fmt)
+        else:
+            raise OSError('{} model not available for spatial variable!'.format(model))
 
-    M = bmat((M), format=fmt)
+        M = []
+        appM = M.append
+
+        tmp = []
+        tmpapp = tmp.append
+        if ishet:
+            tmp_fl = []
+            tmp_flapp = tmp_fl.append
+
+        for n in range(N):  # loop over directions defining total flux
+            # build sub-matrix for n-th order
+            dmat = w[n]*d
+            if ishet:
+                dmat_fl = w[n]*d_fl[:, ::-1]
+
+            if mu[n] < 0:
+                dmat = dmat[:, ::-1]
+                if ishet:
+                    dmat_fl = dmat_fl[:, ::-1]
+
+            tmpapp(dmat)
+            if ishet:
+                tmp_flapp(dmat_fl)
+
+        for order in range(N):  # loop over discrete ordinates eqs
+            if mu[order] > 0:
+                appM(tmp)
+            else:
+                if ishet:
+                    appM(tmp_fl)
+                else:
+                    appM(tmp[::-1])
+        M = bmat((M), format=fmt)
     return M
 
 
