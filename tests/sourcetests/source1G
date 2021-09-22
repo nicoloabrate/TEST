@@ -40,8 +40,8 @@ sD.solve()
 sP.solve()
 sS.solve()
 
-L = myslabD.regions['tmp2'].getxs('DiffLength')
-XSA = myslabD.regions['tmp2'].getxs('Abs')
+L = myslabD.regions['FullAbsorption'].getxs('DiffLength')
+XSA = myslabD.regions['FullAbsorption'].getxs('Abs')
 a = H/4
 b = H/2
 A = S0/XSA/(1/np.tanh((b-a)/L)*np.cosh(a/L)+np.sinh(a/L))
@@ -56,15 +56,16 @@ for x in np.linspace(0, H/2, 1000):
 phiSN = sS.solution.flux
 totphiSN = phiSN[0:myslab2.nS]+np.flipud(phiSN[myslab2.nS:2*myslab2.nS])
 
-phi1 = lambda x: 20*(S0/(1*2)*(1-np.exp(-np.sqrt(3)*x)))
-phi2 = lambda x: 20*(S0/(1*2)*(1-np.exp(-np.sqrt(3)*(H-x))))
+phi1 = lambda x: 20*(S0/(XSA*2)*(1-np.exp(-np.sqrt(3)*XSA*x)))
+phi2 = lambda x: 20*(S0/(XSA*2)*(1-np.exp(-np.sqrt(3)*XSA*(H-x))))
 # phi2 = lambda x: 20*(S0/(1*2)*(np.exp(np.sqrt(3)*x)-np.exp(np.sqrt(3)*(2*x-H))))
 phiT = lambda x: phi1(x)+phi2(x)
 
-plt.plot(myslab.mesh, phiSN[0:myslab2.nS], label='phi1 SN')
+plt.plot(myslab2.mesh, phiSN[0:myslab2.nS], label='phi1 SN')
 plt.plot(myslab.mesh, phi1(myslab.mesh), label='phi1 exact')
 plt.plot(myslab.mesh, np.flipud(phi1(myslab.mesh)), label='phi1 flipped')
 plt.plot(myslab.mesh, phi2(myslab.mesh), label='phi2 exact')
+plt.plot(myslab2.mesh, np.flipud(phiSN[myslab2.nS:]), label='phi2 SN')
 plt.legend()
 plt.show()
 
@@ -91,14 +92,45 @@ for i in range(1, myslab.nS):
     phi2_num[myslab.nS-i-1] = q/(mu/dx+1/2)+phi2_num[myslab.nS-i]*(1-dx/(2*mu))/(1+dx/(2*mu))
 
 
-plt.plot(myslab.mesh, phiSN[0:myslab2.nS], label='phi1 SN')
+plt.plot(myslab2.mesh, phiSN[0:myslab2.nS], label='phi1 SN')
 plt.plot(myslab.mesh, phi1(myslab.mesh), label='phi1 exact')
 plt.plot(myslab.mesh, phi1_num, label='phi1 SN+FD')
 plt.legend()
 plt.show()
 
-plt.plot(myslab.mesh, np.flipud(phiSN[myslab2.nS:2*myslab2.nS]), label='phi2 SN')
+plt.plot(myslab2.mesh, np.flipud(phiSN[myslab2.nS:2*myslab2.nS]), label='phi2 SN')
 plt.plot(myslab.mesh, phi2(myslab.mesh), label='phi2 exact')
 plt.plot(myslab.mesh, phi2_num, label='phi2 SN+FD')
 plt.legend()
 plt.show()
+
+
+# get operators
+# L_diff=np.asarray(myDiff.L.todense())
+# S_diff=np.asarray(myDiff.S.todense())
+# F_diff=np.asarray(myDiff.F.todense())
+# R_diff=np.asarray(myDiff.R.todense())
+# C_diff=np.asarray(myDiff.C.todense())
+# S0_diff=np.asarray(myDiff.S0.todense())
+# F0_diff=np.asarray(myDiff.F0.todense())
+
+# Lp1=np.asarray(myPN.L.todense())
+# Sp1=np.asarray(myPN.S.todense())
+# Fp1=np.asarray(myPN.F.todense())
+# Rp1=np.asarray(myPN.R.todense())
+# S0p1=np.asarray(myPN.S0.todense())
+# F0p1=np.asarray(myPN.F0.todense())
+
+L_FD=np.asarray(mySN.L.todense())
+S_FD=np.asarray(mySN.S.todense())
+F_FD=np.asarray(mySN.F.todense())
+R_FD=np.asarray(mySN.R.todense())
+S0_FD=np.asarray(mySN.S0.todense())
+F0_FD=np.asarray(mySN.F0.todense())
+
+# L_FV=np.asarray(mySNFV.L.todense())
+# S_FV=np.asarray(mySNFV.S.todense())
+# F_FV=np.asarray(mySNFV.F.todense())
+# R_FV=np.asarray(mySNFV.R.todense())
+# S0_FV=np.asarray(mySNFV.S0.todense())
+# F0_FV=np.asarray(mySNFV.F0.todense())

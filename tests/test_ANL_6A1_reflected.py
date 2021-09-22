@@ -19,7 +19,7 @@ import numpy as np
 kref = 0.9015507
 
 xlayers = [-120, -80, 80, 120] # 
-mats = ['ANL_6A1_R1_R3', 'ANL_6A1_R2', 'ANL_6A1_R1_R3']  #
+mats = ['ANL-6A1-R1-R3', 'ANL-6A1-R2', 'ANL-6A1-R1-R3']  #
 G = 2
 
 algo = 'eig'
