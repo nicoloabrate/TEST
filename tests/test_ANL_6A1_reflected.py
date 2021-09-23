@@ -22,9 +22,9 @@ xlayers = [-120, -80, 80, 120] #
 mats = ['ANL-6A1-R1-R3', 'ANL-6A1-R2', 'ANL-6A1-R1-R3']  #
 G = 2
 
-algo = 'eig'
+algo = 'eigs'
 nev = 1
-M = [-4, -10, -4] # [-21, -81, -21] #
+M = [-21, -81, -21] # [-4, -10, -4] #  
 
 # Diffusion
 N = 0
@@ -51,7 +51,7 @@ plt.title('Diffusion')
 
 
 # # P1
-N = 1
+N = 5
 bc = 'Mark'
 myslabP = Slab(M, xlayers, mats, [bc], G, N, 'FD')
 
@@ -125,8 +125,8 @@ phiS2_g1 = kS2FD.solution.get(group=1, moment=0, mode=0)
 
 fig, ax = plt.subplots()
 plt.plot(myslabD.mesh, phiD_g1, label='Diffusion')
-plt.plot(myslabP.mesh, phiP1_g1, label='P1 g=1', linestyle='--')
-plt.plot(myslabSFD.mesh, phiS2_g1, label='S2 g=1', linestyle=':')
+plt.plot(myslabP.mesh, phiP1_g1, label='$P_{%s}$ g=2' % str(N), linestyle='--')
+plt.plot(myslabSFD.mesh, phiS2_g1, label='$S_{%s}$ g=1' % str(N+1), linestyle=':')
 
 if G > 1:
     phiD_g2 = kD.solution.get(group=2, moment=0, mode=0)
@@ -134,11 +134,12 @@ if G > 1:
     phiS2_g2 = kS2FD.solution.get(group=2, moment=0, mode=0)
     
     plt.plot(myslabD.mesh, phiD_g2, label='Diffusion')
-    plt.plot(myslabP.mesh, phiP1_g2, label='P1 g=2', linestyle='--')
-    plt.plot(myslabSFD.mesh, phiS2_g2, label='S2 g=2', linestyle=':')
+    plt.plot(myslabP.mesh, phiP1_g2, label='$P_{%s}$ g=2' % str(N), linestyle='--')
+    plt.plot(myslabSFD.mesh, phiS2_g2, label='$S_{%s}$ g=1' % str(N+1), linestyle=':')
 
-plt.axvline(x=0, c='k')
+# plt.axvline(x=0, c='k')
 plt.legend()
+plt.savefig('2G_refl.png')
 plt.show()
 
 # get operators
