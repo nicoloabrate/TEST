@@ -131,7 +131,8 @@ class sourceproblem():
                                 mysource = lambda mu, E: sourceproblem.mysrc(source, xv, mu, E)*eval_legendre(moment, mu)
                                 # integrate on energy and angle
                                 # FIXME: this has to be tested
-                                f[iS], err = dblquad(mysource, -1, 1, lambda E: E[0], lambda E: E[1])*coeff
+                                f[iS], err = dblquad(mysource, -1, 1, E[0], E[1])
+                                f[iS] = f[iS]*coeff
                                 if err > 1E-5:
                                     print('Source projection failed! Integration error={}'.format(err))
 
@@ -149,7 +150,8 @@ class sourceproblem():
                                 f[iS] = sourceproblem.mysrc(source, xv, mu, 0)*coeff*np.diff(E)
                             else:
                                 mysource = lambda E: sourceproblem.mysrc(source, xv, mu, E)
-                                f[iS], err = quad(mysource, E[0], E[1])*coeff
+                                f[iS], err = quad(mysource, E[0], E[1])
+                                f[iS] = f[iS]*coeff
                                 if err > 1E-5:
                                     print('Source projection failed! Integration error={}'.format(err))
                             iS = iS+1
