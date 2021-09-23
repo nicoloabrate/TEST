@@ -12,13 +12,16 @@ from TEST.geometry import Slab
 import TEST.models.NeutronTransportEquation as NTE
 from TEST.models.SourceProblem import sourceproblem
 import matplotlib.pyplot as plt
+from matplotlib import rcParams, colors
+rcParams['figure.dpi'] = 200
+plt.rc('grid', linestyle=":", color='black')
 
 nev = 1
-M = -5
+M = -50
 N = 1
 G = 1
 bc = 'Mark'
-H = 1
+H = 3
 xlayers = [0, H]
 # define geometry and mesh
 myslab = Slab(M, xlayers, ['FullAbsorption'], [bc], G, N, 'FD')
@@ -72,11 +75,15 @@ plt.legend()
 plt.show()
 
 # plt.plot(myslabD.mesh, sD.solution.flux, label='Diff')
-plt.plot(myslab.mesh, sP.solution.flux[0:myslab.nS], label='PN', c='r')
-plt.plot(myslab2.mesh, totphiSN, label='SN')
-plt.plot(myslab.mesh, phiT(myslab.mesh), '--', label='exact', c='b')
+plt.plot(myslab.mesh, sP.solution.flux[0:myslab.nS], label='$P_{1}$', c='r')
+plt.plot(myslab2.mesh, totphiSN, label='$S_{2}$')
+plt.plot(myslab.mesh, phiT(myslab.mesh), '--', label='analytic', c='b')
 # plt.plot(np.linspace(0, H/2, 1000), tmp, label='Diff. analytical')
+plt.ylabel('Flux [n/(cm$^2$ s)]')
+plt.xlabel('x [cm]')
 plt.legend()
+plt.grid()
+plt.savefig('source_analytic.png')
 plt.show()
 
 dx = myslab.dx[0]
