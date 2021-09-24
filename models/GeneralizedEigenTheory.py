@@ -20,14 +20,13 @@ from copy import deepcopy
 from scipy.linalg import eig
 from scipy.sparse.linalg import eigs
 from TEST.geometry.phasespace import PhaseSpace
-from TEST.methods.BCs import DiffusionBCs, PNBCs, SNBCs
 import TEST.models.NeutronTransportEquation as NTE
 from matplotlib.pyplot import spy
 
 
 class GET():
 
-    def __init__(self, nte, which, geom, nev=1, material=None, group=None):
+    def __init__(self, nte, which, geom, nev=1, keepPhaseSpace=None, group=None):
 
         # --- problem settings
         self.nS = nte.nS
@@ -40,31 +39,38 @@ class GET():
         self.geometry = geom
 
         if 2*nev+1 >= self.operators.S.shape[0]:
-            raise OSError('Too many eigenvalues required! 2*nev+1 should be < operator rank')
+            raise OSError('Too many eigenvalues required! 2*nev+1 should be < rank(operator)')
         else:
             self.nev = nev
 
         # --- define new operators
         self.LHS = deepcopy(self.operators)
-        if material is not None:
+        if keepPhaseSpace is not None:
             voidgeom = deepcopy(geom)
-            # set other regions to void except in the phasespace region of interest
+            isnewmaterial = True
             for reg in geom.regions.keys():
-                if reg not in material.keys():
+                if reg not in keepPhaseSpace['what']:  # set region to void
                     voidgeom.regions[reg].void()
-                else:
-                    voidgeom.regions[reg].void(excludeXS=material[reg])
-                    if isinstance(material[reg], dict):
-                        self.eigenpos = list(material[reg].keys())
-                    elif isinstance(material[reg], list):
-                        self.eigenpos = material[reg]
+                else:  # set to void except in specified region/channel/group
+                    isnewmaterial = False
+                    voidgeom.regions[reg].void(excludeXS=keepPhaseSpace)
+                    if isinstance(keepPhaseSpace[reg], dict):
+                        # FIXME according to where
+                        self.eigenpos = list(keepPhaseSpace[reg].keys())
+                    # elif isinstance(material[reg], list):
+                    #     self.eigenpos = material[reg]
+
+            if isnewmaterial:  # replace newmaterial to void
+                #
+                voidgeom.replace({'where': keepPhaseSpace['where'],
+                                  'with': keepPhaseSpace['what']})
 
             if self.model == 'PN':
                 self.RHS = NTE.PN(voidgeom, self.nA, steady=True, fmt='csc')
             elif self.model == 'SN':
                 self.RHS = NTE.SN(voidgeom, self.nA, steady=True, fmt='csc')
             elif self.model == 'Diffusion':
-                self.RHS = NTE.Diffusion(voidgeom, steady=True, fmt='csc')
+                raise OSError('Diffusion not available for GET!')
 
             # subtract new operators to keep balance
             self.LHS.F = self.operators.F-self.RHS.F
