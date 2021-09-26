@@ -411,6 +411,9 @@ class PhaseSpace:
             reals = self.eigvals[self.eigvals.imag == 0]
             reals = reals[reals != 0]
             # select real eigenvalue with positive total flux
+            if len(reals) == 0:
+                raise OSError('No real eigenvalue available!')
+
             for i in range(len(reals)):
                 # get total flux
                 idx = np.argwhere(self.eigvals==reals[i])[0][0]
