@@ -26,7 +26,7 @@ from matplotlib.pyplot import spy
 
 class GET():
 
-    def __init__(self, nte, which, geom, nev=1, keepPhaseSpace=None, group=None):
+    def __init__(self, nte, which, geom, nev=1, setPhaseSpace=None, group=None):
 
         # --- problem settings
         self.nS = nte.nS
@@ -45,25 +45,28 @@ class GET():
 
         # --- define new operators
         self.LHS = deepcopy(self.operators)
-        if keepPhaseSpace is not None:
+        if setPhaseSpace is not None:
             voidgeom = deepcopy(geom)
             isnewmaterial = True
             for reg in geom.regions.keys():
-                if reg not in keepPhaseSpace['what']:  # set region to void
+                if reg not in setPhaseSpace['which']:  # set region to void
                     voidgeom.regions[reg].void()
                 else:  # set to void except in specified region/channel/group
                     isnewmaterial = False
-                    voidgeom.regions[reg].void(excludeXS=keepPhaseSpace)
-                    if isinstance(keepPhaseSpace[reg], dict):
-                        # FIXME according to where
-                        self.eigenpos = list(keepPhaseSpace[reg].keys())
-                    # elif isinstance(material[reg], list):
-                    #     self.eigenpos = material[reg]
+                    voidgeom.regions[reg].void(excludeXS=setPhaseSpace)
+                    if which == 'theta':
+                        self.eigposition = setPhaseSpace['reaction']
 
             if isnewmaterial:  # replace newmaterial to void
-                #
-                voidgeom.replace({'where': keepPhaseSpace['where'],
-                                  'with': keepPhaseSpace['what']})
+                if isinstance(setPhaseSpace['where'], list):
+                    if isinstance(setPhaseSpace['which'], list):
+                        for where, which in zip(setPhaseSpace['where'], setPhaseSpace['which']):
+                            voidgeom.replace({'where': where, 'which': which})                    
+                    else:
+                        raise OSError('setPhaseSpace: both where and which field should be of type list!')
+                else:
+                    voidgeom.replace({'where': setPhaseSpace['where'],
+                                      'which': setPhaseSpace['which']})
 
             if self.model == 'PN':
                 self.RHS = NTE.PN(voidgeom, self.nA, steady=True, fmt='csc')
@@ -291,14 +294,14 @@ class GET():
         else:
             self.A = LHS.L+LHS.C+LHS.S0+LHS.F0-LHS.S-LHS.F  # destruction operator
 
-        if 'Fiss' in self.eigenpos:
+        if 'Fiss' in self.eigposition:
             self.B = -RHS.F0
-        elif 'Capt' in self.eigenpos:
+        elif 'Capt' in self.eigposition:
             self.B = -RHS.C
-        elif 'S0' in self.eigenpos:
+        elif 'S0' in self.eigposition:
             self.B = -RHS.S0
         else:
-            raise OSError('Theta eigenvalue does not support {} reaction!'.format(self.eigenpos))
+            raise OSError('Theta eigenvalue does not support {} reaction!'.format(self.eigposition))
 
         self.which = 'theta'
         self.whichspectrum = 'SR'

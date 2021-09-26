@@ -448,20 +448,14 @@ class Material():
         mydic = self.__dict__
         for what in mydic.keys():
             if what in alldata:
-                if excludeXS is not None:
+                if isinstance(excludeXS, dict):
                     # keep/reject whole reaction channel
-                    if isinstance(excludeXS, list):
-                        if what in excludeXS:
-                            continue
-                        else:
-                            mydic[what][:] = 0
-                    # keep/reject reaction channel in energy group
-                    elif isinstance(excludeXS, dict):
-                        if what in excludeXS.keys():
+                    if what == excludeXS['reaction']:
+                        if 'energy' in excludeXS.keys():
                             for g in range(0, self.nE):
-                                if g+1 in excludeXS[what]:
-                                    continue  # keep this data
-                                else:
+                                if g+1 not in excludeXS['energy']:
                                     mydic[what][g] = 0
+                    else:
+                        mydic[what][:] = 0
                 else:
                     mydic[what][:] = 0
