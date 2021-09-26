@@ -44,10 +44,10 @@ class Slab:
             self.energygrid = energygrid
 
         # set number of mean free path
-        if isinstance(split, int):
-            self._split = split*np.ones((self.nLayers), dtype=int)
-        elif isinstance(split, float):
-            self._split = split*np.ones((self.nLayers), dtype=float)
+        if isinstance(split, (int, float)):
+            self._split = [split]*self.nLayers # np.ones((self.nLayers), dtype=int)
+        # elif isinstance(split, float):
+        #     self._split = split*np.ones((self.nLayers), dtype=float)
         elif isinstance(split, (list, np.ndarray)):
 
             if len(split) == self.nLayers:
@@ -56,7 +56,7 @@ class Slab:
             else:
                 raise OSError('split specified are not consistent with' +
                               ' the number of regions. Please provide one'
-                              + ' split or as many split as the number of' +
+                              + ' split or as many splits as the number of' +
                               'layers.')
         else:
             raise TypeError('Cannot read type %s for split!' % type(split))
@@ -404,7 +404,7 @@ class Slab:
             tmp = self._split if isinstance(self._split, list) else self._split.tolist()
 
             if list(set(tmp)) == tmp:
-                self._split = self._split*np.ones((self.nLayers))
+                self._split = self._split*np.ones((self.nLayers), dtype=type(self._split))
 
             if max(tmp) < 0 and nlayers_old != self.nLayers:  # user defined points
                 idy = np.argmax(tmp)
@@ -423,35 +423,44 @@ class Slab:
 
                 self.mesher(minmfp, spatial_scheme=self.spatial_scheme)
 
-    def replace(self, replacement, sanitycheck=True):
+    def replace(self, replacement):
         # TODO: finish the implementation and test it
         regs = list(self.regionmap.values())
-        for k, v in replacement.items():
-            # check perturbation consistency
-            if 'which' not in v.keys():
-                raise OSError('Material to be replaced is missing')
-            if 'where' not in v.keys():
-                raise OSError('Replacement coordinates are missing')
-            if 'with' not in v.keys():
-                raise OSError('New material for replacement missing')
-            if 'datapath' not in v.keys():
-                raise OSError('New material file path missing')
-            if 'name' in v.keys():
-                new_mat_name = v['name']
-            else:
-                iR = 0
-                for r in regs:
-                    if 'Replacement' in r:
-                        iR += 1
+        # if 'name' in replacement.keys():
+        #     new_mat_name = replacement['name']
+        # else:
+        #     iR = 0
+        #     for r in regs:
+        #         if 'Replacement' in r:
+        #             iR += 1
+        #     new_mat_name = 'Replacement{}'.format(iR)
 
-        old_mat_name = v['which']
-        coord = v['where']
-        new_mat = v['with']
-        new_mat_name = 'Replacement{}'.format(iR)
-        # look for position where to replace
-        idx = np.argwhere(self.layers==min(coord))
-        self.regionmap[len(regs)+1] = new_mat_name
-        self.regions[new_mat_name] = new_mat
+        if 'which' in replacement.keys():
+            new_mat = replacement['which']
+        else:
+            raise OSError('New material for replacement missing')
+            
+        if 'where' in replacement.keys():
+            if isinstance(replacement['where'], str):
+                for i, k in self.regionmap.items():
+                    if k == replacement['where']:
+                        # coords.append(self.regionwhere[i])
+                        # replace material position
+                        self.regionmap[i] = new_mat
+            elif isinstance(replacement['where'], int):  # region identifier
+                self.regionmap[replacement['where']] = new_mat
+            elif isinstance(replacement['where'], tuple):  
+                for i, coord in self.regionwhere.items():
+                    if coord == replacement['where']:
+                        self.regionmap[i] = new_mat
+            else:
+                OSError('"where" entry cannot be of type {}'.type(replacement['where']))
+        else:
+            raise OSError('Material/location for replacement is missing')
+
+        # define new material data
+        path = None if 'path' not in replacement.keys() else replacement['path']
+        self.regions[new_mat] = Material(new_mat, self.nE, datapath=path)
 
     def computeQW(self):
         """
