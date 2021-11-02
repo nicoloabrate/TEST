@@ -175,8 +175,8 @@ def scatteringTot(obj, model, fmt='csc'):
     """
     SMG = []
     SMGapp = SMG.append
-    scatxs = obj.getxs('S0').sum(axis=1)
-    
+    scatxs = obj.getxs('S0').sum(axis=0)
+
     for gro in range(obj.nE):
 
         if model == 'PN':
@@ -266,12 +266,12 @@ def scattering(obj, model, prod=True, fmt='csc', adjoint=False):
         for arr_gro in range(obj.nE):  # arrival group
 
             if model == 'PN':
-                Mapp(PN.scattering(obj, sm[arr_gro, dep_gro, :, :], fmt=fmt))
+                Mapp(PN.scattering(obj, sm[dep_gro, arr_gro, :, :], fmt=fmt))
             elif model == 'SN':
-                Mapp(SN.scattering(obj, sm[arr_gro, dep_gro, :, :], fmt=fmt))
+                Mapp(SN.scattering(obj, sm[dep_gro, arr_gro, :, :], fmt=fmt))
             elif model == 'Diffusion':
                 # only isotropic scattering is handled
-                Mapp(PN.scattering(obj, sm[arr_gro, dep_gro, :, 0, newaxis],
+                Mapp(PN.scattering(obj, sm[dep_gro, arr_gro, :, 0, newaxis],
                                    fmt=fmt))
             else:
                 raise OSError('%s model not available!' % model)
