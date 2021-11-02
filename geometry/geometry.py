@@ -11,15 +11,16 @@ from matplotlib.pyplot import gca
 from matplotlib import rcParams
 from TEST.material import Material
 from collections import OrderedDict
+from pathlib import Path
 from copy import deepcopy as cp
 from scipy.special import roots_legendre, eval_legendre
-from copy import deepcopy as copy
+
 
 class Slab:
     """Define slab geometry object."""
 
-    def __init__(self, split, layers, regions, BCs, G, AngOrd, spatial_scheme,
-                 datapath=None, verbosity=True, energygrid=None):
+    def __init__(self, split, layers, regions, BCs, energygrid, AngOrd,
+                 spatial_scheme, datapath=None, verbosity=True):
 
         if isinstance(regions, str):
             regions = [regions]
@@ -27,7 +28,8 @@ class Slab:
         self.nLayers = len(layers)-1
         # check input consistency
         if self.nLayers != len(regions):
-            raise OSError('{} regions but {} materials specified!'.format(self.nLayers, len(regions)))
+            raise OSError('{} regions but {} materials \
+                          specified!'.format(self.nLayers, len(regions)))
 
         # assign "test" path for data library
         self.datapath = datapath
@@ -35,17 +37,40 @@ class Slab:
         # assign layers coordinates
         self.layers = layers
 
-        if energygrid is None:
-            if G == 1:
-                self.energygrid = [1E-11, 20]
-            if G == 2:
-                self.energygrid = [1E-11, 0.0625, 20]
-        else:
+        if isinstance(energygrid, (list, np.ndarray, tuple)):
+            self.nE = len(energygrid)-1
+            self.egridname = '{}G'.format(self.nE)
             self.energygrid = energygrid
+        elif isinstance(energygrid, str):
+            pwd = Path(__file__).parent.parent
+            pwd = pwd.joinpath('material')
+            egridpath = pwd.joinpath('datalib', 'group_structures',
+                                     '{}.txt'.format(energygrid))
+            self.nE = len(energygrid)-1
+            self.egridname = str(energygrid)
+            self.energygrid = np.loadtxt(egridpath)
+        elif isinstance(energygrid, (float, int)):
+            if energygrid == 1:
+                self.energygrid = [1E-11, 20]
+                self.nE = 1
+                self.egridname = '1G'
+            else:
+                pwd = Path(__file__).parent.parent
+                pwd = pwd.joinpath('material')
+                egridpath = pwd.joinpath('datalib', 'group_structures',
+                                         '{}G.txt'.format(energygrid))
+                self.energygrid = np.loadtxt(egridpath)
+                self.nE = len(self.energygrid)-1
+                self.egridname = '{}G'.format(self.nE)
+        else:
+            raise OSError('Unknown energygrid {} \
+                          type'.format(type(energygrid)))
 
+        if self.energygrid[0] < self.energygrid[0]:
+            self.energygrid[np.argsort(-self.energygrid)]
         # set number of mean free path
         if isinstance(split, (int, float)):
-            self._split = [split]*self.nLayers # np.ones((self.nLayers), dtype=int)
+            self._split = [split]*self.nLayers
         # elif isinstance(split, float):
         #     self._split = split*np.ones((self.nLayers), dtype=float)
         elif isinstance(split, (list, np.ndarray)):
@@ -75,12 +100,22 @@ class Slab:
             if uniName not in self.regions.keys():
 
                 if datapath is not None:
-                    for (filename, mats) in datapath.items():
-                        if uniName in mats: path = filename
+                    if isinstance(datapath, dict):
+                        for (mat, filename) in datapath.items():
+                            if uniName == mat:
+                                path = filename
+                                break
+                    elif isinstance(datapath, str):
+                        path = datapath
+                    else:
+                        raise OSError('{} not valid for \
+                                      datapath'.format(type(datapath)))
                 else:
                     path = None
 
-                self.regions[uniName] = Material(uniName, G, datapath=path)
+                self.regions[uniName] = Material(uniName, self.energygrid,
+                                                 egridname=self.egridname,
+                                                 datapath=path)
 
             # consistency check precursor families and decay constants
             if 'lambda' in self.regions[uniName].__dict__.keys():
@@ -89,11 +124,14 @@ class Slab:
                     lambdas = self.regions[uniName].__dict__['lambda']
                 else:
                     if self.NPF != self.regions[uniName].NPF:
-                        raise OSError('Number of precursor families in %s not consistent with other regions' % uniName)
+                        raise OSError('Number of precursor families in {} not \
+                                      consistent with other \
+                                      regions'.format(uniName))
                     if not np.allclose(lambdas, self.regions[uniName].__dict__['lambda']):
                         self.regions[uniName].__dict__['lambda'] = lambdas
                         if verbosity:
-                            print('Warning: Forcing decay constants consistency in {}...'.format(uniName))
+                            print('Warning: Forcing decay constants \
+                                  consistency in {}...'.format(uniName))
 
             if AngOrd > 0:
                 minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
@@ -102,11 +140,10 @@ class Slab:
         # assign mesh, ghost mesh and N
         self.mesher(minmfp, spatial_scheme)
 
-        self.regionwhere = OrderedDict(zip(range(0, len(regions)), zip(self.layers[:-1], self.layers[1:])))
-        self.regionmap = OrderedDict(zip(range(0, len(regions)), regions))
+        self.regionwhere = OrderedDict(zip(range(len(regions)), zip(self.layers[:-1], self.layers[1:])))
+        self.regionmap = OrderedDict(zip(range(len(regions)), regions))
         self.AngOrd = AngOrd
         self.spatial_scheme = spatial_scheme
-        self.nE = G
         self.geometry = 'slab'
 
     def mesher(self, minmfp, spatial_scheme):
@@ -256,7 +293,7 @@ class Slab:
         Returns
         -------
         vals : numpy.ndarray
-            ``numpy.ndarray`` with G (groups) rows and R (regions) columns.
+            ``numpy.ndarray`` with nE (groups) rows and R (regions) columns.
 
         """
         if region is None:
@@ -281,11 +318,13 @@ class Slab:
                     if allL is True:
                         old_key = 'S'
                         # get all scattering order matrices for each region
-                        for l in range(L):
-                            key = '%s%d' % (old_key, l)
-                            vals[:, :, ireg, l] = self.regions[reg].getxs(key, pos1, pos2)
+                        for ll in range(L):
+                            key = '%s%d' % (old_key, ll)
+                            vals[:, :, ireg, ll] = self.regions[reg].\
+                                getxs(key, pos1, pos2)
                     else:
-                        vals[:, :, ireg] = self.regions[reg].getxs(key, pos1, pos2)
+                        vals[:, :, ireg] = self.regions[reg].\
+                            getxs(key, pos1, pos2)
 
             elif key == 'beta' or key == 'lambda':
 
@@ -304,7 +343,8 @@ class Slab:
                 vals = np.full((self.nE, NPF, self.nLayers), None)
                 # loop over regions
                 for ireg, reg in self.regionmap.items():
-                    vals[:, :, ireg] = self.regions[reg].getxs(key, pos1, pos2).T
+                    vals[:, :, ireg] = self.regions[reg].\
+                                        getxs(key, pos1, pos2).T
 
             else:
                 vals = np.full((self.nE, self.nLayers), None)
@@ -355,7 +395,8 @@ class Slab:
             dg = v['depgro']
             if k != 'density':
                 if len(hw) != self.nE:
-                    raise OSError('The perturbation intensities required should be %d' % self.nE)
+                    raise OSError('The perturbation intensities required \
+                                  should be {}'.format(self.nE))
 
             if isinstance(x, tuple):
                 x = [x]
@@ -390,9 +431,9 @@ class Slab:
                             regs.insert(idx, regs[idx])
                             oldreg = regs[idx]
                             regs.insert(idx+1, 'Perturbation%d' % iP)
-
-                        self.regions['Perturbation%d' % iP] = cp(self.regions[oldreg])
-                        self.regions['Perturbation%d' % iP].perturb(k, hw, dg, sanitycheck=sanitycheck)
+                        mystr = 'Perturbation{}'.format(iP)
+                        self.regions[mystr] = cp(self.regions[oldreg])
+                        self.regions[mystr].perturb(k, hw, dg, sanitycheck=sanitycheck)
                     # perturbation between two or more regions
                     elif x1 < l and x2 > l:
                         raise OSError('Perturbations can be applied one region at a time!')
@@ -439,7 +480,7 @@ class Slab:
             new_mat = replacement['which']
         else:
             raise OSError('New material for replacement missing')
-            
+
         if 'where' in replacement.keys():
             if isinstance(replacement['where'], str):
                 for i, k in self.regionmap.items():
@@ -449,7 +490,7 @@ class Slab:
                         self.regionmap[i] = new_mat
             elif isinstance(replacement['where'], int):  # region identifier
                 self.regionmap[replacement['where']] = new_mat
-            elif isinstance(replacement['where'], tuple):  
+            elif isinstance(replacement['where'], tuple):
                 for i, coord in self.regionwhere.items():
                     if coord == replacement['where']:
                         self.regionmap[i] = new_mat
