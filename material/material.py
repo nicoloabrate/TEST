@@ -5,6 +5,7 @@ File: material.py
 
 Description: Class to handle different material regions.
 """
+import json
 import numpy as np
 from os import path
 from pathlib import Path
@@ -15,8 +16,9 @@ from copy import deepcopy as copy
 
 rc['xs.reshapeScatter'] = True
 rc['xs.getB1XS'] = False
-rc['xs.variableGroups'] = ['kinetics', 'xs', 'xs-prod']
-# This is hardcoded but depends on Serpent 2 highest Legendre polynomial expansion order
+rc['xs.variableGroups'] = ['kinetics', 'xs', 'xs-prod', 'gc-meta']
+
+# it depends on Serpent 2 highest Legendre polynomial expansion order
 scatt_keys = [*list(map(lambda z: "infS"+str(z), range(0, 8))),
               *list(map(lambda z: "infSp"+str(z), range(0, 8)))]
 xsdf_keys = ['infTot', 'infAbs', 'infDiffcoef', 'infTranspxs', 'infCapt',
@@ -24,7 +26,7 @@ xsdf_keys = ['infTot', 'infAbs', 'infDiffcoef', 'infTranspxs', 'infCapt',
 ene_keys = ['infNubar', 'infInvv', 'infKappa', 'infInvv',  'infChit',
             'infChip', 'infChid']
 
-serp_keys = [*scatt_keys, *xsdf_keys, *ene_keys]
+serp_keys = [*scatt_keys, *xsdf_keys, *ene_keys, 'infFlx']
 
 sumxs = ['Tot', 'Abs', 'Remxs']
 indepdata = ['Capt', 'Fiss', 'S0', 'Nubar', 'Diffcoef', 'Chid', 'Chip']
@@ -32,22 +34,32 @@ basicdata = ['Fiss', 'Nubar', 'S0', 'Chit']
 kinetics = ['lambda', 'beta']
 alldata = list(set([*sumxs, *indepdata, *basicdata, *kinetics]))
 
-# FIXME read energy grid from data
+collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(0, 8))),
+               *list(map(lambda z: "Sp"+str(z), range(0, 8))), 'Invv']
+
+collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'Kappa']
+
+
 class Material():
     """Create material regions with multi-group constants."""
 
-    def __init__(self, uniName, nE, datapath=None):
+    def __init__(self, uniName, energygrid, datapath=None, egridname=None,
+                 reader='json'):
         """
-
+        Initialise object.
 
         Parameters
         ----------
-        uniName : TYPE
-            DESCRIPTION.
-        nE : TYPE
-            DESCRIPTION.
-        datapath : TYPE, optional
-            DESCRIPTION. The default is None.
+        uniName : str
+            Universe name.
+        energygrid : iterable
+            Energy group structure.
+        datapath : str, optional
+            Path to the file containing the data. If None,
+            data are taken from the local database.
+            The default is None.
+        egridname : str, optional
+            Name of the energy group structure. The default is None.
 
         Raises
         ------
@@ -59,63 +71,58 @@ class Material():
         None.
 
         """
+        nE = len(energygrid)-1
+        egridname = egridname if egridname else "{}G".format(nE)
+        pwd = Path(__file__).parent
+
         if datapath is None:
             pwd = Path(__file__).parent
-            datapath = pwd.joinpath('datalib', '%gG' % nE,
-                                    '%s_res.m' % uniName)
+            datapath = pwd.joinpath('datalib', '{}'.format(egridname))
+            filename = uniName
+        elif path.isdir(datapath) is False:
+            pwd = Path(__file__).parent
+            filename = copy(datapath)
+            datapath = pwd.joinpath('datalib', '{}'.format(egridname))
 
-        try:  # read Serpent 2 output with serpentTools
-            if str(datapath).endswith('_res.m'):
-                fname = str(datapath)
+        # if str(datapath).endswith('_res.m'):
+        #     fname = str(datapath)
+        # else:
+        #     fname = '{}_res.m'.format(datapath)
+
+        # if not path.exists(path.dirname(datapath)):
+        #     pwd = Path(__file__).parent
+        #     fname = pwd.joinpath('datalib', '{}'.format(egridname),
+        #                          '{}'.format(fname))
+
+        if reader == 'json':
+            fname = path.join(datapath, "json", filename)
+            fname = '{}.{}'.format(str(fname), reader)
+            if path.exists(fname):
+                self._readjson(fname)
             else:
-                fname = '%s_res.m' % str(datapath)
+                reader = 'serpent'
 
-            if not path.exists(path.dirname(datapath)):
-                pwd = Path(__file__).parent
-                fname = pwd.joinpath('datalib', '%gG' % nE, '%s' % fname)
+        if reader == 'serpent':
+            fname = path.join(datapath, "serpent", filename)
+            fname = '{}{}'.format(str(fname), "_res.m")
 
-            res = read(str(fname))
-            univ = []
-            for key in sorted(res.universes):
-                univ.append(key[0])
-
-            if uniName not in univ:
-                raise OSError('%s does not contain %s GC_UNIVERSE!' % (datapath, uniName))
+            if path.exists(fname):
+                self._readserpentres(fname, uniName, nE, egridname)
             else:
-                data = res.getUniv(uniName, 0)
+                reader = 'txt'
 
-            if len(data.infExp['infAbs']) != nE:
-                raise OSError('%s no. energy groups not match with input G!' % datapath)
+        if reader == 'txt':
+            fname = path.join(datapath, "txt", filename)
+            fname = '{}.{}'.format(str(fname), reader)
+            if path.exists(fname):
+                self._readtxt(fname, nE)
+            else:
+                raise OSError('{} not found!'.format(fname))
 
-            selfdic = self.__dict__
-
-            for my_key in serp_keys:
-
-                if my_key.startswith('infS') or my_key.startswith('infSp'):
-                    vals = np.reshape(data.infExp[my_key], (nE, nE))
-                else:
-                    vals = data.infExp[my_key]
-
-                selfdic[my_key.split('inf')[1]] = vals
-
-            # kinetics parameters
-            self.beta = res.resdata['fwdAnaBetaZero'][::2]
-            self.beta_tot = self.beta[0]
-            self.beta = self.beta[1:]
-            # this to avoid confusion with python lambda function
-            selfdic['lambda'] = res.resdata['fwdAnaLambda'][::2]
-            selfdic['lambda_tot'] = selfdic['lambda'][0]
-            selfdic['lambda'] = selfdic['lambda'][1:]
-            self.nE = nE
-            self.UniName = uniName
-
-        except FileNotFoundError:
-            try:  # read ad-hoc file format
-                self._readtxt(str(fname).split('_res.m')[0], nE)
-                self.nE = nE
-                self.UniName = uniName
-            except FileNotFoundError:
-                raise OSError('Material file for %s does not exist!' % uniName)
+        self.nE = nE
+        self.egridname = egridname
+        self.energygrid = energygrid
+        self.UniName = uniName
 
         try:
             self.NPF = (self.beta).size
@@ -131,12 +138,67 @@ class Material():
         self.L = S if S > L else L  # get maximum scattering order
         self.datacheck()
 
+    def _readjson(self, path):
+        """
+        Read data from json file.
+
+        Parameters
+        ----------
+        filename : str
+            Path to json file.
+
+        Returns
+        -------
+        None.
+
+        """
+        data = json.load(path)
+        for k, v in data.items():
+            if isinstance(v, list):
+                self.__dict__[k] = np.asarray(v)
+            else:
+                self.__dict__[k] = v
+
+    def _readserpentres(self, datapath, uniName, nE, egridname):
+
+        res = read(str(datapath))
+        univ = []
+        for key in sorted(res.universes):
+            univ.append(key[0])
+
+        if uniName not in univ:
+            raise OSError('GC_UNIVERSE {} not in {}'.format(uniName, datapath))
+        else:
+            data = res.getUniv(uniName, 0, 0, 0)
+        if len(data.infExp['infAbs']) != nE:
+            raise OSError('{} energy groups do not match with \
+                          input grid!'.format(datapath))
+
+        selfdic = self.__dict__
+        for my_key in serp_keys:
+
+            if my_key.startswith('infS') or my_key.startswith('infSp'):
+                vals = np.reshape(data.infExp[my_key], (nE, nE))
+            else:
+                vals = data.infExp[my_key]
+
+            selfdic[my_key.split('inf')[1]] = vals
+
+        # kinetics parameters
+        selfdic['beta'] = res.resdata['fwdAnaBetaZero'][::2]
+        selfdic['beta_tot'] = selfdic['beta'][0]
+        selfdic['beta'] = selfdic['beta'][1:]
+        # this to avoid confusion with python lambda function
+        selfdic['lambda'] = res.resdata['fwdAnaLambda'][::2]
+        selfdic['lambda_tot'] = selfdic['lambda'][0]
+        selfdic['lambda'] = selfdic['lambda'][1:]
+
     def _readtxt(self, fname, nE):
         """
         Parse the material data from a .txt file.
 
-        Macro-group constants are parsed from a formatted file with column-wise data
-        separated by headers beginning with "#" and the name of the data:
+        Macro-group constants are parsed from a formatted file with column-wise
+        data separated by headers beginning with "#" and the name of the data:
             * Tot: total cross section [cm^-1]
             * Transpxs: transport cross section [cm^-1]
                         It is defined as total_xs-avg_direction*scattering_xs
@@ -157,7 +219,8 @@ class Material():
             * Kappa: average fission deposited heat [MeV]
             * Invv: particle inverse velocity [s/cm]
             * S0, S1, S2,... : scattering matrix cross section [cm^-1]
-            * Sp0, Sp1, Sp2,... : scattering production matrix cross section [cm^-1]
+            * Sp0, Sp1, Sp2,... : scattering production matrix cross section
+                                [cm^-1]
             * beta: delayed neutron fractions [-]
             * lambda: precursors families decay constant [-]
 
@@ -194,7 +257,8 @@ class Material():
                     G = len(data)
 
                 if G != nE:
-                    raise OSError('Number of groups in line %g is not consistent!', il)
+                    raise OSError('Number of groups in line %g is not \
+                                  consistent!', il)
 
                 if key.startswith('S') or key.startswith('Sp'):
                     # multi-line data (scattering matrix)
@@ -279,42 +343,44 @@ class Material():
             for g in range(0, self.nE):
                 # no perturbation
                 if howmuch[g] == 0:
-                   continue
-    
+                    continue
+
                 mydic = self.__dict__
                 if what in indepdata:
-                   # update perturbed parameter
-                   if depgro is None:
-                       delta = mydic[what][g]*howmuch[g]
-                       mydic[what][g] = mydic[what][g]+delta
-                   else:  # select departure group for scattering matrix
-                       delta = mydic[what][depgro]*howmuch[depgro]
-                       mydic[what][depgro] = mydic[what][depgro]+delta
-    
-                   # select case to ensure data consistency
-                   if what == 'Fiss':
-                       self.Nsf[g] = self.Nubar[g]*mydic[what][g]
-                   elif what == 'Nubar':
-                       self.Nsf[g] = self.Fiss[g]*mydic[what][g]
-                       # computesumxs = False
-                   elif what.startswith('Chi'):
-                       if what in ['Chit']:
-                           mydic[what] = mydic[what]*(1+delta)
-                       else:
-                           raise OSError('Delayed/prompt spectra perturbation still missing!')
-                   elif what == 'Diffcoef':
-                       # Hp: change in diffcoef implies change in capture
-                       delta = 1/(3*mydic[what][g])-self.Transpxs[g]
-                   elif what == 'S0':
-                       # change higher moments, if any
-                       for l in range(0, self.L):
-                           R = (mydic[what][g]/mydic[what][g]-delta)
-                           key = 'S%d' % l
-                           mydic[key][depgro][g] = mydic[key][depgro][g]*R
-    
+                    # update perturbed parameter
+                    if depgro is None:
+                        delta = mydic[what][g]*howmuch[g]
+                        mydic[what][g] = mydic[what][g]+delta
+                    else:  # select departure group for scattering matrix
+                        delta = mydic[what][depgro]*howmuch[depgro]
+                        mydic[what][depgro] = mydic[what][depgro]+delta
+
+                    # select case to ensure data consistency
+                    if what == 'Fiss':
+                        self.Nsf[g] = self.Nubar[g]*mydic[what][g]
+                    elif what == 'Nubar':
+                        self.Nsf[g] = self.Fiss[g]*mydic[what][g]
+                        # computesumxs = False
+                    elif what.startswith('Chi'):
+                        if what in ['Chit']:
+                            mydic[what] = mydic[what]*(1+delta)
+                        else:
+                            raise OSError('Delayed/prompt spectra \
+                                           perturbation still missing!')
+                    elif what == 'Diffcoef':
+                        # Hp: change in diffcoef implies change in capture
+                        delta = 1/(3*mydic[what][g])-self.Transpxs[g]
+                    elif what == 'S0':
+                        # change higher moments, if any
+                        for ll in range(self.L):
+                            R = (mydic[what][g]/mydic[what][g]-delta)
+                            key = 'S%d' % ll
+                            mydic[key][depgro][g] = mydic[key][depgro][g]*R
+
                 else:
                     if sanitycheck:
-                        raise OSError('%s cannot be perturbed directly!' % what)
+                        raise OSError('{} cannot be perturbed \
+                                      directly!'.format(what))
                     else:
                         # update perturbed parameter
                         if depgro is None:
@@ -367,7 +433,8 @@ class Material():
         # --- compute mean of scattering cosine
         if 'S1' in datavail:
             sTOT1 = self.S1.sum(axis=1) if len(self.S1.shape) > 1 else self.S1
-            self.mu0 = 0*self.Tot if np.isnan((sTOT1/sTOT).sum()) else sTOT1/sTOT
+            self.mu0 = 0*self.Tot if np.isnan((sTOT1/sTOT).sum()) \
+                else sTOT1/sTOT
         elif 'Diffcoef' in datavail:
             tmp = 1/(3*self.Diffcoef)
             self.mu0 = (self.Tot-tmp)/sTOT
@@ -375,7 +442,8 @@ class Material():
             self.mu0 = np.zeros((self.nE, ))
         # check consistency
         if abs(self.mu0).max() > 1:
-            raise OSError('Average cosine larger than 1! Check {} data!'.format(self.UniName))
+            raise OSError('Average cosine larger than 1! Check {} \
+                          data!'.format(self.UniName))
         # --- compute transport xs
         self.Transpxs = self.Tot-self.mu0*sTOT
         # --- compute diffusion coefficient
@@ -387,8 +455,11 @@ class Material():
         # --- ensure consistency kinetic parameters (if fissile medium)
         if self.Fiss.max() > 0:
             if abs(self.Chit.sum() - 1) > 1E-5:
-                raise OSError('Total fission spectra in %s not normalised!' % self.UniName)
+                raise OSError('Total fission spectra in {} not \
+                              normalised!'.format(self.UniName))
 
+            # ensure pdf normalisation
+            self.Chit /= self.Chit.sum()
             for s in kinetics:
                 if s in datavail:
                     kincons = True
@@ -401,24 +472,32 @@ class Material():
                         # each family has same emission spectrum
                         self.Chid = np.asarray([self.Chid]*self.NPF)
                     elif self.Chid.shape != (self.NPF, self.nE):
-                        raise OSError('Delayed fiss. spectrum should be (%d, %d)'
-                                      % (self.NPF, self.nE))
+                        raise OSError('Delayed fiss. spectrum should be \
+                                      ({}, {})'.format(self.NPF, self.nE))
 
                     for g in range(0, self.nE):
-                        chit = (1-self.beta.sum())*self.Chip[g]+np.dot(self.beta, self.Chid[:, g])
-                        if abs(self.Chit[g]-chit) > 1E-5:
-                            raise OSError('Fission spectra or delayed fractions in %s not consistent!' % self.UniName)
+                        chit = (1-self.beta.sum())*self.Chip[g] + \
+                                np.dot(self.beta, self.Chid[:, g])
+                        if abs(self.Chit[g]-chit) > 1E-3:
+                            raise OSError('Fission spectra or delayed \
+                                          fractions in {} not \
+                                          consistent!'.format(self.UniName))
 
                 except AttributeError as err:
                     if "'Material' object has no attribute 'Chid'" in str(err):
-                        self.Chid = self.Chit
+                        self.Chid = np.asarray([self.Chit]*self.NPF)
                         self.Chip = self.Chit
                     else:
                         print(err)
 
+                # ensure pdf normalisation
+                self.Chip /= self.Chip.sum()
+                for p in range(self.NPF):
+                    self.Chid[p, :] /= self.Chid[p, :].sum()
+
     def void(self, excludeXS=None, sanitycheck=True):
         """
-        Make region void except for some group-wise user-specified reaction
+        Make region void except for some group-wise user-specified reaction.
 
         Parameters
         ----------
@@ -437,9 +516,9 @@ class Material():
 
         """
         # add anisotropic XS
-        for l in range(self.L):
-            new = 'S{}'.format(l)
-            newP = 'Sp{}'.format(l)
+        for ll in range(self.L):
+            new = 'S{}'.format(ll)
+            newP = 'Sp{}'.format(ll)
             if new not in alldata:
                 alldata.append(new)
             if newP not in alldata:
@@ -459,3 +538,218 @@ class Material():
                         mydic[what][:] = 0
                 else:
                     mydic[what][:] = 0
+
+    def to_json(self):
+        """
+        Dump object to json file.
+
+        Returns
+        -------
+        None.
+
+        """
+        tmp = {}
+        with open('{}_{}.json'.format(self.UniName, self.egridname), 'w') as f:
+
+            for k, v in self.__dict__.items():
+                if isinstance(v, (np.ndarray)):
+                    tmp[k] = v.tolist()
+                else:
+                    tmp[k] = v
+
+            json.dump(tmp, f, sort_keys=True, indent=10)
+
+    def collapse(self, fewgrp, egridname=None):
+        """
+        Collapse in energy the multi-group data.
+
+        Parameters
+        ----------
+        fewgrp : iterable
+            Few-group structure to perform the collapsing.
+
+        Raises
+        ------
+        OSError
+            Collapsing failed: weighting flux missing in {}.
+
+        Returns
+        -------
+        None.
+
+        """
+        if 'Flx' not in self.__dict__.keys():
+            raise OSError('Collapsing failed: weighting flux missing in \
+                          {}'.format(self.UniName))
+        else:
+            multigrp = self.energygrid
+            if isinstance(fewgrp, list):
+                fewgrp = np.asarray(fewgrp)
+            # ensure descending order
+            fewgrp = fewgrp[np.argsort(-fewgrp)]
+            H = len(multigrp)-1
+            G = len(fewgrp)-1
+            # sanity check
+            if G > H:
+                raise OSError('Collapsing failed: few-group structure should \
+                              have less than {} group'.format(H))
+            if multigrp[0] != fewgrp[0] or multigrp[0] != fewgrp[0]:
+                raise OSError('Collapsing failed: few-group structure  \
+                              boundaries do not match with multi-group \
+                              one')
+
+            iS = 0
+            collapsed = {}
+            collapsed['Flx'] = np.zeros((G, ))
+            for g in range(G):
+                # select fine groups in g
+                G1, G2 = fewgrp[g], fewgrp[g+1]
+                iE = np.argwhere(np.logical_and(multigrp[iS:] < G1,
+                                                multigrp[iS:] >= G2))[-1][0]+iS
+                # compute flux in g
+                flx = self.Flx
+                NC = flx[iS:iE].sum()
+                collapsed['Flx'][g] = NC
+                # --- collapse
+                for key, v in self.__dict__.items():
+                    # --- cross section and inverse of velocity
+                    if key in collapse_xs:
+                        # --- preallocation
+                        dims = (G, G) if 'S' in key else (G, )
+                        if g == 0:
+                            collapsed[key] = np.zeros(dims)
+
+                        if len(dims) == 1:
+                            collapsed[key][g] = flx[iS:iE].dot(v[iS:iE])/NC
+                        else:
+                            # --- scattering
+                            iS2 = 0
+                            for g2 in range(G):  # arrival group
+                                I1, I2 = fewgrp[g2], fewgrp[g2+1]
+                                iE2 = np.argwhere(np.logical_and
+                                                  (multigrp[iS2:] < I1,
+                                                   multigrp[iS2:] >= I2))
+                                iE2 = iE2[-1][0]+iS2
+                                s = v[iS:iE, iS2:iE2].sum(axis=1)
+                                collapsed[key][g][g2] = flx[iS:iE].dot(s)/NC
+                                iS2 = iE2
+                    # --- fission-related data
+                    elif key in collapse_xsf:
+                        if self.Fiss.max() <= 0:
+                            if key == 'Chid':
+                                collapsed[key] = np.zeros((self.NPF, G))
+                            else:
+                                collapsed[key] = np.zeros((G, ))
+                            continue
+                        fissrate = flx[iS:iE]*self.Fiss[iS:iE]
+                        FRC = fissrate.sum()
+                        if key == 'Chid':
+                            if g == 0:
+                                collapsed[key] = np.zeros((self.NPF, G))
+                            for p in range(self.NPF):
+                                collapsed[key][p, g] = v[p, iS:iE].sum()
+                        else:
+                            if g == 0:
+                                collapsed[key] = np.zeros((G, ))
+
+                            if 'Chi' in key:
+                                collapsed[key][g] = v[iS:iE].sum()
+                            else:
+                                collapsed[key][g] = fissrate.dot(v[iS:iE])/FRC
+                    else:
+                        continue
+                iS = iE
+            # overwrite data
+            self.energygrid = fewgrp
+            self.nE = G
+            self.egridname = egridname if egridname else '{}G'.format(G)
+            for key in self.__dict__.keys():
+                if key in collapsed.keys():
+                    self.__dict__[key] = collapsed[key]
+            # ensure data consistency
+            self.datacheck()
+
+
+class Mix(Material):
+    """Create regions mixing other materials."""
+
+    def __init__(self, universes, densities, energygrid, datapath=None,
+                 egridname=None, reader='json', mixname=None):
+        """
+        Initialise object.
+
+        Parameters
+        ----------
+        uniName : str
+            Universe name.
+        energygrid : iterable
+            Energy group structure.
+        datapath : str, optional
+            Path to the file containing the data. If None,
+            data are taken from the local database.
+            The default is None.
+        egridname : str, optional
+            Name of the energy group structure. The default is None.
+
+        Raises
+        ------
+        OSError
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        nE = len(energygrid)-1
+        egridname = egridname if egridname else "{}G".format(nE)
+
+        if len(universes) != len(densities):
+            raise OSError('Number of regions and number of densities mismatch')
+
+        idx = 0
+        for k, v in dict(zip(universes, densities)):
+            kpath = datapath[idx]
+            mat = Material(k, energygrid, datapath=kpath, egridname=egridname,
+                           reader=reader)
+            idx += 1
+            # density multiplication and summation
+            for s in mat.keys():
+                if s in collapse_xs:
+                    if idx == 0:
+                        self.__dict__[s] = densities*mat[s]
+                    else:
+                        self.__dict__[s] = self.__dict__[s]+densities*mat[s]
+                # FIXME
+                if s in collapse_xsf:
+                    if idx == 0:
+                        nu = mat['Nubar'] if 'Chi' in s else 1
+                        self.__dict__[s] = mat['Fiss']*mat[s]*nu
+                    else:
+                        self.__dict__[s] = self.__dict__[s]+mat['Fiss'] * \
+                                            mat[s]*nu
+        for s in collapse_xsf:
+            nu = mat['Nubar'] if 'Chi' in s else 1
+            self.__dict__[s] = self.__dict__[s]/np.sum(mat['Fiss']*nu)
+
+        if mixname is None:
+            mixname = '_'.join(universes)
+
+        self.nE = nE
+        self.egridname = egridname
+        self.energygrid = energygrid
+        self.UniName = mixname
+
+        try:
+            self.NPF = (self.beta).size
+        except AttributeError:
+            print('Kinetic parameters not available!')
+            self.NPF = None
+
+        # --- complete data and perform sanity check
+        L = 0
+        datastr = list(self.__dict__.keys())
+        # //2 since there are 'S' and 'Sp'
+        S = sum('S' in s for s in datastr)//2
+        self.L = S if S > L else L  # get maximum scattering order
+        self.datacheck()
