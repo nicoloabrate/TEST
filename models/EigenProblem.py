@@ -25,6 +25,10 @@ from TEST.models.NeutronPrecursorsEquation import NPE as npe
 from matplotlib.pyplot import spy
 
 
+_targetdict = {'SM': 'SMALLEST_MAGNITUDE', 'SR': 'SMALLEST_REAL',
+               'LM': 'LARGEST_MAGNITUDE', 'LR': 'LARGEST_REAL',
+               'TM': 'TARGET_MAGNITUDE', 'TR': 'TARGET_REAL'}
+
 class eigenproblem():
 
     def __init__(self, nte, which, geom, nev=1, generalisedTime=False):
@@ -43,7 +47,8 @@ class eigenproblem():
             self.operatorsPrec = npe(geom, fmt='csc')
 
         if 2*nev+1 >= self.operators.S.shape[0]:
-            raise OSError('Too many eigenvalues required! 2*nev+1 should be < operator rank')
+            raise OSError('Too many eigenvalues required! 2*nev+1 should be \
+                          < operator rank')
         else:
             self.nev = nev
 
@@ -57,130 +62,158 @@ class eigenproblem():
         except AttributeError:
             raise OSError('{} eigenproblem not available!'.format(which))
 
-    def _petsc(self, verbosity=False, tol=1E-8, monitor=True, sigma=None):
+    def _slepc(self, verbose=False, tol=1E-8, monitor=True, sigma=None,
+               normalisation='totalflux'):
 
-        if self.which!= 'theta':
-            L, P = self.A, self.B
-        else:
-            L, P = self.B, self.A
         start = t.time()
-        # BUG: set to 0 explicitly diagonal terms that does not appear (and thus are null)
-        if L.format != 'csr':
-            L = L.tocsr()
-
+        if sigma:
+            self.sigma = sigma
+        # BUG: set to 0 explicitly diagonal terms that does not appear
+        # (and thus are null)
+        A, B = self.A, self.B
+        if A.format != 'csr':
+            A = A.tocsr()
         # PETSc requires full diagonal
-        diagL = L.diagonal()
+        diagL = A.diagonal()
         idL = np.array(np.where([diagL == 0])[1])
         # explicitly force 0 on diagonal
-        L[idL, idL] = 0
+        A[idL, idL] = 0
 
-        if P is not None:
-            if P.format != 'csr':
-                P = P.tocsr()
-            diagP = P.diagonal()
-            idP = np.array(np.where([diagP == 0])[1])
-            P[idP, idP] = 0
+        if B is not None:
+            if B.format != 'csr':
+                B = B.tocsr()
+            diagB = B.diagonal()
+            idP = np.array(np.where([diagB == 0])[1])
+            B[idP, idP] = 0
 
-        rows, cols = L.shape
-        # create PETSc matrices
-        L = PETSc.Mat().createAIJ(size=L.shape, csr=(L.indptr, L.indices, L.data))
-        if P is not None:
-            P = PETSc.Mat().createAIJ(size=P.shape, csr=(P.indptr, P.indices, P.data))
+        rows, cols = A.shape
 
-            # PC = PETSc.PC()  # PCFactorSetShiftType('NONZERO')
-            # PC.setFactorSolverType('matsolverumfpack')
-            # PC.setFactorShift(shift_type='nonzero', amount=0)
-            # P.reorderForNonzeroDiagonal(atol=1E-12)
+        # --- create PETSc matrices
+        A = PETSc.Mat().createAIJ(size=A.shape, csr=(A.indptr, A.indices,
+                                                     A.data))
+        if B is not None:
+            B = PETSc.Mat().createAIJ(size=B.shape, csr=(B.indptr, B.indices,
+                                                         B.data))
 
-        if self.which in ['alpha', 'delta', 'omega', 'theta']:
-
-            if self.whichspectrum in ['SM', 'SR']:
-                # E settings
-                E = SLEPc.EPS().create()
-
-                if P is not None:
-                    E.setOperators(P, L)
-                    E.setDimensions(nev=self.nev)
-                    E.setProblemType(SLEPc.EPS.ProblemType.GNHEP)
-
-                else:
-                    E.setOperators(L)
-                    E.setDimensions(nev=self.nev)
-                    E.setProblemType(SLEPc.EPS.ProblemType.NHEP)
-
-                E.setWhichEigenpairs(E.Which.TARGET_MAGNITUDE)
-                if self.sigma is not None:
-                    E.setTarget(self.sigma)
-
-                st = E.getST()
-                st.setType('sinvert')
-
-            else:
-
-                # E settings
-                E = SLEPc.EPS().create()
-                if P is not None:
-                    E.setOperators(P, L)
-                    E.setDimensions(nev=self.nev)
-                    E.setProblemType(SLEPc.EPS.ProblemType.GNHEP)
-
-                else:
-                    E.setOperators(L)
-                    E.setDimensions(nev=self.nev)
-                    E.setProblemType(SLEPc.EPS.ProblemType.NHEP)
-
-                if self.whichspectrum == 'LM':
-                    E.setWhichEigenpairs(SLEPc.EPS.Which.LARGEST_MAGNITUDE)
-
-                elif self.whichspectrum == 'LR':
-                    E.setWhichEigenpairs(SLEPc.EPS.Which.LARGEST_REAL)
-
-        elif self.which in ['gamma', 'kappa']:
-            E = SLEPc.EPS().create()
-            E.setOperators(P, L)
-            E.setWhichEigenpairs(E.Which.LARGEST_MAGNITUDE)
-            E.setDimensions(nev=self.nev)
-
+        # --- create eigenvalue problem object
+        E = SLEPc.EPS().create()
+        # E.setType('jd')
+        # set operators
+        if B is not None:
+            E.setOperators(B, A)
+            E.setProblemType(SLEPc.EPS.ProblemType.GNHEP)
         else:
-            raise OSError('{} eigenproblem not available!'.format(self.which))
+            E.setOperators(A)
+            E.setProblemType(SLEPc.EPS.ProblemType.NHEP)
+        # Eigenvalue Problem settings
+        E.setDimensions(nev=self.nev)
+        E.setWhichEigenpairs(E.Which.__dict__[_targetdict[self.whichspectrum]])
+        # Spectral Transformation settings
+        st = E.getST()
+        if self.whichspectrum in ['TM', 'TR']:
+            if self.sigma is None:
+                raise OSError('Missing target for {} \
+                              mode!'.format(_targetdict[self.whichspectrum]))
+            else:
+                E.setTarget(self.sigma)
+
+        # set spectral transformation
+        if self.which in ['alpha', 'omega', 'delta']:
+            st.setType('sinvert')
 
         end = t.time()
 
-        if verbosity is True:
-            print("ELAPSED TIME (PETSc setup): %f [s]" % (end-start))
+        if verbose:
+            print("ELAPSED TIME (SLEPc setup): %f [s]" % (end-start))
 
-        if monitor is True:
+        if monitor:
             E.setMonitor(eigenproblem.convmonitor)
+        else:
+            res = None
 
         E.setTolerances(tol=tol)
-        start = t.time()
         E.setFromOptions()
-        E.solve()
+
+        # Krylov Sub Pace settings
+        ksp = st.getKSP()
+        # PreConditioner settings
+        pc = ksp.getPC()
+
+        # --- solve
+        start = t.time()
+        try:
+            E.solve()
+        except Exception as e:
+            if '[0] Zero pivot in LU factorization' in str(e):
+                pc.setFactorShift(shift_type='positive_definite')
+                E.solve()
+            else:
+                raise OSError(e)
+        # --- ensure at least one converged eigenvalue
+        if E.getConverged() == 0:
+            while E.getConverged() == 0:
+                self.nev = 2*self.nev
+                print('No eigenvalue converged! Looking for ' \
+                      '{} eigvalues...'.format(self.nev))
+                E.setDimensions(nev=self.nev)
+                E.solve()
+        # ensure fundamental convergence
+        nofund = True
+        while nofund:
+            # --- extract eigenvectors
+            vr, vi = A.getVecs()
+
+            vals = []
+            vecs = []
+            err = []
+            eigvect = np.full((rows, max(self.nev, E.getConverged())), np.nan,
+                              dtype=complex)
+            for iE in range(E.getConverged()):
+                val = E.getEigenpair(iE, vr, vi)
+                vals.append(val)
+                err.append(E.computeError(iE))
+                vecs = [complex(vr0, wi0) for vr0, wi0 in zip(vr.getArray(),
+                                                              vi.getArray())]
+                eigvect[:, iE] = np.asarray(vecs, dtype=complex).T
+
+            res = np.asarray(err)
+
+            # create native phase space
+            myeigpair = {'eigenvalues': np.asarray(vals),
+                         'eigenvectors' : eigvect,
+                         'problem': self.which}
+            self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
+                                       normalize=None)
+
+            if self.fundamentalconverged():
+                nofund = False
+            else:
+                self.nev = 2*self.nev
+                print('No eigenvalue converged! Looking for ' \
+                      '{} eigvalues...'.format(self.nev))
+                E.setDimensions(nev=self.nev)
+                E.solve()
+
+        self.solution.normalize(which=normalisation)
         end = t.time()
 
-        if verbosity is True:
-            print("ELAPSED TIME (PETSc solution): %f [s]" % (end-start))
+        if verbose:
+            print("ELAPSED TIME (SLEPc solution): %f [s]" % (end-start))
 
-        vr, vi = L.getVecs()
+        return res
 
-        vals = []
-        vecs = []
-        err = []
-        eigvect = np.full((rows, max(self.nev, E.getConverged())), np.nan, dtype=complex)
-        for iE in range(E.getConverged()):
-            val = E.getEigenpair(iE, vr, vi)
-            vals.append(val)
-            err.append(E.computeError(iE))
-            vecs = [complex(vr0, wi0) for vr0, wi0 in zip(vr.getArray(),
-                                                          vi.getArray())]
-            eigvect[:, iE] = np.asarray(vecs, dtype=complex).T
+    def fundamentalconverged(self):
+        try:
+            eig, ev = self.solution.getfundamental()
+            ans = True
+        except OSError as ierr:
+            ans = False
+            if 'No fundamental eigenvalue detected!' not in str(ierr):
+                print(ierr)
+        return ans
 
-        eigvals = np.asarray(vals)
-        res = np.asarray(err)
-        return eigvals, eigvect, res
-
-    def issingular(A):
-        A = A.todense()
+    def issingular(self, which_operator):
+        A = self.__dict__['which_operator'].todense()
         shapecheck = A.shape[0] == A.shape[1]
         rankcheck = np.linalg.matrix_rank(A) == A.shape[0]
         isinvertible = shapecheck and rankcheck
@@ -188,12 +221,12 @@ class eigenproblem():
 
     def convmonitor(eps, its, nconv, eig, err):
         """
-        Monitor convergence of the PETSc eigensolver
+        Monitor convergence of the SLEPc eigensolver
 
         Parameters
         ----------
         eps : object
-            EPS object of PETSc.
+            EPS object of SLEPc.
         its : int
             Iterations.
         nconv : int
@@ -249,7 +282,8 @@ class eigenproblem():
         self.A = B
         self.B = T
         self.which = 'alpha'
-        self.whichspectrum = 'SM'
+        self.whichspectrum = 'TR'
+        self.sigma = 0
 
     def gamma(self):
         """
@@ -263,7 +297,7 @@ class eigenproblem():
         op = self.operators
         if self.nev == 0 or self.BC is False:  # gamma infinite
             if self.model != 'Diffusion':
-                self.A = op.Linf+op.C+op.S0+op.F0  # no leakage, infinite medium
+                self.A = op.Linf+op.C+op.S0+op.F0  # no leakage, inf. medium
             else:
                 self.A = op.R  # no leakage, infinite medium
         else:
@@ -271,7 +305,7 @@ class eigenproblem():
 
         self.B = op.F+op.S  # multiplication operator
         self.which = 'gamma'
-        self.whichspectrum = 'LM'
+        self.whichspectrum = 'LR'
         self.sigma = None
 
     def delta(self):
@@ -287,7 +321,7 @@ class eigenproblem():
         self.A = op.L  # leakage operator
         self.B = op.F+op.S-op.F0-op.S0-op.C  # material operator
         self.which = 'delta'
-        self.whichspectrum = 'SR'
+        self.whichspectrum = 'TR'
         self.sigma = 1
 
     def theta(self):
@@ -303,7 +337,7 @@ class eigenproblem():
         # define theta eigenproblem operators
         if self.nev == 0 or self.BC is False:  # infinite medium
             if self.model != 'Diffusion':
-                self.A = op.Linf+op.S0+op.F0-op.S-op.F  # no leakage, infinite medium
+                self.A = op.Linf+op.S0+op.F0-op.S-op.F  # no leakage, inf. med.
             else:
                 self.A = op.S0+op.F0-op.S-op.F  # no leakage, infinite medium
             self.nev = 1
@@ -313,8 +347,8 @@ class eigenproblem():
         self.B = -op.C
 
         self.which = 'theta'
-        self.whichspectrum = 'SR'
-        self.sigma = 0
+        self.whichspectrum = 'TR'  # 'SR'
+        self.sigma = 1  # 0
 
     def kappa(self):
         """
@@ -329,7 +363,7 @@ class eigenproblem():
         # define kappa eigenproblem operators
         if self.nev == 0 or self.BC is False:  # kappa infinite
             if self.model != 'Diffusion':
-                self.A = op.Linf+op.C+op.S0+op.F0-op.S  # no leakage, infinite medium
+                self.A = op.Linf+op.C+op.S0+op.F0-op.S  # no leakage, inf. med.
             else:
                 self.A = op.C+op.S0+op.F0-op.S  # no leakage, infinite medium
             self.nev = 1
@@ -338,7 +372,7 @@ class eigenproblem():
 
         self.B = op.F  # multiplication operator
         self.which = 'kappa'
-        self.whichspectrum = 'LM'
+        self.whichspectrum = 'LR'
         self.sigma = None
 
     def omega(self, generalised=False):
@@ -394,7 +428,7 @@ class eigenproblem():
         # --- capture
         tmp1, tmp2 = hstack([self.operators.C, A1]), hstack([A1.T, A2])
         self.C = vstack(([tmp1.copy(), tmp2.copy()]))
-        
+
         # --- leakage
         self.L = bmat([[self.operators.L, A1], [A1.T, A2]])
 
@@ -411,11 +445,14 @@ class eigenproblem():
 
         # define alpha delayed eigenproblem operators
         if self.nev == 0 or self.BC is False:  # omega infinite S+Fp+Fd+E-(R+D)
-            self.A = self.S+self.Fp+self.Fd+self.E-self.C-self.F0-self.S0-self.D  # no leakage, inf medium
+            # no leakage, inf medium
+            self.A = self.S+self.Fp+self.Fd+self.E-self.C-self.F0-self.S0 \
+                    -self.D
             self.nev = 1
 
         else:
-            self.A = self.S+self.Fp+self.Fd+self.E-self.C-self.F0-self.S0-self.D-self.L
+            self.A = self.S+self.Fp+self.Fd+self.E-self.C-self.F0-self.S0 \
+                    -self.D-self.L
 
         if generalised is False:
             self.B = None
@@ -424,28 +461,35 @@ class eigenproblem():
         else:
             self.B = T
         self.which = 'omega'
-        self.whichspectrum = 'SM'
-        self.sigma = None
+        self.whichspectrum = 'TR'
+        self.sigma = 0
 
-    def solve(self, algo='PETSc', verbosity=False,tol=1E-14, monitor=False,
-              normalisation='totalflux', shift=None):
+    def solve(self, algo='SLEPc', verbose=False,tol=1E-14, monitor=False,
+              normalisation='totalflux', shift=None, which=None):
 
         A = self.A
         B = self.B
         res = None
-        if shift is not None:
-            self.sigma = shift
-        else:
-            self.sigma = None
-        if algo == 'PETSc':
-            try:
+        if which:
+            if which not in _targetdict.keys():
+                raise OSError('Target spectrum cannot be {}. Available' \
+                              'options are: {}' \
+                              .format(which, (k for k in _targetdict.keys())))
+            self.whichspectrum = which
+        # if shift is not None:
+        #     self.sigma = shift
+        # else:
+        #     self.sigma = None
+        if algo == 'SLEPc':
+            # try:
                 start = t.time()
-                eigvals, eigvect, res = self._petsc(tol=tol, monitor=monitor,
-                                                    sigma=self.sigma)
+                res = self._slepc(tol=tol, monitor=monitor, sigma=shift,
+                                  normalisation=normalisation)
                 end = t.time()
-            except NameError:
-                print('PETSc/SLEPc packages not installed. Switching to scipy...')
-                algo = 'eigs'
+            # except NameError:
+            #     print('SLEPc/SLEPc packages not installed. \
+            #           Switching to scipy...')
+            #     algo = 'eigs'
 
         if algo == 'eigs':
             if A.format != 'csc':
@@ -467,9 +511,20 @@ class eigenproblem():
                 M1, M2 = A, B
 
             start = t.time()
+            # TODO: check if fundamental
             eigvals, eigvect = eigs(M1, M=M2, k=self.nev, sigma=self.sigma,
                                     which=self.whichspectrum)
             end = t.time()
+            if verbose:
+                print("ELAPSED TIME: %f [s]" % (end-start))
+
+            # create native phase space
+            myeigpair = {'eigenvalues': eigvals[0:self.nev],
+                         'eigenvectors' : eigvect,
+                         'problem': self.which}
+            self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
+                                       normalize=True, whichnorm=normalisation)
+
 
         elif algo == 'eig':
 
@@ -489,41 +544,24 @@ class eigenproblem():
 
             if self.which in ['delta', 'theta']:
                 eigvals = 1/eigvals
+            if verbose:
+                print("ELAPSED TIME: %f [s]" % (end-start))
+
+            # create native phase space
+            myeigpair = {'eigenvalues': eigvals[0:self.nev],
+                         'eigenvectors' : eigvect,
+                         'problem': self.which}
+            self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
+                                       normalize=True, whichnorm=normalisation)
 
         else:
-            if algo != 'PETSc':
+            if algo != 'SLEPc':
                 raise OSError('%s algorithm is unavailable!' % algo)
-
-        if verbosity is True and algo != 'PETSc':
-            print("ELAPSED TIME: %f [s]" % (end-start))
 
         self.algo = algo
 
-        # --- manipulate eigenpairs
-        # sort eigenvalues
-        idx = eigvals.argsort()[::-1]
-        eigvals = eigvals[idx]
-        eigvect = eigvect[:, idx]
-
-        # force sign consistency
-        signs = np.sign(eigvect[1, :])  # sign of 2nd row to avoid BCs
-        eigvect = np.conj(signs)*eigvect
-
-        # convert to np.float64 if imaginary part is null
-        if np.iscomplex(eigvect[:, 0:self.nev]).sum() == 0:
-            ev = eigvect[:, 0:self.nev].real
-        else:
-            ev = eigvect[:, 0:self.nev]
-
         if res is not None:
             self.residual = res
-
-        # create native phase space
-        myeigpair = {'eigenvalues': eigvals[0:self.nev],
-                     'eigenvectors' : ev,
-                     'problem': self.which}
-        self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
-                                   normalize=True, whichnorm=normalisation)
 
     def spy(self, what, markersize=2):
         spy(self.__dict__[what], markersize=markersize)
