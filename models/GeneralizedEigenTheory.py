@@ -98,7 +98,7 @@ class GET():
         except AttributeError:
             raise OSError('{} eigenproblem not available!'.format(which))
 
-    def _petsc(self, verbosity=False, tol=1E-8, monitor=True, sigma=None):
+    def _petsc(self, verbose=False, tol=1E-8, monitor=True, sigma=None):
 
         if self.which!= 'theta':
             L, P = self.A, self.B
@@ -186,7 +186,7 @@ class GET():
 
         end = t.time()
 
-        if verbosity is True:
+        if verbose is True:
             print("ELAPSED TIME (PETSc setup): %f [s]" % (end-start))
 
         E.setTolerances(tol=tol)
@@ -195,7 +195,7 @@ class GET():
         E.solve()
         end = t.time()
 
-        if verbosity is True:
+        if verbose is True:
             print("ELAPSED TIME (PETSc solution): %f [s]" % (end-start))
 
         vr, vi = L.getVecs()
@@ -307,7 +307,7 @@ class GET():
         self.whichspectrum = 'SR'
         self.sigma = 0
 
-    def solve(self, algo='PETSc', verbosity=False,tol=1E-14, monitor=False,
+    def solve(self, algo='PETSc', verbose=False,tol=1E-14, monitor=False,
               normalisation='totalflux', shift=None):
 
         A = self.A
@@ -374,7 +374,7 @@ class GET():
             if algo != 'PETSc':
                 raise OSError('%s algorithm is unavailable!' % algo)
 
-        if verbosity is True and algo != 'PETSc':
+        if verbose is True and algo != 'PETSc':
             print("ELAPSED TIME: %f [s]" % (end-start))
 
         self.algo = algo

@@ -20,7 +20,7 @@ class Slab:
     """Define slab geometry object."""
 
     def __init__(self, split, layers, regions, BCs, energygrid, AngOrd,
-                 spatial_scheme, datapath=None, verbosity=True):
+                 spatial_scheme, datapath=None, verbose=True):
 
         if isinstance(regions, str):
             regions = [regions]
@@ -129,7 +129,7 @@ class Slab:
                                       regions'.format(uniName))
                     if not np.allclose(lambdas, self.regions[uniName].__dict__['lambda']):
                         self.regions[uniName].__dict__['lambda'] = lambdas
-                        if verbosity:
+                        if verbose:
                             print('Warning: Forcing decay constants \
                                   consistency in {}...'.format(uniName))
 

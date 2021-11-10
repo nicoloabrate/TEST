@@ -14,7 +14,7 @@ from collections import OrderedDict
 
 keys = ['split', 'layers', 'regions', 'BCs', 'G', 'AngOrd', 
         'spatial_scheme']
-kwkeys = ['datapath', 'verbosity', 'energygrid']
+kwkeys = ['datapath', 'verbose', 'energygrid']
 changekeys = ['N', 'dx', '_split', 'centers', 'edges', 'mesh',
               'ghostmesh', 'nS', 'nLayers', 'regions']
 class Config:
