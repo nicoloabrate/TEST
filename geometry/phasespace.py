@@ -30,8 +30,8 @@ class PhaseSpace:
         solution : dict or ndarray
             Solution living in the phase space. If it is a dict, it is treated
             as the solution of an eigenvalue problem. If it is an ndarray and
-            ``source`` is True, it is treated as the solution of a source-driven
-            problem.
+            ``source`` is True, it is treated as the solution of a
+            source-driven problem.
         energygrid : ndarray, optional
             Multi-group energy grid structure. The default is None.
         source : bool, optional
@@ -57,14 +57,35 @@ class PhaseSpace:
                 self.flux = solution['solution']
                 self.problem = solution['problem']
             else:
-                self.eigvals = solution['eigenvalues']
-                self.eigvect = solution['eigenvectors']
+                eigvals = solution['eigenvalues']
+                eigvect = solution['eigenvectors']
                 self.problem = solution['problem']
-                self.nev = len(self.eigvals)
+                self.nev = len(eigvals)
+
+                # --- manipulate eigenpairs
+                # sort eigenvalues
+                idx = eigvals.argsort()[::-1]
+                eigvals = eigvals[idx]
+                eigvect = eigvect[:, idx]
+
+                # force sign consistency
+                signs = np.sign(eigvect[1, :])  # sign of 2nd row to avoid BCs
+                eigvect = np.conj(signs)*eigvect
+
+                # convert to np.float64 if imaginary part is null
+                if np.iscomplex(eigvect[:, 0:self.nev]).sum() == 0:
+                    ev = eigvect[:, 0:self.nev].real
+                else:
+                    ev = eigvect[:, 0:self.nev]
+
+                self.eigvals = eigvals
+                self.eigvect = ev
+
                 if normalize is True:
                     self.normalize(which=whichnorm)
         else:
-            raise OSError('Type {} cannot be handled by phase space!'.format(type(solution)))
+            raise OSError('Type {} cannot be handled by phase space!' \
+                          .format(type(solution)))
 
     def braket(self, v1, v2=None):
         """
@@ -85,7 +106,8 @@ class PhaseSpace:
 
         """
         # if self.geometry.AngOrd > 0:
-        #     raise OSError('Braket cannot be applied yet to transport solutions!')
+        #     raise OSError('Braket cannot be applied yet to transport
+        #       solutions!')
         # FIXME braket on transport solutions does not work properly
         v1v2 = np.multiply(v1, v2) if v2 is not None else v1
         geom = self.geometry
@@ -117,7 +139,8 @@ class PhaseSpace:
         Raises
         ------
         OSError
-            Phase space interpolation cannot be applied yet to transport solutions!
+            Phase space interpolation cannot be applied yet to transport
+            solutions!
 
         Returns
         -------
@@ -127,7 +150,8 @@ class PhaseSpace:
         """
         G = self.geometry.nE
         if self.geometry.AngOrd > 0:
-            raise OSError('Phase space interpolation cannot be applied yet to transport solutions!')
+            raise OSError('Phase space interpolation cannot be applied yet' \
+                          ' to transport solutions!')
 
         if isref is True:
             x = self.geometry.mesh
@@ -187,9 +211,12 @@ class PhaseSpace:
             KFiss = np.zeros((nS*nE, ))
             for g in range(nE):
                 if self.geometry.spatial_scheme == 'FV':
-                    KFiss[0+g*nS:nS+g*nS] = FV.zero(self.geometry, fisxs[g, :]*kappa[g, :], meshtype='centers')
+                    KFiss[0+g*nS:nS+g*nS] = FV.zero(self.geometry,
+                                                    fisxs[g, :]*kappa[g, :],
+                                                    meshtype='centers')
                 elif self.geometry.spatial_scheme == 'FD':
-                    KFiss[0+g*nS:nS+g*nS] = FD.zero(self.geometry, fisxs[g, :]*kappa[g, :])
+                    KFiss[0+g*nS:nS+g*nS] = FD.zero(self.geometry,
+                                                    fisxs[g, :]*kappa[g, :])
 
             y = self.get(moment=0, mode=0)
             C = power/self.braket(KFiss*y)
@@ -218,26 +245,35 @@ class PhaseSpace:
             n, m = self.solution.eigvect.shape[1], self.eigvect.shape[1]
             # check consistency
             if adjoint is None:
-                raise OSError('For biorthogonal normalisation the adjoint input argument is needed!')
+                raise OSError('For biorthogonal normalisation the adjoint' \
+                              ' input argument is needed!')
             elif n != m:
-                raise OSError('Adjoint modes number does not match forward modes! {}!={}'.format(n, m))
+                raise OSError('Adjoint modes number does not match forward' \
+                              ' modes! {}!={}'.format(n, m))
             elif adjoint.operators.state != 'steady':
-                raise OSError('Bi-orthogonal normalisation only available for steady state condition!')
+                raise OSError('Bi-orthogonal normalisation only available ' \
+                              'for steady state condition!')
 
             for iv, v in enumerate(self.eigvect.T):
                 v_adj = self.solution.eigvect[:, iv]
-                self.eigvect[:, iv] = v/self.braket(self.operators.F.dot(v_adj), v)
+                self.eigvect[:, iv] = v/self.braket \
+                                        (self.operators.F.dot(v_adj), v)
 
         else:
-            print('Normalisation failed. {} not available as normalisation mode'.format(which))
+            print('Normalisation failed. {} not available as ' \
+                  'normalisation mode'.format(which))
 
-    def plot(self, group, angle=None, mode=0, moment=0, family=0, precursors=False,
-             ax=None, title=None, imag=False, normalise=True, **kwargs):
+    def plot(self, group, angle=None, mode=0, moment=0, family=0,
+             precursors=False, ax=None, title=None, imag=False, normalise=True,
+             **kwargs):
 
         y = self.get(group, angle=angle, mode=mode, family=family,
                      precursors=precursors, moment=moment, normalise=normalise)
         yr, yi = y.real, y.imag
-        x = self.geometry.mesh if len(yr) == self.geometry.nS else self.geometry.ghostmesh
+        if len(yr) == self.geometry.nS:
+            x = self.geometry.mesh
+        else:
+            x = self.geometry.ghostmesh
         ax = ax or plt.gca()
 
         y = yr if imag is False else yi
@@ -251,9 +287,10 @@ class PhaseSpace:
         ax.set_title(title)
 
     def plotspectrum(self, loglog=False, gaussplane=True, geom=None, ax=None,
-                     grid=True, ylims=None, xlims=None, threshold=None, subplt=False,
-                     fundmark='*', fundcol='blue', mymark='o', mycol='red',
-                     markerfull=True, mysize=80, alpha=0.5, label=None):
+                     grid=True, ylims=None, xlims=None, threshold=None,
+                     subplt=False, fundmark='*', fundcol='blue', mymark='o',
+                     mycol='red', markerfull=True, mysize=80, alpha=0.5,
+                     label=None):
 
         if self.problem == 'omega' and geom is not None:
             lambdas = geom.getxs('lambda')
@@ -291,11 +328,13 @@ class PhaseSpace:
         if gaussplane is True:
             markerfull = mycol if markerfull else 'none'
             sub1.scatter(evals.real, evals.imag, marker=mymark, color=mycol,
-                         facecolors=markerfull, s=mysize, alpha=alpha, label=label)
+                         facecolors=markerfull, s=mysize, alpha=alpha,
+                         label=label)
             # plot fundamental
             markerfull = fundcol if markerfull else 'none'
             sub1.scatter(show*val.real, show*val.imag, marker=fundmark,
-                         facecolors=markerfull, s=mysize, color=fundcol, alpha=alpha)
+                         facecolors=markerfull, s=mysize, color=fundcol,
+                         alpha=alpha)
         else:
 
             sub1.scatter(np.arange(0, len(evals.real)-1), evals.real,
@@ -320,7 +359,8 @@ class PhaseSpace:
             sub1.set_ylabel('$Im(\%s)$' % label)
 
         if ylims is None:
-            sub1.set_ylim([min(self.eigvals.imag)*1.1, max(self.eigvals.imag)*1.1])
+            sub1.set_ylim([min(self.eigvals.imag)*1.1,
+                           max(self.eigvals.imag)*1.1])
         else:
             sub1.set_ylim(ylims)
 
@@ -342,8 +382,8 @@ class PhaseSpace:
             miny, maxy = min(self.eigvals.imag), max(self.eigvals.imag)
             minx, maxx = min(self.eigvals.real), max(self.eigvals.real)
             # plot blocked area
-            sub1.fill_between((minl*maxx/10, -minl*maxx/10), miny*1.1, maxy*1.1,
-                              facecolor='red', alpha=0.15)
+            sub1.fill_between((minl*maxx/10, -minl*maxx/10), miny*1.1,
+                              maxy*1.1, facecolor='red', alpha=0.15)
 
             choice = np.logical_and(np.greater_equal(self.eigvals.real, minl),
                                     np.less_equal(self.eigvals.real, maxl))
@@ -366,14 +406,16 @@ class PhaseSpace:
             xlo2, xup2 = sub2.get_xlim()
             ylo2, yup2 = sub2.get_ylim()
             # connection patch for first axes
-            con1 = ConnectionPatch(xyA=(minl*maxx/10, (ylo1+yup1)/2), coordsA=sub1.transData,
+            con1 = ConnectionPatch(xyA=(minl*maxx/10, (ylo1+yup1)/2),
+                                   coordsA=sub1.transData,
                                    xyB=(xlo2, yup2), coordsB=sub2.transData,
                                    color='red', alpha=0.2)
             # Add left side to the figure
             fig.add_artist(con1)
 
             # connection patch for first axes
-            con2 = ConnectionPatch(xyA=(-minl*maxx/10, (ylo1+yup1)/2), coordsA=sub1.transData,
+            con2 = ConnectionPatch(xyA=(-minl*maxx/10, (ylo1+yup1)/2),
+                                   coordsA=sub1.transData,
                                    xyB=(xlo2, ylo2), coordsB=sub2.transData,
                                    color='red', alpha=0.2)
             # Add right side to the figure
@@ -396,84 +438,54 @@ class PhaseSpace:
         plt.polar(np.angle(val), abs(val), marker='*', color='blue')
 
     def getfundamental(self, lambdas=None):
+        idx = None
         if self.problem in ['kappa', 'gamma']:
             for i in range(self.nev):
                 # get total flux
                 v = self.get(moment=0, nEv=i)
                 # fix almost zero points to avoid sign issues
                 v[np.abs(v) < np.finfo(float).eps] = 0
-                if np.all(v >= 0) if v[0] >= 0 else np.all(v < 0):
+                ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
+                if ispos:
                     idx = i
                     break
-                else:
-                    idx = i
-        elif self.problem == 'theta':
-            reals = self.eigvals[self.eigvals.imag == 0]
-            reals = reals[reals != 0]
-            # select real eigenvalue with positive total flux
-            if len(reals) == 0:
-                raise OSError('No real eigenvalue available!')
 
-            for i in range(len(reals)):
-                # get total flux
-                idx = np.argwhere(self.eigvals==reals[i])[0][0]
-                v = self.get(moment=0, nEv=idx)
-                # fix almost zero points to avoid sign issues
-                v[np.abs(v) < np.finfo(float).eps] = 0
-                if np.all(v >= 0) if v[0] >= 0 else np.all(v < 0):
-                    break
-                else:
-                    idx = i
-                    if idx == len(reals):
-                        print('WARNING: fundamental choice may be wrong!')
-            # idx = np.argwhere([self.eigvals == reals.max()])[0][1]
-        elif self.problem == 'delta':
+        elif self.problem in ['delta', 'alpha']:
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
-            # # FIXME clean spurious big eigenvalues (temporary patch)
-            # reals = reals[abs(reals) < 1E3]
-
             reals = reals[reals != 0]
             # select real eigenvalue with positive total flux
             for i in range(len(reals)):
                 # get total flux
-                idx = np.argwhere(self.eigvals==reals[i])[0][0]
-                v = self.get(moment=0, nEv=idx)
+                ind = np.argwhere(self.eigvals==reals[i])[0][0]
+                v = self.get(moment=0, nEv=ind)
                 # fix almost zero points to avoid sign issues
                 v[np.abs(v) < np.finfo(float).eps] = 0
-                ispositive = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
-                if ispositive:
+                ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
+                if ispos:
+                    idx = np.argwhere(self.eigvals==reals[i])[0][0]
                     break
 
-            # if np.all(reals <= 0):
-            #     reals = reals[reals != 0]
-            #     fund = min(reals)
-            #     idx = np.where(self.eigvals == fund)[0][0]
-            # elif np.all(reals > 0):
-            #     fund = min(reals)
-            #     idx = np.where(self.eigvals == fund)[0][0]
-            # else:
-            #     # FIXME patch to find delta
-            #     reals = reals[reals > 0]
-            #     reals = reals[reals < 10]
-            #     minreal = np.where(reals == reals.max())
-            #     idx = np.where(self.eigvals == reals[minreal])[0][0]
-
         else:
-            if self.problem == 'alpha':
+            # if self.problem == 'alpha':
+            #     # select real eigenvalues
+            #     reals = self.eigvals[self.eigvals.imag == 0]
+            #     # all negative
+            #     if np.all(reals < 0):
+            #         reals_abs = abs(self.eigvals[self.eigvals.imag == 0])
+            #         try:
+            #             whichreal = np.where(reals_abs == reals_abs.min())
+            #         except ValueError:
+            #             raise OSError('No fundamental eigenvalue detected!')
+            #     else:
+            #         reals_abs = self.eigvals[self.eigvals.imag == 0]
+            #         whichreal = np.where(reals_abs == reals_abs.max())
+
+            #     idx = np.where(self.eigvals == reals[whichreal])[0][0]
+
+            #if lambdas is not None:
                 # select real eigenvalues
-                reals = self.eigvals[self.eigvals.imag == 0]
-                # all negative
-                if np.all(reals < 0):
-                    reals_abs = abs(self.eigvals[self.eigvals.imag == 0])
-                    whichreal = np.where(reals_abs == reals_abs.min())
-                else:
-                    reals_abs = self.eigvals[self.eigvals.imag == 0]
-                    whichreal = np.where(reals_abs == reals_abs.max())
-                # blended
-                idx = np.where(self.eigvals == reals[whichreal])[0][0]
-            elif lambdas is not None:
-                # select real eigenvalues
+                lambdas = self.geometry.getxs('lambda')
                 choice = np.logical_and(np.greater_equal(self.eigvals.real,
                                                          min(-lambdas)),
                                         np.less_equal(self.eigvals.real,
@@ -483,6 +495,9 @@ class PhaseSpace:
                 reals_abs = abs(prompt[prompt.imag == 0])
                 minreal = np.where(reals_abs == reals_abs.min())
                 idx = np.where(self.eigvals == reals[minreal])[0][0]
+
+        if idx is None:
+            raise OSError('No fundamental eigenvalue detected!')
 
         eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
         return eigenvalue, eigenvector
@@ -560,7 +575,8 @@ class PhaseSpace:
 
         if group:
             if group > self.nE:
-                raise OSError('Cannot get group {} for {}-group data!'.format(group, self.nE))
+                raise OSError('Cannot get group {} for {}-group' \
+                              ' data!'.format(group, self.nE))
 
         if self.problem in ['static', 'delayed', 'prompt']:  # source problem
             vect = self.flux
@@ -569,7 +585,10 @@ class PhaseSpace:
                 vect = self.eigvect[:, nEv]
             else:
                 if mode == 0:
-                    lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
+                    if self.problem == 'omega':
+                        lambdas = self.geometry.getxs('lambda')
+                    else:
+                        lambdas = None
                     _, vect = self.getfundamental(lambdas)
                 else:
                     vect = self.eigvect[:, mode]
@@ -611,7 +630,8 @@ class PhaseSpace:
             tmp = np.zeros((dim*G))
             for n in range(self.nA):
                 # interpolate to have consistent PN moments
-                y = vect if n % 2 == 0 else self.interp(vect, self.geometry.stag_mesh)
+                y = vect if n % 2 == 0 else self.interp(vect,
+                                                        self.geometry.stag_mesh)
                 tmp = tmp+(2*n+1)/2*eval_legendre(n, angle)*y
             # get values for requested groups
             iS, iE = (nS*(group-1), nS*(group-1)+nS)if group else (0, -1)
@@ -654,7 +674,10 @@ class PhaseSpace:
                 vect = self.eigvect[:, nEv]
             else:
                 if mode == 0:
-                    lambdas = self.geometry.getxs('lambda') if self.problem == 'omega' else None
+                    if self.problem == 'omega':
+                        lambdas = self.geometry.getxs('lambda')
+                    else:
+                        lambdas = None
                     _, vect = self.getfundamental(lambdas)
                 else:
                     vect = self.eigvect[:, mode]
@@ -688,18 +711,24 @@ class PhaseSpace:
                     iS = idx*nS+nS*(g-1)*self.nA
                     iE = idx*nS+nS*(g-1)*self.nA+nS
                 # store slices
-                y[ig*nS:(ig+1)*nS] = vect[iS:iE] if angle >= 0 else np.flipud(vect[iS:iE])
+                if angle >= 0:
+                    y[ig*nS:(ig+1)*nS] = vect[iS:iE]
+                else:
+                    y[ig*nS:(ig+1)*nS] = np.flipud(vect[iS:iE])
 
         else:
             # compute flux moments
             y = np.zeros((nS*len(gro), ))
             for n in range(self.nA):
-                phi = np.zeros((nS*len(gro), ))  # allocate group-wise angular flux
+                phi = np.zeros((nS*len(gro), ))  # allocate group-wise ang. flux
                 for ig, g in enumerate(gro):
                     iS = n*nS+nS*(g-1)*self.nA
                     iE = n*nS+nS*(g-1)*self.nA+nS
                     # get group-wise angular flux
-                    phi[ig*nS:(ig+1)*nS] = vect[iS:iE] if mu[n] >= 0 else np.flipud(vect[iS:iE])
+                    if mu[n] >= 0:
+                        phi[ig*nS:(ig+1)*nS] = vect[iS:iE]
+                    else:
+                        np.flipud(vect[iS:iE])
                 # compute flux moment contribution
                 y = y+w[n]*eval_legendre(moment, mu[n])*phi
 
