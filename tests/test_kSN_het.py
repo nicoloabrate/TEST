@@ -13,7 +13,7 @@ import TEST.models.NeutronTransportEquation as NTE
 from TEST.models.EigenProblem import eigenproblem
 import matplotlib.pyplot as plt
 
-algo = 'PETSc'
+algo = 'SLEPc'
 M = -10
 N = 1
 G = 1
@@ -69,4 +69,3 @@ plt.show()
 # plt.plot(myslabS.mesh, phiSN2, label='SN-FV', linestyle='--')
 # plt.legend()
 # plt.show()
-

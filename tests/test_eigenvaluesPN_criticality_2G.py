@@ -30,11 +30,11 @@ def test_PNcriticality():
 
     a = eigenproblem(myPN, 'alpha', myslab, nev=nev)
     g = eigenproblem(myPN, 'gamma', myslab, nev=nev)
-    g.solve(algo='PETSc')
+    g.solve(algo='SLEPc')
     d = eigenproblem(myPN, 'delta', myslab, nev=nev+5)
-    d.solve(algo='PETSc')
+    d.solve(algo='SLEPc')
     k = eigenproblem(myPN, 'kappa', myslab, nev=nev)
-    k.solve(algo='PETSc')
+    k.solve(algo='SLEPc')
 
     # flxk1, _ = k.solution.get(1, angle=0, mode=0)
     # flxk2, _ = k.solution.get(2, angle=0, mode=0)
@@ -57,11 +57,11 @@ def test_SNcriticality():
 
     a = eigenproblem(mySN, 'alpha', myslab, nev=nev)
     g = eigenproblem(mySN, 'gamma', myslab, nev=nev)
-    g.solve(algo='PETSc')
+    g.solve(algo='SLEPc')
     d = eigenproblem(mySN, 'delta', myslab, nev=nev+2)
-    d.solve(algo='PETSc')
+    d.solve(algo='SLEPc')
     k = eigenproblem(mySN, 'kappa', myslab, nev=nev)
-    k.solve(algo='PETSc')
+    k.solve(algo='SLEPc')
 
     # flxk1, _ = k.solution.get(1, angle=0, mode=0)
     # flxk2, _ = k.solution.get(2, angle=0, mode=0)
