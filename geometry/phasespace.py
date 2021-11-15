@@ -7,11 +7,16 @@ Description: Class to handle phase space operations.
 """
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import checkdep_usetex
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib.patches import ConnectionPatch
 from scipy.special import eval_legendre
 import TEST.methods.space.FD as FD
 import TEST.methods.space.FV as FV
+from TEST.utils import h5 as myh5
+
+usetex = checkdep_usetex(True)
+params = {'text.usetex': usetex}
 
 
 class PhaseSpace:
@@ -84,8 +89,9 @@ class PhaseSpace:
                 if normalize is True:
                     self.normalize(which=whichnorm)
         else:
-            raise OSError('Type {} cannot be handled by phase space!' \
-                          .format(type(solution)))
+            msg = 'Type {} cannot be handled by phase'\
+                    'space!'.format(type(solution))
+            raise OSError(msg)
 
     def braket(self, v1, v2=None):
         """
@@ -114,17 +120,16 @@ class PhaseSpace:
         G = geom.nE
         S = geom.nS
         grid = geom.mesh
-        I = 0
+        II = 0
         # TODO consider integration over non-group energy grid
         for g in range(G):
             skip = g*S
-            I = I+np.trapz(v1v2[skip:skip+S], x=grid)
-        return I
+            II = II+np.trapz(v1v2[skip:skip+S], x=grid)
+        return II
 
     def interp(self, yp, xx, isref=True):
         """
-        Interpolate linearly vector yp on a different phase space geometrical
-        grid.
+        Interpolate vector yp on a different phase space geometrical grid.
 
         Parameters
         ----------
@@ -150,8 +155,9 @@ class PhaseSpace:
         """
         G = self.geometry.nE
         if self.geometry.AngOrd > 0:
-            raise OSError('Phase space interpolation cannot be applied yet' \
-                          ' to transport solutions!')
+            msg = 'Phase space interpolation cannot be applied yet' \
+                          ' to transport solutions!'
+            raise OSError(msg)
 
         if isref is True:
             x = self.geometry.mesh
@@ -204,7 +210,7 @@ class PhaseSpace:
 
             fisxs = self.geometry.getxs('Fiss')
             try:
-                kappa = self.geometry.getxs('Kappa')*1.6E-13 # J
+                kappa = self.geometry.getxs('Kappa')*1.6E-13  # [J]
             except KeyError:
                 kappa = 200*1.6E-13  # J
 
@@ -245,28 +251,63 @@ class PhaseSpace:
             n, m = self.solution.eigvect.shape[1], self.eigvect.shape[1]
             # check consistency
             if adjoint is None:
-                raise OSError('For biorthogonal normalisation the adjoint' \
-                              ' input argument is needed!')
+                msg = 'For biorthogonal normalisation the adjoint' \
+                              ' input argument is needed!'
+                raise OSError(msg)
             elif n != m:
-                raise OSError('Adjoint modes number does not match forward' \
-                              ' modes! {}!={}'.format(n, m))
+                msg = 'Adjoint modes number does not match forward' \
+                              f' modes! {n}!={m}'
+                raise OSError(msg)
             elif adjoint.operators.state != 'steady':
-                raise OSError('Bi-orthogonal normalisation only available ' \
-                              'for steady state condition!')
+                msg = 'Bi-orthogonal normalisation only available ' \
+                              'for steady state condition!'
+                raise OSError(msg)
 
             for iv, v in enumerate(self.eigvect.T):
                 v_adj = self.solution.eigvect[:, iv]
-                self.eigvect[:, iv] = v/self.braket \
-                                        (self.operators.F.dot(v_adj), v)
+                self.eigvect[:, iv] = v/self.braket(self.operators.F.dot(v_adj), v)
 
         else:
-            print('Normalisation failed. {} not available as ' \
-                  'normalisation mode'.format(which))
+            msg = f'Normalisation failed. {which} not available as ' \
+                  'normalisation mode'
+            print(msg)
 
     def plot(self, group, angle=None, mode=0, moment=0, family=0,
              precursors=False, ax=None, title=None, imag=False, normalise=True,
              **kwargs):
+        """
+        Plot solution on a certain portion of the phase space.
 
+        Parameters
+        ----------
+        group : TYPE
+            DESCRIPTION.
+        angle : TYPE, optional
+            DESCRIPTION. The default is None.
+        mode : TYPE, optional
+            DESCRIPTION. The default is 0.
+        moment : TYPE, optional
+            DESCRIPTION. The default is 0.
+        family : TYPE, optional
+            DESCRIPTION. The default is 0.
+        precursors : TYPE, optional
+            DESCRIPTION. The default is False.
+        ax : TYPE, optional
+            DESCRIPTION. The default is None.
+        title : TYPE, optional
+            DESCRIPTION. The default is None.
+        imag : TYPE, optional
+            DESCRIPTION. The default is False.
+        normalise : TYPE, optional
+            DESCRIPTION. The default is True.
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         y = self.get(group, angle=angle, mode=mode, family=family,
                      precursors=precursors, moment=moment, normalise=normalise)
         yr, yi = y.real, y.imag
@@ -291,7 +332,51 @@ class PhaseSpace:
                      subplt=False, fundmark='*', fundcol='blue', mymark='o',
                      mycol='red', markerfull=True, mysize=80, alpha=0.5,
                      label=None):
+        """
+        Plot operator spectrum (i.e. all eigenvalues).
 
+        Parameters
+        ----------
+        loglog : TYPE, optional
+            DESCRIPTION. The default is False.
+        gaussplane : TYPE, optional
+            DESCRIPTION. The default is True.
+        geom : TYPE, optional
+            DESCRIPTION. The default is None.
+        ax : TYPE, optional
+            DESCRIPTION. The default is None.
+        grid : TYPE, optional
+            DESCRIPTION. The default is True.
+        ylims : TYPE, optional
+            DESCRIPTION. The default is None.
+        xlims : TYPE, optional
+            DESCRIPTION. The default is None.
+        threshold : TYPE, optional
+            DESCRIPTION. The default is None.
+        subplt : TYPE, optional
+            DESCRIPTION. The default is False.
+        fundmark : TYPE, optional
+            DESCRIPTION. The default is '*'.
+        fundcol : TYPE, optional
+            DESCRIPTION. The default is 'blue'.
+        mymark : TYPE, optional
+            DESCRIPTION. The default is 'o'.
+        mycol : TYPE, optional
+            DESCRIPTION. The default is 'red'.
+        markerfull : TYPE, optional
+            DESCRIPTION. The default is True.
+        mysize : TYPE, optional
+            DESCRIPTION. The default is 80.
+        alpha : TYPE, optional
+            DESCRIPTION. The default is 0.5.
+        label : TYPE, optional
+            DESCRIPTION. The default is None.
+
+        Returns
+        -------
+        None.
+
+        """
         if self.problem == 'omega' and geom is not None:
             lambdas = geom.getxs('lambda')
             subplt = False if subplt is False else True
@@ -352,11 +437,15 @@ class PhaseSpace:
             label = self.problem
 
         if self.problem == 'alpha' or self.problem == 'omega':
-            sub1.set_xlabel('$Re(\%s) ~[s^{-1}]$' % label)
-            sub1.set_ylabel('$Im(\%s) ~[s^{-1}]$' % label)
+            xlbl = f'Re({label}) [s^{-1}]' if usetex else f'$Re(\{label})~[s^{-1}]$'
+            ylbl = f'Im({label}) [s^{-1}]' if usetex else f'$Im(\{label})~[s^{-1}]$'
+            sub1.set_xlabel(xlbl)
+            sub1.set_ylabel(ylbl)
         else:
-            sub1.set_xlabel('$Re(\%s)$' % label)
-            sub1.set_ylabel('$Im(\%s)$' % label)
+            xlbl = f'Re({label})' if usetex else f'$Re(\{label})$'
+            ylbl = f'Im({label})' if usetex else f'$Im(\{label})$'
+            sub1.set_xlabel(xlbl)
+            sub1.set_ylabel(ylbl)
 
         if ylims is None:
             sub1.set_ylim([min(self.eigvals.imag)*1.1,
@@ -421,8 +510,8 @@ class PhaseSpace:
             # Add right side to the figure
             fig.add_artist(con2)
 
-            sub2.set_xlabel('$Re(\%s)$' % label)
-            sub2.set_ylabel('$Im(\%s)$' % label)
+            sub2.set_xlabel(f'$Re({label})$')
+            sub2.set_ylabel(f'$Im({label})$')
             sub2.ticklabel_format(axis='x', scilimits=[-5, 5])
             sub2.ticklabel_format(axis='y', scilimits=[-5, 5])
             if grid is True:
@@ -430,6 +519,19 @@ class PhaseSpace:
             plt.tight_layout()
 
     def polarspectrum(self, ax=None):
+        """
+        Plot spectrum on polar coordinates.
+
+        Parameters
+        ----------
+        ax : TYPE, optional
+            DESCRIPTION. The default is None.
+
+        Returns
+        -------
+        None.
+
+        """
         ax = ax or plt.gca()
         plt.polar(np.angle(self.eigvals[1:]), abs(self.eigvals[1:]),
                   marker='o', color='red')
@@ -438,6 +540,27 @@ class PhaseSpace:
         plt.polar(np.angle(val), abs(val), marker='*', color='blue')
 
     def getfundamental(self, lambdas=None):
+        """
+        Get fundamental eigenpair.
+
+        Parameters
+        ----------
+        lambdas : TYPE, optional
+            DESCRIPTION. The default is None.
+
+        Raises
+        ------
+        OSError
+            DESCRIPTION.
+
+        Returns
+        -------
+        eigenvalue : TYPE
+            DESCRIPTION.
+        eigenvector : TYPE
+            DESCRIPTION.
+
+        """
         idx = None
         if self.problem in ['kappa', 'gamma']:
             for i in range(self.nev):
@@ -457,13 +580,13 @@ class PhaseSpace:
             # select real eigenvalue with positive total flux
             for i in range(len(reals)):
                 # get total flux
-                ind = np.argwhere(self.eigvals==reals[i])[0][0]
+                ind = np.argwhere(self.eigvals == reals[i])[0][0]
                 v = self.get(moment=0, nEv=ind)
                 # fix almost zero points to avoid sign issues
                 v[np.abs(v) < np.finfo(float).eps] = 0
                 ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
                 if ispos:
-                    idx = np.argwhere(self.eigvals==reals[i])[0][0]
+                    idx = np.argwhere(self.eigvals == reals[i])[0][0]
                     break
 
         else:
@@ -483,18 +606,18 @@ class PhaseSpace:
 
             #     idx = np.where(self.eigvals == reals[whichreal])[0][0]
 
-            #if lambdas is not None:
-                # select real eigenvalues
-                lambdas = self.geometry.getxs('lambda')
-                choice = np.logical_and(np.greater_equal(self.eigvals.real,
-                                                         min(-lambdas)),
-                                        np.less_equal(self.eigvals.real,
-                                                      max(-lambdas)))
-                prompt = np.extract(~choice, self.eigvals)
-                reals = prompt[prompt.imag == 0]
-                reals_abs = abs(prompt[prompt.imag == 0])
-                minreal = np.where(reals_abs == reals_abs.min())
-                idx = np.where(self.eigvals == reals[minreal])[0][0]
+            # if lambdas is not None:
+            # select real eigenvalues
+            lambdas = self.geometry.getxs('lambda')
+            choice = np.logical_and(np.greater_equal(self.eigvals.real,
+                                                     min(-lambdas)),
+                                    np.less_equal(self.eigvals.real,
+                                                  max(-lambdas)))
+            prompt = np.extract(~choice, self.eigvals)
+            reals = prompt[prompt.imag == 0]
+            reals_abs = abs(prompt[prompt.imag == 0])
+            minreal = np.where(reals_abs == reals_abs.min())
+            idx = np.where(self.eigvals == reals[minreal])[0][0]
 
         if idx is None:
             raise OSError('No fundamental eigenvalue detected!')
@@ -575,8 +698,9 @@ class PhaseSpace:
 
         if group:
             if group > self.nE:
-                raise OSError('Cannot get group {} for {}-group' \
-                              ' data!'.format(group, self.nE))
+                msg = 'Cannot get group {} for {}-group' \
+                              ' data!'.format(group, self.nE)
+                raise OSError(msg)
 
         if self.problem in ['static', 'delayed', 'prompt']:  # source problem
             vect = self.flux
@@ -733,3 +857,12 @@ class PhaseSpace:
                 y = y+w[n]*eval_legendre(moment, mu[n])*phi
 
         return y
+
+    def to_hdf5(self, h5name=None):
+        """Save phase space object to HDF5 file."""
+        if h5name is None:
+            h5name = ''
+
+        myh5.write({'training_samples': self.new_samples}, h5name,
+                   attrs=None, chunks=True, compression=True,
+                   overwrite=True)
