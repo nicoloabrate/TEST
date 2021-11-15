@@ -13,7 +13,7 @@ from matplotlib.patches import ConnectionPatch
 from scipy.special import eval_legendre
 import TEST.methods.space.FD as FD
 import TEST.methods.space.FV as FV
-from TEST.utils import h5 as myh5
+import TEST.utils.h5 as myh5
 
 usetex = checkdep_usetex(True)
 params = {'text.usetex': usetex}
@@ -437,13 +437,13 @@ class PhaseSpace:
             label = self.problem
 
         if self.problem == 'alpha' or self.problem == 'omega':
-            xlbl = f'Re({label}) [s^{-1}]' if usetex else f'$Re(\{label})~[s^{-1}]$'
-            ylbl = f'Im({label}) [s^{-1}]' if usetex else f'$Im(\{label})~[s^{-1}]$'
+            xlbl = f'$Re(\{label})~[s^{-1}]$' if usetex else f'Re({label}) [s^{-1}]'
+            ylbl = f'$Im(\{label})~[s^{-1}]$' if usetex else f'Im({label}) [s^{-1}]'
             sub1.set_xlabel(xlbl)
             sub1.set_ylabel(ylbl)
         else:
-            xlbl = f'Re({label})' if usetex else f'$Re(\{label})$'
-            ylbl = f'Im({label})' if usetex else f'$Im(\{label})$'
+            xlbl = f'$Re(\{label})$' if usetex else f'Re({label})'
+            ylbl = f'$Im(\{label})$' if usetex else f'Im({label})'
             sub1.set_xlabel(xlbl)
             sub1.set_ylabel(ylbl)
 
@@ -861,8 +861,10 @@ class PhaseSpace:
     def to_hdf5(self, h5name=None):
         """Save phase space object to HDF5 file."""
         if h5name is None:
-            h5name = ''
+            h5name = 'data_{}_{}_{}_{}_{}.h5'.format(self.problem, self.nS,
+                                                  self.nA, self.nE, self.model)
 
-        myh5.write({'training_samples': self.new_samples}, h5name,
-                   attrs=None, chunks=True, compression=True,
+        # attrs = {'nS': self.nS, 'nA': self.nA, 'nE': self.nE,
+        #          'model': self.model, 'problem': self.problem}
+        myh5.write(self, 'PhaseSpace', h5name, chunks=True, compression=True,
                    overwrite=True)
