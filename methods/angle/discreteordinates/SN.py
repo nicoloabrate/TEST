@@ -28,7 +28,7 @@ def removal(obj, data, fmt='csc'):
     """
     N = obj.AngOrd
     if N <= 1:
-        raise OSError('Cannot build S_{}'.format(N))
+        raise OSError(f'Cannot build S{N}')
     model = obj.spatial_scheme
     mu = obj.QW['mu']
     M = []
@@ -46,7 +46,7 @@ def removal(obj, data, fmt='csc'):
             dia, pos = t, [0]
             m = t.shape[1]
         else:
-            raise OSError('{} model not available for spatial variable!'.format(model))
+            raise OSError(f'{model} model not available for spatial variable!')
 
         tmp = diags(dia, pos, (m, m), format=fmt)
         appM(tmp)
@@ -175,7 +175,7 @@ def scattering(obj, sm, fmt='csc'):
                     d_fl = diags([f_fl, f_fl[:, 1:]], [0, -1], (m, m), format=fmt)
                 f = np.insert(f, 0, 0, axis=1)
                 d = diags([f, f[:, 1:]], [0, -1], (m, m), format=fmt)
-    
+
             elif model == 'FV':
                 f = FV.zero(obj, xs, meshtype='centers')
                 if ishet:
@@ -190,23 +190,23 @@ def scattering(obj, sm, fmt='csc'):
             if ishet:
                 tmp_fl = []
                 tmp_flapp = tmp_fl.append
-    
+
             for n in range(N):  # loop over directions defining total flux
 
                 # build sub-matrix for n-th order
                 dmat = w[n]*d
                 if ishet:
                     dmat_fl = w[n]*d_fl[:, ::-1]
-    
+
                 if mu[n] < 0:
                     dmat = dmat[:, ::-1]
                     if ishet:
                         dmat_fl = dmat_fl[:, ::-1]
-    
+
                 tmpapp(dmat)
                 if ishet:
                     tmp_flapp(dmat_fl)
-    
+
             for order in range(N):  # loop over discrete ordinates eqs
                 if mu[order] > 0:
                     appM(tmp)
@@ -253,7 +253,7 @@ def scattering(obj, sm, fmt='csc'):
                         d = d[:, ::-1]
                     tmpapp(d)
                 appM(tmp)
-    
+
         M = bmat((M), format=fmt)
 
     return M
