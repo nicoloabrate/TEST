@@ -46,9 +46,9 @@ class Slab:
             pwd = pwd.joinpath('material')
             egridpath = pwd.joinpath('datalib', 'group_structures',
                                      '{}.txt'.format(energygrid))
-            self.nE = len(energygrid)-1
             self.egridname = str(energygrid)
             self.energygrid = np.loadtxt(egridpath)
+            self.nE = len(self.energygrid)-1
         elif isinstance(energygrid, (float, int)):
             if energygrid == 1:
                 self.energygrid = [1E-11, 20]
@@ -140,7 +140,9 @@ class Slab:
         # assign mesh, ghost mesh and N
         self.mesher(minmfp, spatial_scheme)
 
-        self.regionwhere = OrderedDict(zip(range(len(regions)), zip(self.layers[:-1], self.layers[1:])))
+        self.regionwhere = OrderedDict(zip(range(len(regions)),
+                                           zip(self.layers[:-1],
+                                               self.layers[1:])))
         self.regionmap = OrderedDict(zip(range(len(regions)), regions))
         self.AngOrd = AngOrd
         self.spatial_scheme = spatial_scheme
@@ -186,14 +188,17 @@ class Slab:
 
             # grid
             if uselinsp:
-                ngrid = np.linspace(self.layers[iLay], self.layers[iLay+1], N[iLay])
+                ngrid = np.linspace(self.layers[iLay], self.layers[iLay+1],
+                                    N[iLay])
             else:
                 if iLay == self.nLayers-1:
-                    ngrid = np.arange(self.layers[iLay], self.layers[iLay+1], dx[iLay])
+                    ngrid = np.arange(self.layers[iLay], self.layers[iLay+1],
+                                      dx[iLay])
                     ngrid = np.append(ngrid, self.layers[iLay+1])
                     N[iLay] = N[iLay]+1
                 else:
-                    ngrid = np.arange(self.layers[iLay], self.layers[iLay+1], dx[iLay])
+                    ngrid = np.arange(self.layers[iLay], self.layers[iLay+1],
+                                      dx[iLay])
 
             grid = np.concatenate((old_grid, ngrid))
             old_grid = grid
@@ -246,7 +251,6 @@ class Slab:
 
     def displaygeom(self, ax=None, xlabel=None, labels=None):
         """Plot regions."""
-
         ax = ax or gca()
         c = ['royalblue', 'firebrick',
              'forestgreen', 'gold', 'darkorange',
@@ -439,15 +443,19 @@ class Slab:
                         raise OSError('Perturbations can be applied one region at a time!')
 
             self.nLayers = len(self.layers)-1
-            self.regionwhere = OrderedDict(zip(range(self.nLayers), zip(self.layers[:-1], self.layers[1:])))
+            self.regionwhere = OrderedDict(zip(range(self.nLayers),
+                                               zip(self.layers[:-1],
+                                                   self.layers[1:])))
             self.regionmap = OrderedDict(zip(range(self.nLayers), regs))
             # update mesh to take into account new layers
-            tmp = self._split if isinstance(self._split, list) else self._split.tolist()
+            tmp = self._split if isinstance(self._split, list) else \
+                self._split.tolist()
 
             if list(set(tmp)) == tmp:
-                self._split = self._split*np.ones((self.nLayers), dtype=type(self._split))
+                self._split = self._split*np.ones((self.nLayers),
+                                                  dtype=type(self._split))
 
-            if max(tmp) < 0 and nlayers_old != self.nLayers:  # user defined points
+            if max(tmp) < 0 and nlayers_old != self.nLayers:  # user def points
                 idy = np.argmax(tmp)
                 scaling_fact = (x2-x1)/(self.layers[idy+1]-self.layers[idy])
                 minmfp = self._split.insert(idx, int(scaling_fact*max(tmp)))
@@ -495,7 +503,8 @@ class Slab:
                     if coord == replacement['where']:
                         self.regionmap[i] = new_mat
             else:
-                OSError('"where" entry cannot be of type {}'.type(replacement['where']))
+                OSError('"where" entry cannot be of' \
+                        'type {}'.type(replacement['where']))
         else:
             raise OSError('Material/location for replacement is missing')
 
@@ -528,4 +537,5 @@ class Slab:
         self.QW = QW
 
     def updateN(self, N):
+        """Update the angle order."""
         self.AngOrd = N
