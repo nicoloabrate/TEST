@@ -93,38 +93,137 @@ class PhaseSpace:
                     'space!'.format(type(solution))
             raise OSError(msg)
 
-    def braket(self, v1, v2=None):
+    def braket(self, v1, v2=None, phasespacevolume=None, dims=('nE*nS')):
         """
         Compute bra-ket product over the phase space.
 
         Parameters
         ----------
         v1 : ndarray
-            DESCRIPTION.
+            Array with dimensions specified in ``dims`` variable.
         v2 : ndarray
-            DESCRIPTION.
-        geom : object
-            DESCRIPTION.
+            Array with dimensions specified in ``dims`` variable.
+        phasespacevolume : dict
+            Dict containing 'g' and 'x' keys to specify integration boundaries.
+        dims : tuple
+            Dimensions can be (nS), (nE), (nA), (nS*nE), (nS*nA), (nE*nA),
+            (nS*nE*nA), (nS, nE), (nS, nA), (nE, nA), (nS, nE, nA).
+            Multiple dimensions can be in whichever order, e.g. also (nA, nS)
+            is good.
+            WATCH OUT: 1D array are assumed to be ordered as space, angle,
+            energy, e.g. all nodes for mu=mu1, g=g1, all nodes for mu=mu2 and
+            g=g1 and so on.
 
         Returns
         -------
-        None.
+        II : float or ndarray
+            Integration output.
 
         """
-        # if self.geometry.AngOrd > 0:
-        #     raise OSError('Braket cannot be applied yet to transport
-        #       solutions!')
-        # FIXME braket on transport solutions does not work properly
-        v1v2 = np.multiply(v1, v2) if v2 is not None else v1
-        geom = self.geometry
-        G = geom.nE
-        S = geom.nS
-        grid = geom.mesh
-        II = 0
-        # TODO consider integration over non-group energy grid
-        for g in range(G):
-            skip = g*S
-            II = II+np.trapz(v1v2[skip:skip+S], x=grid)
+        # get array dimensions
+        if isinstance(dims, str):
+            vdim = 1
+            for d in dims.split('*'):
+                vdim *= self.__dict__[d]
+        elif isinstance(dims, tuple):
+            vdim = ()
+            for d in dims:
+                vdim = vdim+(self.__dict__[d],)
+        else:
+            raise TypeError('phasespace.braket: dims must be tuple or str,' \
+                            ' not {}'.format(type(dims)))
+        # consistency check
+        if v1.shape != vdim:
+            raise OSError('phasespace.braket: v1 and dims argument mismatch!')
+
+        if v2:
+            if v1.shape != v2.shape:
+                raise OSError('phasespace.braket: v1 and v2 shape mismatch!')
+            v1v2 = v1.multiply(v2)
+        # initialisation
+        G = self.geometry.nE
+        # A = self.geometry.nA  # FIXME, TODO: how to handle PN and A?
+        S = self.geometry.nS
+        xgrid = self.geometry.mesh
+        egrid = self.geometry.energygrid
+        idx1, idx2 = 0, S
+        ide1, ide2 = 0, G
+
+        if isinstance(phasespacevolume, dict):
+            if 'x' in phasespacevolume.keys():
+                if hasattr(phasespacevolume['x'], '__iter__'):
+                    if len(phasespacevolume['x']) > 2:
+                        raise OSError('x must consist of only two elements!')
+                elif phasespacevolume['x'] is None:
+                    idx1, idx2 = None, None
+                else:
+                    raise TypeError('x entry must be iterable of two elements!')
+                phasespacevolume['x'].sort()
+                x1, x2 = phasespacevolume['x']
+                idx1, idx2 = np.argmin(abs(xgrid-x1)), np.argmin(abs(xgrid-x2))
+            if 'g' in phasespacevolume.keys():
+                if hasattr(phasespacevolume['g'], '__iter__'):
+                    if len(phasespacevolume['g']) > 2:
+                        raise OSError('g must consist of only two elements!')
+                elif phasespacevolume['g'] is None:
+                    ide1, ide2 = None, None
+                else:
+                    raise TypeError('g entry must be iterable of two elements!')
+                phasespacevolume['g'].sort()
+                e1, e2 = phasespacevolume['g']
+                ide1, ide2 = np.argmin(abs(egrid-e1)), np.argmin(abs(egrid-e2))
+        elif phasespacevolume is not None:
+            raise TypeError('phasespacevolume argument must be of type dict'\
+                            'not of type {}!'.format(type(phasespacevolume())))
+
+        # --- perform integration
+        if isinstance(vdim, int):  # 1D array (flattened)
+            if (ide1, ide2) == (None, None):  # integrate over space
+                n = G if 'nE' in dims else 1
+                II = np.zeros((n, ))
+                for g in range(G):
+                    skip = g*S
+                    iS = skip+idx1
+                    iE = skip+idx2
+                    II[g] = np.trapz(v1v2[iS:iE], x=xgrid[idx1:idx2])
+            elif (idx1, idx2) == (None, None):  # integrate over energy
+                n = S if 'nS' in dims else 1
+                II = np.zeros((n, ))
+                for idx in range(S):
+                    II[idx] = v1v2[range(idx, idx+(G)*S, S)].sum()
+            else:  # integrate in energy and space
+                II = 0
+                for g in range(G):
+                    skip = g*S
+                    if g >= ide1 and g<= ide2:
+                        iS = skip+idx1
+                        iE = skip+idx2
+                        II = II+np.trapz(v1v2[iS:iE], x=xgrid[idx1:idx2])
+        else:  # ndarray
+            if (ide1, ide2) == (None, None):  # integrate over space
+                j = 0
+                for i, d in enumerate(dims):
+                    if d == 'nE':
+                        continue
+                    else:
+                        v1v2 = v1v2.sum(axis=j)
+                        j = j-1  # TODO debug
+                II = v1v2
+            elif (idx1, idx2) == (None, None):  # integrate over energy
+                j = 0
+                for i, d in enumerate(dims):
+                    if d == 'nS':
+                        continue
+                    else:
+                        v1v2 = v1v2.sum(axis=j)
+                        j = j-1  # TODO debug
+                II = v1v2
+            else:  # integrate in energy and space
+                for i, d in enumerate(dims):
+                    v1v2 = v1v2.sum(axis=j)
+                    j = j-1
+                II = v1v2
+
         return II
 
     def interp(self, yp, xx, isref=True):
@@ -265,18 +364,19 @@ class PhaseSpace:
 
             for iv, v in enumerate(self.eigvect.T):
                 v_adj = self.solution.eigvect[:, iv]
-                self.eigvect[:, iv] = v/self.braket(self.operators.F.dot(v_adj), v)
+                self.eigvect[:, iv] = v/self.braket(self.operators.\
+                                                    F.dot(v_adj), v)
 
         else:
             msg = f'Normalisation failed. {which} not available as ' \
                   'normalisation mode'
             print(msg)
 
-    def plot(self, group, angle=None, mode=0, moment=0, family=0,
-             precursors=False, ax=None, title=None, imag=False, normalise=True,
+    def xplot(self, group, angle=None, mode=0, moment=0, family=0, ax=None,
+             precursors=False, title=None, imag=False, normalise=True,
              **kwargs):
         """
-        Plot solution on a certain portion of the phase space.
+        Plot solution along space for a certain portion of the phase space.
 
         Parameters
         ----------
@@ -327,11 +427,87 @@ class PhaseSpace:
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
         ax.set_title(title)
 
-    def plotspectrum(self, loglog=False, gaussplane=True, geom=None, ax=None,
+    def eplot(self, x=None, angle=None, mode=0, moment=0, family=0,
+              ax=None, precursors=False, title=None, figname=None,
+              imag=False, normalise=True, **kwargs):
+        """
+        Plot solution along energy for a certain portion of the phase space.
+
+        Parameters
+        ----------
+        group : TYPE
+            DESCRIPTION.
+        angle : TYPE, optional
+            DESCRIPTION. The default is None.
+        mode : TYPE, optional
+            DESCRIPTION. The default is 0.
+        moment : TYPE, optional
+            DESCRIPTION. The default is 0.
+        family : TYPE, optional
+            DESCRIPTION. The default is 0.
+        precursors : TYPE, optional
+            DESCRIPTION. The default is False.
+        ax : TYPE, optional
+            DESCRIPTION. The default is None.
+        title : TYPE, optional
+            DESCRIPTION. The default is None.
+        imag : TYPE, optional
+            DESCRIPTION. The default is False.
+        normalise : TYPE, optional
+            DESCRIPTION. The default is True.
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        if x:
+            if isinstance(x, (int, float)):
+                x = [x]
+            elif not isinstance(x, (list, np.ndarray, tuple)):
+                raise OSError('x cannot be of {} type'.format(type(x)))
+
+            eflx = np.zeros((self.nE, len(x)))
+            for g in range(self.nE):
+                y = self.get(g, angle=angle, mode=mode, family=family,
+                             precursors=precursors, moment=moment,
+                             normalise=normalise)
+                for i, ix in enumerate(x):
+                    mesh = self.geometry.mesh
+                    eflx[g, i] = y[np.argmin(abs(mesh-ix))]
+        else:  # space integration
+            eflx = np.zeros((self.nE, ))
+            for g in range(self.nE):
+                y = self.get(g, angle=angle, mode=mode, family=family,
+                             precursors=precursors, moment=moment,
+                             normalise=normalise)
+                eflx[g] = self.braket(y)
+
+        yr, yi = y.real, y.imag
+        if len(yr) == self.geometry.nS:
+            x = self.geometry.mesh
+        else:
+            x = self.geometry.ghostmesh
+        ax = ax or plt.gca()
+
+        y = yr if imag is False else yi
+        plt.plot(x, y, **kwargs)
+
+        ax.locator_params(nbins=8)
+        ax.xaxis.set_major_formatter(FormatStrFormatter('%g'))
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+        ax.set_title(title)
+        if figname:
+            plt.tight_layout()
+            plt.savefig(f'{figname}.png')
+
+    def plotspectrum(self, loglog=False, gaussplane=True, ax=None,
                      grid=True, ylims=None, xlims=None, threshold=None,
                      subplt=False, fundmark='*', fundcol='blue', mymark='o',
                      mycol='red', markerfull=True, mysize=80, alpha=0.5,
-                     label=None):
+                     label=None, figname=None):
         """
         Plot operator spectrum (i.e. all eigenvalues).
 
@@ -341,8 +517,6 @@ class PhaseSpace:
             DESCRIPTION. The default is False.
         gaussplane : TYPE, optional
             DESCRIPTION. The default is True.
-        geom : TYPE, optional
-            DESCRIPTION. The default is None.
         ax : TYPE, optional
             DESCRIPTION. The default is None.
         grid : TYPE, optional
@@ -377,8 +551,8 @@ class PhaseSpace:
         None.
 
         """
-        if self.problem == 'omega' and geom is not None:
-            lambdas = geom.getxs('lambda')
+        if self.problem == 'omega':
+            lambdas = self.geometry.getxs('lambda')
             subplt = False if subplt is False else True
         else:
             lambdas = None
@@ -469,7 +643,7 @@ class PhaseSpace:
         if subplt is True:
             minl, maxl = min(-lambdas[:, 0]), max(-lambdas[:, 0])
             miny, maxy = min(self.eigvals.imag), max(self.eigvals.imag)
-            minx, maxx = min(self.eigvals.real), max(self.eigvals.real)
+            maxx = max(self.eigvals.real)
             # plot blocked area
             sub1.fill_between((minl*maxx/10, -minl*maxx/10), miny*1.1,
                               maxy*1.1, facecolor='red', alpha=0.15)
@@ -516,7 +690,11 @@ class PhaseSpace:
             sub2.ticklabel_format(axis='y', scilimits=[-5, 5])
             if grid is True:
                 sub2.grid(alpha=0.2)
+
+        if figname:
             plt.tight_layout()
+            plt.savefig(f'{figname}_eig_spectrum.png')
+
 
     def polarspectrum(self, ax=None):
         """
@@ -573,7 +751,7 @@ class PhaseSpace:
                     idx = i
                     break
 
-        elif self.problem in ['delta', 'alpha']:
+        elif self.problem in ['delta', 'alpha', 'omega']:
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
             reals = reals[reals != 0]
