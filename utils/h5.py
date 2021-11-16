@@ -236,13 +236,15 @@ class write():
             Group name(s).
         h5name : string
             File where data are stored.
-        attrs : dict
+        attributes : dict
             Dictionary attributes that can be assigned for further description
             (default is ``None``).
         chunks : bool, optional
             Flag to save HDF5 in chunks.
         compression : bool, optional
             Flag to save compressed HDF5.
+        overwrite : bool, optional
+            Flag to overwrite HDF5. Default is ``True``.
 
         Returns
         -------
