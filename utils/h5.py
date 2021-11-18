@@ -7,7 +7,6 @@ Description: Utility to read/write objects from/to HDF5 files.
 """
 import os
 import h5py
-import chardet
 import numpy as np
 from collections import OrderedDict
 from numpy import string_, ndarray, array, asarray
@@ -23,10 +22,10 @@ class read():
         HDF5 file name that is parsed.
     """
 
-    _float_types = (float, float16, float32, float64, complex128)
+    _float_types = (float, float16, float32, float64, complex, complex128)
     _int_types = (int, int8, int16, int32, int64)
     _arr_types = (ndarray, list)
-    _types = (*_int_types, *_float_types, *_arr_types, str,
+    _types = (*_int_types, *_float_types, *_arr_types, str, np.bytes_,
               h5py._hl.dataset.Dataset, dict, tuple, OrderedDict)
     _str2type = {i.__name__: i for i in _types}
 
@@ -81,16 +80,18 @@ class read():
 
                         try:
                             if attrs != {}:
-                                dic[k]['%s_metadata' % str(k)] = attrs
+                                dic[k]['{}_metadata'.format(str(k))] = attrs
 
-                        except IndexError:
+                        except (IndexError, TypeError):
                             if attrs != {}:
-                                dic['%s_metadata' % str(k)] = attrs
+                                dic['{}_metadata'.format(str(k))] = attrs
 
                 self.__dict__[gro.replace(" ", "_")] = dic
 
             except AttributeError:
-                self.__dict__[gro.replace(" ", "_")] = read._h52py(fh5[gro], pytype=attrs['pytype'])
+                s = gro.replace(" ", "_")
+                self.__dict__[s] = read._h52py(fh5[gro],
+                                               pytype=attrs['pytype'], )
 
             if metadata is True:
                 self.__dict__['%s_metadata' % gro] = attrs
@@ -117,43 +118,46 @@ class read():
             list).
         """
         if pytype is None:
-
             try:
                 pytype = item.dtype.name
-
             except AttributeError:
-
                 if isinstance(item, str):
                     val = item
                 else:
                     val = read._h52dict(item)
-
                 return val
 
         if type(item).__name__ in read._str2type:
 
-            if isinstance(item, read._arr_types) or item.size > 1:
-                val = array(item)
-
-            elif (isinstance(item, read._float_types) or item.dtype in read._float_types) and len(item.shape) == 0:
-                val = array(item)
-                val = float(val)
-
-            elif (isinstance(item, read._int_types) or item.dtype in read._int_types) and len(item.shape) == 0:
-                val = array(item)
-                val = int(val)
+            if isinstance(item, h5py._hl.dataset.Dataset):
+                if pytype == 'str':
+                    if item.shape == ():
+                        val = array(item)[()].decode()
+                    else:
+                        val = []
+                        for i in item:
+                            val.append(i.decode())
+                        val = np.asarray(val)
+                else:
+                    dt = item.dtype
+                    val = np.zeros(item.shape, dtype=dt)
+                    item.read_direct(val)
 
             elif pytype == 'str':
                 val = item
 
-            elif pytype == b'str':
+            elif 'bytes' in pytype:
+                enc = item.attrs['encoding'].decode('ascii')
+                val = item.value.decode(enc)
 
+            elif pytype == b'str':
                 try:
                     enc = item.attrs['encoding'].decode('ascii')
 
                 except KeyError:
                     enc = 'ascii'
-                    print('Warning: %s of type b''str'' read with ''ascii'' encoding')
+                    print('Warning: %s of type b''str'' read with'
+                          ' ''ascii'' encoding')
 
                 val = item.value.decode(enc)
 
@@ -170,7 +174,6 @@ class read():
         else:
             raise TypeError('Cannot read data %s!' % item)
 
-        # print(type(item).__name__ == 'Group')
         return val
 
     def _h52dict(path):
@@ -187,15 +190,15 @@ class read():
         dic: dict
             group/subgroup/dataset converted to dictionary.
         """
-        # FIXME: try parallel computation to speed up. Too slow!
         dic = {}
-        for key, it in path.items():
+        for key, item in path.items():
 
-            if isinstance(it, h5py._hl.dataset.Dataset):
-                dic[key] = it[()]
+            if isinstance(item, h5py._hl.dataset.Dataset):
+                dic[key] = read._h52py(item, pytype=item.attrs['pytype'])
+                # print(key, item.attrs['pytype'], type(item[()]))
 
-            elif isinstance(it, h5py._hl.group.Group):
-                dic[key] = read._h52dict(it)
+            elif isinstance(item, h5py._hl.group.Group):
+                dic[key] = read._h52dict(item)
 
         return dic
 
@@ -220,6 +223,7 @@ class read():
             dic[k] = read._h52py(v)
 
         return dic
+
 
 class write():
 
@@ -265,7 +269,7 @@ class write():
                 groupname = [groupname]
             else:
                 self.fh5.close()
-                raise OSError('Unknown type {} for groupname!'\
+                raise OSError('Unknown type {} for groupname!'
                               .format(groupname.type))
         if len(obj) != len(groupname):
             self.fh5.close()
@@ -338,19 +342,20 @@ class write():
                 fh5g.attrs[k] = v
 
         if 'pytype' not in fh5g.attrs.keys():
-                fh5g.attrs['pytype'] = dt
+            fh5g.attrs['pytype'] = dt
 
         for key, item in dic.items():
             # convert key into str
             if isinstance(key, (int64, float64, float, int)):
                 key = str(key)
+            # convert items
             if isinstance(item, (int64, float64, bytes, int, float)):
                 fh5g.create_dataset(key, data=item)
                 fh5g[key].attrs['pytype'] = str(type(item))
             elif isinstance(item, str):
                 dt_str = h5py.special_dtype(vlen=str)
                 fh5g.create_dataset(key, data=item, dtype=dt_str)
-                fh5g[key].attrs['pytype'] = string_('str')
+                fh5g[key].attrs['pytype'] = 'str'
             elif isinstance(item, (list, tuple, ndarray, set)):
                 write.iterable2h5(fh5[grp], key, item)
             elif isinstance(item, dict):
@@ -362,8 +367,7 @@ class write():
                 write.dict2h5(fh5[grp], key, item)
                 fh5g[key].attrs['pytype'] = str(type(item).__name__)
             else:
-                raise ValueError('Cannot save %s type with dict2h5' % type(item))
-
+                raise ValueError('Cannot save {} type!'.format(type(item)))
 
     def iterable2h5(fh5, dataname, iterable, attrs=None, grp=None):
 
@@ -376,11 +380,11 @@ class write():
 
         ittype = iterable.dtype
         if isinstance(iterable, ndarray):
-            if 'U' in str(ittype):
+            if 'U' in str(ittype):  # string array
                 iterable = iterable.astype(dtype='O')
                 dt_str = h5py.special_dtype(vlen=str)
                 fh5.create_dataset(dataname, data=iterable, dtype=dt_str)
-                fh5[dataname].attrs['pytype'] = str(type(iterable))
+                fh5[dataname].attrs['pytype'] = 'str'
             elif 'object' in str(ittype):
                 fh5[grp].attrs.create('pytype', type(iterable).__name__)
                 for i, obj in enumerate(iterable):
@@ -424,12 +428,14 @@ def _checkname(fname):
     lst = fname.split(".")
 
     if len(lst) == 1:
-        raise OSError("File extension is missing. Only HDF5 can be read/written!")
+        msg = ("File extension is missing. Only HDF5 can be read/written!")
+        raise OSError(msg)
 
     else:
 
         if lst[-1] != "hdf5" and lst[-1] != "h5":
-            raise OSError("File extension is wrong. Only HDF5 can be read/written!")
+            msg = ("File extension is wrong. Only HDF5 can be read/written!")
+            raise OSError(msg)
 
     return fname
 
