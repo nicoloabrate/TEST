@@ -19,134 +19,153 @@ from scipy.special import roots_legendre, eval_legendre
 class Slab:
     """Define slab geometry object."""
 
-    def __init__(self, split, layers, regions, BCs, energygrid, AngOrd,
-                 spatial_scheme, datapath=None, verbose=True):
+    def __init__(self, split=None, layers=None, regions=None, BCs=None,
+                 energygrid=None, AngOrd=None, spatial_scheme=None,
+                 datapath=None, h5file=None, verbose=True):
 
-        if isinstance(regions, str):
-            regions = [regions]
-        # assign number of layers
-        self.nLayers = len(layers)-1
-        # check input consistency
-        if self.nLayers != len(regions):
-            raise OSError('{} regions but {} materials \
-                          specified!'.format(self.nLayers, len(regions)))
+        if h5file:
+            if isinstance(h5file, dict):
+                for k, v in h5file.items():
+                    if k == 'regions':
+                        self.regions = {}
+                        for matname, mat in v.items():
+                            self.regions[matname] = Material(h5file=mat)
+                    else:
+                        if type(v) is bytes:
+                            v = v.decode()
 
-        # assign "test" path for data library
-        self.datapath = datapath
-
-        # assign layers coordinates
-        self.layers = layers
-
-        if isinstance(energygrid, (list, np.ndarray, tuple)):
-            self.nE = len(energygrid)-1
-            self.egridname = '{}G'.format(self.nE)
-            self.energygrid = energygrid
-        elif isinstance(energygrid, str):
-            pwd = Path(__file__).parent.parent
-            pwd = pwd.joinpath('material')
-            egridpath = pwd.joinpath('datalib', 'group_structures',
-                                     '{}.txt'.format(energygrid))
-            self.egridname = str(energygrid)
-            self.energygrid = np.loadtxt(egridpath)
-            self.nE = len(self.energygrid)-1
-        elif isinstance(energygrid, (float, int)):
-            if energygrid == 1:
-                self.energygrid = [1E-11, 20]
-                self.nE = 1
-                self.egridname = '1G'
+                        self.__dict__[k] = v
+            elif isinstance(h5file, str):
+                print('To do')
             else:
+                msg = "h5file must be dict or str, not {}".format(type(h5file))
+                raise TypeError(msg)
+        else:
+            if isinstance(regions, str):
+                regions = [regions]
+            # assign number of layers
+            self.nLayers = len(layers)-1
+            # check input consistency
+            if self.nLayers != len(regions):
+                raise OSError('{} regions but {} materials \
+                              specified!'.format(self.nLayers, len(regions)))
+
+            # assign "test" path for data library
+            self.datapath = datapath
+
+            # assign layers coordinates
+            self.layers = layers
+
+            if isinstance(energygrid, (list, np.ndarray, tuple)):
+                self.nE = len(energygrid)-1
+                self.egridname = '{}G'.format(self.nE)
+                self.energygrid = energygrid
+            elif isinstance(energygrid, str):
                 pwd = Path(__file__).parent.parent
                 pwd = pwd.joinpath('material')
                 egridpath = pwd.joinpath('datalib', 'group_structures',
-                                         '{}G.txt'.format(energygrid))
+                                         '{}.txt'.format(energygrid))
+                self.egridname = str(energygrid)
                 self.energygrid = np.loadtxt(egridpath)
                 self.nE = len(self.energygrid)-1
-                self.egridname = '{}G'.format(self.nE)
-        else:
-            raise OSError('Unknown energygrid {} \
-                          type'.format(type(energygrid)))
-
-        if self.energygrid[0] < self.energygrid[0]:
-            self.energygrid[np.argsort(-self.energygrid)]
-        # set number of mean free path
-        if isinstance(split, (int, float)):
-            self._split = [split]*self.nLayers
-        # elif isinstance(split, float):
-        #     self._split = split*np.ones((self.nLayers), dtype=float)
-        elif isinstance(split, (list, np.ndarray)):
-
-            if len(split) == self.nLayers:
-                self._split = split
-
+            elif isinstance(energygrid, (float, int)):
+                if energygrid == 1:
+                    self.energygrid = [1E-11, 20]
+                    self.nE = 1
+                    self.egridname = '1G'
+                else:
+                    pwd = Path(__file__).parent.parent
+                    pwd = pwd.joinpath('material')
+                    egridpath = pwd.joinpath('datalib', 'group_structures',
+                                             '{}G.txt'.format(energygrid))
+                    self.energygrid = np.loadtxt(egridpath)
+                    self.nE = len(self.energygrid)-1
+                    self.egridname = '{}G'.format(self.nE)
             else:
-                raise OSError('split specified are not consistent with' +
-                              ' the number of regions. Please provide one'
-                              + ' split or as many splits as the number of' +
-                              'layers.')
-        else:
-            raise TypeError('Cannot read type %s for split!' % type(split))
+                raise OSError('Unknown energygrid {} \
+                              type'.format(type(energygrid)))
 
-        # set Boundary Conditions
-        self.BC = BCs if isinstance(BCs, list) else [BCs]
+            if self.energygrid[0] < self.energygrid[0]:
+                self.energygrid[np.argsort(-self.energygrid)]
+            # set number of mean free path
+            if isinstance(split, (int, float)):
+                self._split = [split]*self.nLayers
+            # elif isinstance(split, float):
+            #     self._split = split*np.ones((self.nLayers), dtype=float)
+            elif isinstance(split, (list, np.ndarray)):
 
-        # assign material properties
-        self.regions = {}
-        minmfp = np.zeros((self.nLayers, ))
+                if len(split) == self.nLayers:
+                    self._split = split
+                else:
+                    msg = ('split specified are not consistent with'
+                           ' the number of regions. Please provide one'
+                           ' split or as many splits as the number of'
+                           'layers.')
+                    raise OSError(msg)
+            else:
+                raise TypeError('Cannot read type %s for split!' % type(split))
 
-        for iLay in range(0, self.nLayers):
+            # set Boundary Conditions
+            self.BC = BCs if isinstance(BCs, list) else [BCs]
 
-            uniName = regions[iLay]
+            # assign material properties
+            self.regions = {}
+            minmfp = np.zeros((self.nLayers, ))
 
-            if uniName not in self.regions.keys():
+            for iLay in range(0, self.nLayers):
 
-                if datapath is not None:
-                    if isinstance(datapath, dict):
-                        for (mat, filename) in datapath.items():
-                            if uniName == mat:
-                                path = filename
-                                break
-                    elif isinstance(datapath, str):
-                        path = datapath
+                uniName = regions[iLay]
+
+                if uniName not in self.regions.keys():
+
+                    if datapath is not None:
+                        if isinstance(datapath, dict):
+                            for (mat, filename) in datapath.items():
+                                if uniName == mat:
+                                    path = filename
+                                    break
+                        elif isinstance(datapath, str):
+                            path = datapath
+                        else:
+                            raise OSError('{} not valid for \
+                                          datapath'.format(type(datapath)))
                     else:
-                        raise OSError('{} not valid for \
-                                      datapath'.format(type(datapath)))
+                        path = None
+
+                    self.regions[uniName] = Material(uniName, self.energygrid,
+                                                     egridname=self.egridname,
+                                                     datapath=path)
+
+                # consistency check precursor families and decay constants
+                if 'lambda' in self.regions[uniName].__dict__.keys():
+                    if iLay == 0:
+                        self.NPF = self.regions[uniName].NPF
+                        lambdas = self.regions[uniName].__dict__['lambda']
+                    else:
+                        if self.NPF != self.regions[uniName].NPF:
+                            raise OSError('Number of precursor families in {} \
+                                          not consistent with other \
+                                          regions'.format(uniName))
+                        if not np.allclose(lambdas, self.regions[uniName].__dict__['lambda']):
+                            self.regions[uniName].__dict__['lambda'] = lambdas
+                            if verbose:
+                                print('Warning: Forcing decay constants \
+                                      consistency in {}...'.format(uniName))
+
+                if AngOrd > 0:
+                    minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
                 else:
-                    path = None
+                    minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
+            # assign mesh, ghost mesh and N
+            self.mesher(minmfp, spatial_scheme)
 
-                self.regions[uniName] = Material(uniName, self.energygrid,
-                                                 egridname=self.egridname,
-                                                 datapath=path)
-
-            # consistency check precursor families and decay constants
-            if 'lambda' in self.regions[uniName].__dict__.keys():
-                if iLay == 0:
-                    self.NPF = self.regions[uniName].NPF
-                    lambdas = self.regions[uniName].__dict__['lambda']
-                else:
-                    if self.NPF != self.regions[uniName].NPF:
-                        raise OSError('Number of precursor families in {} not \
-                                      consistent with other \
-                                      regions'.format(uniName))
-                    if not np.allclose(lambdas, self.regions[uniName].__dict__['lambda']):
-                        self.regions[uniName].__dict__['lambda'] = lambdas
-                        if verbose:
-                            print('Warning: Forcing decay constants \
-                                  consistency in {}...'.format(uniName))
-
-            if AngOrd > 0:
-                minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
-            else:
-                minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
-        # assign mesh, ghost mesh and N
-        self.mesher(minmfp, spatial_scheme)
-
-        self.regionwhere = OrderedDict(zip(range(len(regions)),
-                                           zip(self.layers[:-1],
-                                               self.layers[1:])))
-        self.regionmap = OrderedDict(zip(range(len(regions)), regions))
-        self.AngOrd = AngOrd
-        self.spatial_scheme = spatial_scheme
-        self.geometry = 'slab'
+            self.regionwhere = OrderedDict(zip(range(len(regions)),
+                                               zip(self.layers[:-1],
+                                                   self.layers[1:])))
+            self.regionmap = OrderedDict(zip(range(len(regions)), regions))
+            self.AngOrd = AngOrd
+            self.spatial_scheme = spatial_scheme
+            self.geometry = 'slab'
 
     def mesher(self, minmfp, spatial_scheme):
         """
