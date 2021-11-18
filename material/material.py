@@ -7,16 +7,21 @@ Description: Class to handle different material regions.
 """
 import json
 import numpy as np
+import matplotlib.pyplot as plt
 from os import path
 from pathlib import Path
 from serpentTools import read
-from serpentTools.settings import rc
+from serpentTools.settings import rc as rcst
 from copy import deepcopy as copy
+from matplotlib import rc, checkdep_usetex
 
+usetex = checkdep_usetex(True)
+rc("font", **{"family": "sans-serif", "sans-serif": ["Helvetica"]})
+rc("text", usetex=usetex)
 
-rc['xs.reshapeScatter'] = True
-rc['xs.getB1XS'] = False
-rc['xs.variableGroups'] = ['kinetics', 'xs', 'xs-prod', 'gc-meta']
+rcst['xs.reshapeScatter'] = True
+rcst['xs.getB1XS'] = False
+rcst['xs.variableGroups'] = ['kinetics', 'xs', 'xs-prod', 'gc-meta']
 
 # it depends on Serpent 2 highest Legendre polynomial expansion order
 scatt_keys = [*list(map(lambda z: "infS"+str(z), range(0, 8))),
@@ -36,14 +41,20 @@ alldata = list(set([*sumxs, *indepdata, *basicdata, *kinetics]))
 
 collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(0, 8))),
                *list(map(lambda z: "Sp"+str(z), range(0, 8))), 'Invv']
-
 collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'Kappa']
+
+units = {'Chid': '-', 'Chit': '-', 'Chip': '-', 'Tot': 'cm^{-1}',
+         'Capt': 'cm^{-1}', 'Abs': 'cm^{-1}', 'Fiss': 'cm^{-1}',
+         'NuSf': 'cm^{-1}', 'Remxs': 'cm^{-1}', 'Transpxs': 'cm^{-1}',
+         'Kappa': 'MeV', 'S': 'cm^{-1}', 'Nubar': '-', 'Invv': 's/cm',
+         'Difflenght': 'cm^2', 'Diffcoef': 'cm', 'Flx': 'a.u.'}
 
 
 class Material():
     """Create material regions with multi-group constants."""
 
-    def __init__(self, uniName, energygrid, datapath=None, egridname=None,
+    def __init__(self, uniName=None, energygrid=None, datapath=None,
+                 egridname=None, h5file=None,
                  reader='json'):
         """
         Initialise object.
@@ -71,72 +82,74 @@ class Material():
         None.
 
         """
-        nE = len(energygrid)-1
-        egridname = egridname if egridname else "{}G".format(nE)
-        pwd = Path(__file__).parent
-
-        if datapath is None:
+        if h5file:
+            if isinstance(h5file, dict):
+                for k, v in h5file.items():
+                    if type(v) is bytes:
+                        v = v.decode()
+                    self.__dict__[k] = v
+            elif isinstance(h5file, str):
+                print('To do')
+            else:
+                msg = "h5file must be dict or str, not {}".format(type(h5file))
+                raise TypeError(msg)
+        else:
+            nE = len(energygrid)-1
+            egridname = egridname if egridname else "{}G".format(nE)
             pwd = Path(__file__).parent
-            datapath = pwd.joinpath('datalib', '{}'.format(egridname))
-            filename = uniName
-        elif path.isdir(datapath) is False:
-            pwd = Path(__file__).parent
-            filename = copy(datapath)
-            datapath = pwd.joinpath('datalib', '{}'.format(egridname))
 
-        # if str(datapath).endswith('_res.m'):
-        #     fname = str(datapath)
-        # else:
-        #     fname = '{}_res.m'.format(datapath)
+            if datapath is None:
+                pwd = Path(__file__).parent
+                datapath = pwd.joinpath('datalib', '{}'.format(egridname))
+                filename = uniName
+            elif path.isdir(datapath) is False:
+                pwd = Path(__file__).parent
+                filename = copy(datapath)
+                datapath = pwd.joinpath('datalib', '{}'.format(egridname))
 
-        # if not path.exists(path.dirname(datapath)):
-        #     pwd = Path(__file__).parent
-        #     fname = pwd.joinpath('datalib', '{}'.format(egridname),
-        #                          '{}'.format(fname))
+            if reader == 'json':
+                fname = path.join(datapath, "json", filename)
+                fname = '{}.{}'.format(str(fname), reader)
+                if path.exists(fname):
+                    self._readjson(fname)
+                else:
+                    reader = 'serpent'
 
-        if reader == 'json':
-            fname = path.join(datapath, "json", filename)
-            fname = '{}.{}'.format(str(fname), reader)
-            if path.exists(fname):
-                self._readjson(fname)
-            else:
-                reader = 'serpent'
+            if reader == 'serpent':
+                fname = path.join(datapath, "serpent", filename)
+                fname = '{}{}'.format(str(fname), "_res.m")
 
-        if reader == 'serpent':
-            fname = path.join(datapath, "serpent", filename)
-            fname = '{}{}'.format(str(fname), "_res.m")
+                if path.exists(fname):
+                    self._readserpentres(fname, uniName, nE, egridname)
+                else:
+                    reader = 'txt'
 
-            if path.exists(fname):
-                self._readserpentres(fname, uniName, nE, egridname)
-            else:
-                reader = 'txt'
+            if reader == 'txt':
+                fname = path.join(datapath, "txt", filename)
+                fname = '{}.{}'.format(str(fname), reader)
+                if path.exists(fname):
+                    self._readtxt(fname, nE)
+                else:
+                    raise OSError('{} not found!'.format(fname))
 
-        if reader == 'txt':
-            fname = path.join(datapath, "txt", filename)
-            fname = '{}.{}'.format(str(fname), reader)
-            if path.exists(fname):
-                self._readtxt(fname, nE)
-            else:
-                raise OSError('{} not found!'.format(fname))
+            self.nE = nE
+            self.egridname = egridname
+            self.energygrid = energygrid
+            self.UniName = uniName
 
-        self.nE = nE
-        self.egridname = egridname
-        self.energygrid = energygrid
-        self.UniName = uniName
+            try:
+                self.NPF = (self.beta).size
+            except AttributeError:
+                print('Kinetic parameters not available!')
+                self.NPF = None
 
-        try:
-            self.NPF = (self.beta).size
-        except AttributeError:
-            print('Kinetic parameters not available!')
-            self.NPF = None
-
-        # --- complete data and perform sanity check
-        L = 0
-        datastr = list(self.__dict__.keys())
-        # //2 since there are 'S' and 'Sp'
-        S = sum('S' in s for s in datastr)//2
-        self.L = S if S > L else L  # get maximum scattering order
-        self.datacheck()
+            # --- complete data and perform sanity check
+            L = 0
+            datastr = list(self.__dict__.keys())
+            # //2 since there are 'S' and 'Sp'
+            S = sum('S' in s for s in datastr)//2
+            self.L = S if S > L else L  # get maximum scattering order
+            self.datacheck()
 
     def _readjson(self, path):
         """
@@ -317,6 +330,46 @@ class Material():
                 vals = self.__dict__[key][pos1]
 
         return vals
+
+    def plot(self, what, dep_group=None, family=1, ax=None, figname=None,
+             **kwargs):
+
+        E = self.energygrid
+        ax = ax or plt.gca()
+        xs = self.__dict__[what]
+
+        if 'S' in what:
+            if dep_group:
+                xs = xs[dep_group, :]
+                what = f'{what}_{dep_group}'
+            else:
+                raise OSError('Material.plot: dep_group variable needed!')
+        elif what == 'Chid':
+            xs = xs[family-1, :]
+        elif what == 'Flx':
+            xs = xs/xs.dot(-np.diff(E))
+
+        if 'S' in what:
+            uom = units['S']
+        else:
+            uom = units[what]
+
+        if usetex:
+            uom = f'$\\rm {uom}$'
+
+        if 'label' not in kwargs.keys():
+            kwargs['label'] = what
+
+        plt.stairs(xs, edges=E, baseline=None, **kwargs)
+        ax.set_xlabel('E [MeV]')
+        ax.set_ylabel(f'{what} [{uom}]')
+        ax.set_xscale('log')
+        if what not in ['Nubar', 'Chid', 'Chip', 'Chit']:
+            ax.set_yscale('log')
+        plt.grid(which='both', alpha=0.2)
+        if figname:
+            plt.tight_layout()
+            plt.savefig(f"{figname}.png")
 
     def perturb(self, what, howmuch, depgro=None, sanitycheck=True):
         """
@@ -559,7 +612,7 @@ class Material():
 
             json.dump(tmp, f, sort_keys=True, indent=10)
 
-    def collapse(self, fewgrp, egridname=None):
+    def collapse(self, fewgrp, spectrum=None, egridname=None):
         """
         Collapse in energy the multi-group data.
 
@@ -578,96 +631,100 @@ class Material():
         None.
 
         """
-        if 'Flx' not in self.__dict__.keys():
-            raise OSError('Collapsing failed: weighting flux missing in \
-                          {}'.format(self.UniName))
+        if spectrum:
+            flx = spectrum
         else:
-            multigrp = self.energygrid
-            if isinstance(fewgrp, list):
-                fewgrp = np.asarray(fewgrp)
-            # ensure descending order
-            fewgrp = fewgrp[np.argsort(-fewgrp)]
-            H = len(multigrp)-1
-            G = len(fewgrp)-1
-            # sanity check
-            if G > H:
-                raise OSError('Collapsing failed: few-group structure should \
-                              have less than {} group'.format(H))
-            if multigrp[0] != fewgrp[0] or multigrp[0] != fewgrp[0]:
-                raise OSError('Collapsing failed: few-group structure  \
-                              boundaries do not match with multi-group \
-                              one')
-
-            iS = 0
-            collapsed = {}
-            collapsed['Flx'] = np.zeros((G, ))
-            for g in range(G):
-                # select fine groups in g
-                G1, G2 = fewgrp[g], fewgrp[g+1]
-                iE = np.argwhere(np.logical_and(multigrp[iS:] < G1,
-                                                multigrp[iS:] >= G2))[-1][0]+iS
-                # compute flux in g
+            if 'Flx' not in self.__dict__.keys():
+                raise OSError('Collapsing failed: weighting flux missing in \
+                              {}'.format(self.UniName))
+            else:
                 flx = self.Flx
-                NC = flx[iS:iE].sum()
-                collapsed['Flx'][g] = NC
-                # --- collapse
-                for key, v in self.__dict__.items():
-                    # --- cross section and inverse of velocity
-                    if key in collapse_xs:
-                        # --- preallocation
-                        dims = (G, G) if 'S' in key else (G, )
-                        if g == 0:
-                            collapsed[key] = np.zeros(dims)
 
-                        if len(dims) == 1:
-                            collapsed[key][g] = flx[iS:iE].dot(v[iS:iE])/NC
-                        else:
-                            # --- scattering
-                            iS2 = 0
-                            for g2 in range(G):  # arrival group
-                                I1, I2 = fewgrp[g2], fewgrp[g2+1]
-                                iE2 = np.argwhere(np.logical_and
-                                                  (multigrp[iS2:] < I1,
-                                                   multigrp[iS2:] >= I2))
-                                iE2 = iE2[-1][0]+iS2
-                                s = v[iS:iE, iS2:iE2].sum(axis=1)
-                                collapsed[key][g][g2] = flx[iS:iE].dot(s)/NC
-                                iS2 = iE2
-                    # --- fission-related data
-                    elif key in collapse_xsf:
-                        if self.Fiss.max() <= 0:
-                            if key == 'Chid':
-                                collapsed[key] = np.zeros((self.NPF, G))
-                            else:
-                                collapsed[key] = np.zeros((G, ))
-                            continue
-                        fissrate = flx[iS:iE]*self.Fiss[iS:iE]
-                        FRC = fissrate.sum()
-                        if key == 'Chid':
-                            if g == 0:
-                                collapsed[key] = np.zeros((self.NPF, G))
-                            for p in range(self.NPF):
-                                collapsed[key][p, g] = v[p, iS:iE].sum()
-                        else:
-                            if g == 0:
-                                collapsed[key] = np.zeros((G, ))
+        multigrp = self.energygrid
+        if isinstance(fewgrp, list):
+            fewgrp = np.asarray(fewgrp)
+        # ensure descending order
+        fewgrp = fewgrp[np.argsort(-fewgrp)]
+        H = len(multigrp)-1
+        G = len(fewgrp)-1
+        # sanity check
+        if G > H:
+            raise OSError('Collapsing failed: few-group structure should \
+                          have less than {} group'.format(H))
+        if multigrp[0] != fewgrp[0] or multigrp[0] != fewgrp[0]:
+            raise OSError('Collapsing failed: few-group structure  \
+                          boundaries do not match with multi-group \
+                          one')
 
-                            if 'Chi' in key:
-                                collapsed[key][g] = v[iS:iE].sum()
-                            else:
-                                collapsed[key][g] = fissrate.dot(v[iS:iE])/FRC
+        iS = 0
+        collapsed = {}
+        collapsed['Flx'] = np.zeros((G, ))
+        for g in range(G):
+            # select fine groups in g
+            G1, G2 = fewgrp[g], fewgrp[g+1]
+            iE = np.argwhere(np.logical_and(multigrp[iS:] < G1,
+                                            multigrp[iS:] >= G2))[-1][0]+iS
+            # compute flux in g
+            NC = flx[iS:iE].sum()
+            collapsed['Flx'][g] = NC
+            # --- collapse
+            for key, v in self.__dict__.items():
+                # --- cross section and inverse of velocity
+                if key in collapse_xs:
+                    # --- preallocation
+                    dims = (G, G) if 'S' in key else (G, )
+                    if g == 0:
+                        collapsed[key] = np.zeros(dims)
+
+                    if len(dims) == 1:
+                        collapsed[key][g] = flx[iS:iE].dot(v[iS:iE])/NC
                     else:
+                        # --- scattering
+                        iS2 = 0
+                        for g2 in range(G):  # arrival group
+                            I1, I2 = fewgrp[g2], fewgrp[g2+1]
+                            iE2 = np.argwhere(np.logical_and
+                                              (multigrp[iS2:] < I1,
+                                               multigrp[iS2:] >= I2))
+                            iE2 = iE2[-1][0]+iS2
+                            s = v[iS:iE, iS2:iE2].sum(axis=1)
+                            collapsed[key][g][g2] = flx[iS:iE].dot(s)/NC
+                            iS2 = iE2
+                # --- fission-related data
+                elif key in collapse_xsf:
+                    if self.Fiss.max() <= 0:
+                        if key == 'Chid':
+                            collapsed[key] = np.zeros((self.NPF, G))
+                        else:
+                            collapsed[key] = np.zeros((G, ))
                         continue
-                iS = iE
-            # overwrite data
-            self.energygrid = fewgrp
-            self.nE = G
-            self.egridname = egridname if egridname else '{}G'.format(G)
-            for key in self.__dict__.keys():
-                if key in collapsed.keys():
-                    self.__dict__[key] = collapsed[key]
-            # ensure data consistency
-            self.datacheck()
+                    fissrate = flx[iS:iE]*self.Fiss[iS:iE]
+                    FRC = fissrate.sum()
+                    if key == 'Chid':
+                        if g == 0:
+                            collapsed[key] = np.zeros((self.NPF, G))
+                        for p in range(self.NPF):
+                            collapsed[key][p, g] = v[p, iS:iE].sum()
+                    else:
+                        if g == 0:
+                            collapsed[key] = np.zeros((G, ))
+
+                        if 'Chi' in key:
+                            collapsed[key][g] = v[iS:iE].sum()
+                        else:
+                            collapsed[key][g] = fissrate.dot(v[iS:iE])/FRC
+                else:
+                    continue
+            iS = iE
+        # overwrite data
+        self.energygrid = fewgrp
+        self.nE = G
+        self.egridname = egridname if egridname else '{}G'.format(G)
+        for key in self.__dict__.keys():
+            if key in collapsed.keys():
+                self.__dict__[key] = collapsed[key]
+        # ensure data consistency
+        self.datacheck()
 
 
 class Mix(Material):
