@@ -525,7 +525,7 @@ class PhaseSpace:
                      ylims=None, xlims=None, threshold=None, subplt=False,
                      fundmark="*", fundcol="blue", mymark="o", mycol="red",
                      markerfull=True, mysize=80, alpha=0.5, label=None,
-                     figname=None, ):
+                     figname=None, **kwargs):
         """
         Plot operator spectrum (i.e. all eigenvalues).
 
@@ -606,20 +606,20 @@ class PhaseSpace:
             markerfull = mycol if markerfull else "none"
             sub1.scatter(evals.real, evals.imag, marker=mymark, color=mycol,
                          facecolors=markerfull, s=mysize, alpha=alpha,
-                         label=label, )
+                         label=label, **kwargs)
             # plot fundamental
             markerfull = fundcol if markerfull else "none"
             sub1.scatter(show*val.real, show*val.imag, marker=fundmark,
                          facecolors=markerfull, s=mysize, color=fundcol,
-                         alpha=alpha, )
+                         alpha=alpha, **kwargs)
         else:
 
             sub1.scatter(np.arange(0, len(evals.real)-1), evals.real,
                          marker=mymark, color=mycol, facecolors=markerfull,
-                         s=mysize, )
+                         s=mysize, **kwargs)
             # plot fundamental
             sub1.scatter(0, show*val, marker=fundmark, facecolors=markerfull,
-                         s=mysize, color=fundcol, )
+                         s=mysize, color=fundcol, **kwargs)
 
         if self.problem == "alpha":
             label = "alpha"
