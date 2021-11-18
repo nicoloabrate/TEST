@@ -9,6 +9,7 @@ Description: Utility to get default energy grid stored in
 import numpy as np
 from pathlib import Path
 
+
 def get_energy_grid(grid_name):
     pwd = Path(__file__).parent.parent
     pwd = pwd.joinpath('material')
