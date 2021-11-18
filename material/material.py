@@ -341,12 +341,15 @@ class Material():
         if 'S' in what:
             if dep_group:
                 xs = xs[dep_group, :]
-                what = f'{what}_{dep_group}'
+                what = f'{what}-{dep_group}'
             else:
                 raise OSError('Material.plot: dep_group variable needed!')
         elif what == 'Chid':
             xs = xs[family-1, :]
         elif what == 'Flx':
+            xs = xs/xs.dot(-np.diff(E))
+
+        if 'Chi' in what:
             xs = xs/xs.dot(-np.diff(E))
 
         if 'S' in what:
@@ -366,6 +369,7 @@ class Material():
         ax.set_xscale('log')
         if what not in ['Nubar', 'Chid', 'Chip', 'Chit']:
             ax.set_yscale('log')
+
         plt.grid(which='both', alpha=0.2)
         if figname:
             plt.tight_layout()
@@ -631,12 +635,12 @@ class Material():
         None.
 
         """
-        if spectrum:
+        if spectrum is not None:
             flx = spectrum
         else:
             if 'Flx' not in self.__dict__.keys():
-                raise OSError('Collapsing failed: weighting flux missing in \
-                              {}'.format(self.UniName))
+                raise OSError('Collapsing failed: weighting flux missing in'
+                              '{}'.format(self.UniName))
             else:
                 flx = self.Flx
 
@@ -687,8 +691,9 @@ class Material():
                                               (multigrp[iS2:] < I1,
                                                multigrp[iS2:] >= I2))
                             iE2 = iE2[-1][0]+iS2
-                            s = v[iS:iE, iS2:iE2].sum(axis=1)
-                            collapsed[key][g][g2] = flx[iS:iE].dot(s)/NC
+                            s = v[iS:iE, iS2:iE2].sum(axis=0)
+                            NCS = flx[iS2:iE2].sum()
+                            collapsed[key][g][g2] = flx[iS2:iE2].dot(s)/NCS
                             iS2 = iE2
                 # --- fission-related data
                 elif key in collapse_xsf:
