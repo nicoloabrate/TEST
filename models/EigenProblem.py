@@ -29,6 +29,7 @@ _targetdict = {'SM': 'SMALLEST_MAGNITUDE', 'SR': 'SMALLEST_REAL',
                'LM': 'LARGEST_MAGNITUDE', 'LR': 'LARGEST_REAL',
                'TM': 'TARGET_MAGNITUDE', 'TR': 'TARGET_REAL'}
 
+
 class eigenproblem():
 
     def __init__(self, nte, which, geom, nev=1, generalisedTime=False):
@@ -481,15 +482,15 @@ class eigenproblem():
         # else:
         #     self.sigma = None
         if algo == 'SLEPc':
-            # try:
+            try:
                 start = t.time()
                 res = self._slepc(tol=tol, monitor=monitor, sigma=shift,
                                   normalisation=normalisation)
                 end = t.time()
-            # except NameError:
-            #     print('SLEPc/SLEPc packages not installed. \
-            #           Switching to scipy...')
-            #     algo = 'eigs'
+            except NameError:
+                print('SLEPc/SLEPc packages not installed. \
+                      Switching to scipy...')
+                algo = 'eigs'
 
         if algo == 'eigs':
             if A.format != 'csc':
