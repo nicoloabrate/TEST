@@ -106,6 +106,8 @@ class Material():
                 pwd = Path(__file__).parent
                 filename = copy(datapath)
                 datapath = pwd.joinpath('datalib', '{}'.format(egridname))
+            else:
+                raise OSError('{datapath} path not valid!')
 
             if reader == 'json':
                 fname = path.join(datapath, "json", filename)
