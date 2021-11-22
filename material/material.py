@@ -473,7 +473,7 @@ class Material():
                 raise OSError('%s is missing in %s data!' % (s, self.UniName))
         # --- compute in-group scattering
         InScatt = np.diag(self.S0)
-        sTOT = self.S0.sum(axis=1) if len(self.S0.shape) > 1 else self.S0
+        sTOT = self.S0.sum(axis=0) if len(self.S0.shape) > 1 else self.S0
         # --- compute fission production cross section
         self.Nsf = self.Fiss*self.Nubar
         # --- compute missing sum reactions
@@ -491,7 +491,7 @@ class Material():
         self.secpercoll = (sTOT+self.Nsf)/(self.Tot)
         # --- compute mean of scattering cosine
         if 'S1' in datavail:
-            sTOT1 = self.S1.sum(axis=1) if len(self.S1.shape) > 1 else self.S1
+            sTOT1 = self.S1.sum(axis=0) if len(self.S1.shape) > 1 else self.S1
             self.mu0 = 0*self.Tot if np.isnan((sTOT1/sTOT).sum()) \
                 else sTOT1/sTOT
         elif 'Diffcoef' in datavail:
