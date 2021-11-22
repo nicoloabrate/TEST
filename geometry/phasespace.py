@@ -1052,7 +1052,7 @@ class PhaseSpace:
                     if mu[n] >= 0:
                         phi[ig*nS:(ig+1)*nS] = vect[iS:iE]
                     else:
-                        np.flipud(vect[iS:iE])
+                        phi[ig*nS:(ig+1)*nS] = np.flipud(vect[iS:iE])
                 # compute flux moment contribution
                 y = y+w[n]*eval_legendre(moment, mu[n])*phi
 
