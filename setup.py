@@ -9,10 +9,10 @@ from setuptools import setup, find_packages
 
 setup(
    name='TEST',
-   version='0.1.0',
+   version='1.0.0',
    author='N. Abrate',
    author_email='nicolo.abrate@polito.it',
-   url='https://nicolo_abrate@bitbucket.org/nicolo_abrate/test.git',
+   url='https://github.com/nicoloabrate/TEST.git',
    package_name = ['TEST'],
    packages=find_packages(),
    license='LICENSE.md',
