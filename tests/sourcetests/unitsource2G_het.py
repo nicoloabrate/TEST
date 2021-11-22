@@ -23,7 +23,7 @@ G = 2
 bc = 'Mark'
 
 # define geometry and mesh
-mats = ['ideal_reflector'] # ['H2O', 'H2O', 'H2O']
+mats = ['IdealReflector'] # ['H2O', 'H2O', 'H2O']
 # myslabD = Slab(M, xlayers, mats, ['zero'], G, 0, 'FD')
 myslabP = Slab(M, xlayers, mats, [bc], G, N, 'FD')
 myslabS = Slab(M, xlayers, mats, [bc], G, N+1, 'FD')
@@ -54,16 +54,16 @@ sS.solve()
 
 fig, ax = plt.subplots()
 myslabP.displaygeom()
-sP.solution.plot(1)
+sP.solution.xplot(1)
 if G > 1:
-    sP.solution.plot(2)
+    sP.solution.xplot(2)
 plt.title('P1')
 
 fig, ax = plt.subplots()
 myslabS.displaygeom()
-sS.solution.plot(1)
+sS.solution.xplot(1)
 if G > 1:
-    sS.solution.plot(2)
+    sS.solution.xplot(2)
 plt.title('S2')
 
 # ---
