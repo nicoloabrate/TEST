@@ -341,7 +341,7 @@ class Material():
         return vals
 
     def plot(self, what, dep_group=None, family=1, ax=None, figname=None,
-             normalize=True, **kwargs):
+             normalise=True, **kwargs):
 
         E = self.energygrid
         ax = ax or plt.gca()
@@ -356,7 +356,7 @@ class Material():
         elif what == 'Chid':
             xs = xs[family-1, :]
         elif what == 'Flx':
-            if normalize:
+            if normalise:
                 u = np.log(self.energygrid/self.energygrid[0])
                 xs = xs/np.diff(-u)
 

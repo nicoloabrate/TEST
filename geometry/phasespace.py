@@ -498,7 +498,8 @@ class PhaseSpace:
                                       phasespacevolume={'g': None})
 
         if normalise:
-            eflx = eflx/eflx.dot(-np.diff(E))
+            u = np.log(E/E[0])
+            eflx = eflx/np.diff(-u)
         yr, yi = eflx.real, eflx.imag
         ax = ax or plt.gca()
 
