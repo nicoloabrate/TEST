@@ -13,18 +13,19 @@ import TEST.models.NeutronTransportEquation as NTE
 from TEST.models.EigenProblem import eigenproblem
 import matplotlib.pyplot as plt
 
-algo = 'eig'
-M = 20
+algo = 'SLEPc'
+M = 15
 N = 3
 G = 2
 bc = 'Mark'
-mat1 = 'URRa0SL'
-H = 1
+mat1 = 'URRa-2-0-SL'
+H = 7.566853
 xlayers = [-H, H]
 
 # define geometry and mesh
 myslabP = Slab(M, xlayers, [mat1], [bc], G, N, 'FD')
-myslabSFV = Slab(M, xlayers, [mat1], [bc], G, N+1, 'FV')  #[mat1, mat2, mat1]
+print('{slabP.nS}')
+myslabSFV = Slab(M, xlayers, [mat1], [bc], G, N+1, 'FV')
 myslabSFD = Slab(M, xlayers, [mat1], [bc], G, N+1, 'FD')
 
 # myDiff = NTE.Diffusion(myslabD, steady=True, fmt='csc', BC=True)
