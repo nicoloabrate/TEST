@@ -48,6 +48,13 @@ units = {'Chid': '-', 'Chit': '-', 'Chip': '-', 'Tot': 'cm^{-1}',
          'NuSf': 'cm^{-1}', 'Remxs': 'cm^{-1}', 'Transpxs': 'cm^{-1}',
          'Kappa': 'MeV', 'S': 'cm^{-1}', 'Nubar': '-', 'Invv': 's/cm',
          'Difflenght': 'cm^2', 'Diffcoef': 'cm', 'Flx': 'a.u.'}
+xslabels = {'Chid': 'delayed fiss. emission spectrum', 'Chit': 'total fiss. emission spectrum', 
+            'Chip': 'prompt fiss. emission spectrum', 'Tot': 'Total xs',
+            'Capt': 'Capture xs', 'Abs': 'Absorption xs', 'Fiss': 'Fission xs',
+            'NuSf': 'Fiss. production xs', 'Remxs': 'Removal xs', 'Transpxs': 'Transport xs',
+            'Kappa': 'Fiss. energy', 'S': 'Scattering xs', 'Nubar': 'neutrons by fission', 
+            'Invv': 'Inverse velocity', 'Difflenght': 'Diff. length', 'Diffcoef': 'Diff. coeff.', 
+            'Flx': 'Flux spectrum'}
 
 
 class Material():
@@ -334,22 +341,25 @@ class Material():
         return vals
 
     def plot(self, what, dep_group=None, family=1, ax=None, figname=None,
-             **kwargs):
+             normalize=True, **kwargs):
 
         E = self.energygrid
         ax = ax or plt.gca()
         xs = self.__dict__[what]
-
+        whatlabel = xslabels[what]
         if 'S' in what:
             if dep_group:
                 xs = xs[dep_group, :]
-                what = f'{what}-{dep_group}'
+                whatlabel = f'{xslabels[what]} from g={dep_group}'
             else:
                 raise OSError('Material.plot: dep_group variable needed!')
         elif what == 'Chid':
             xs = xs[family-1, :]
         elif what == 'Flx':
-            xs = xs/xs.dot(-np.diff(E))
+            if normalize:
+                u = np.log(self.energygrid/self.energygrid[0])
+                xs = xs/np.diff(-u)
+
 
         if 'Chi' in what:
             xs = xs/xs.dot(-np.diff(E))
@@ -359,6 +369,9 @@ class Material():
         else:
             uom = units[what]
 
+        if 'Flx' in what and normalize:
+            whatlabel = 'Flux per unit lethargy'
+
         if usetex:
             uom = f'$\\rm {uom}$'
 
@@ -367,7 +380,7 @@ class Material():
 
         plt.stairs(xs, edges=E, baseline=None, **kwargs)
         ax.set_xlabel('E [MeV]')
-        ax.set_ylabel(f'{what} [{uom}]')
+        ax.set_ylabel(f'{whatlabel} [{uom}]')
         ax.set_xscale('log')
         if what not in ['Nubar', 'Chid', 'Chip', 'Chit']:
             ax.set_yscale('log')
