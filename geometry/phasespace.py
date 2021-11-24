@@ -7,8 +7,8 @@ Description: Class to handle phase space operations.
 """
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import rc, checkdep_usetex
-from matplotlib.ticker import FormatStrFormatter,LogLocator
+from matplotlib import rc, rcParams, checkdep_usetex
+from matplotlib.ticker import FormatStrFormatter
 from matplotlib.patches import ConnectionPatch
 from scipy.special import eval_legendre
 import TEST.methods.space.FD as FD
@@ -17,8 +17,12 @@ import TEST.utils.h5 as myh5
 from TEST.geometry import Slab
 
 usetex = checkdep_usetex(True)
-rc("font", **{"family": "sans-serif", "sans-serif": ["Helvetica"]})
-rc("text", usetex=usetex)
+rc('text', usetex=usetex)
+rc('font', **{'family' : "sans-serif"})
+if usetex:
+    rc('font', **{'family' : "sans-serif"})
+    params= {'text.latex.preamble' : r'\usepackage{libertinus}'}
+    rcParams.update(params)
 
 
 class PhaseSpace:
@@ -58,6 +62,7 @@ class PhaseSpace:
             self.nA = operators.nA
             self.nE = operators.nE
             self.nS = operators.nS
+            self.nF = geometry.NPF
 
             if energygrid is not None:
                 self.energygrid = energygrid
@@ -437,7 +442,9 @@ class PhaseSpace:
         # ax.set_xlim([min(self.geometry.layers), max(self.geometry.layers)])
         ax.xaxis.set_major_formatter(FormatStrFormatter("%g"))
         ax.yaxis.set_major_formatter(FormatStrFormatter("%.2f"))
-        ax.set_title(title)
+        if title is not None:
+            ax.set_title(title)
+        plt.grid(which='both', alpha=0.2)
         if figname:
             plt.tight_layout()
             plt.savefig(f"{figname}.png")
@@ -518,6 +525,8 @@ class PhaseSpace:
         ax.set_yscale('log')
         plt.grid(which='both', alpha=0.2)
         ax.set_xlabel('E [MeV]')
+        if title is not None:
+            plt.title(title)
         if figname:
             plt.tight_layout()
             plt.savefig(f"{figname}.png")
@@ -526,9 +535,8 @@ class PhaseSpace:
                      timelimit=None, delayed=False,
                      ax=None, grid=True, colormap=False,
                      ylims=None, xlims=None, threshold=None, subplt=False,
-                     fundmark="*", fundcol="blue", mymark="o", mycol="red",
-                     markerfull=True, mysize=80, alpha=0.5, label=None,
-                     figname=None, **kwargs):
+                     fundmark="*", fundcol="blue", markerfull=True, 
+                     label=None, figname=None, **kwargs):
         """
         Plot operator spectrum (i.e. all eigenvalues).
 
@@ -602,7 +610,7 @@ class PhaseSpace:
                 show = np.nan
             evals = evals[abs(evals) < threshold]
 
-        if subplt is True:
+        if subplt:
             fig = plt.figure(figsize=(6.4*2, 4.8))
             sub1 = fig.add_subplot(1, 2, 1)
             sub2 = fig.add_subplot(1, 2, 2)
@@ -615,30 +623,29 @@ class PhaseSpace:
                 sub1 = fig.add_subplot(1, 1, 1)
 
         # --- marker settings
-        mymark = "o" if mymark is None else mymark
-        mycol = "red" if mycol is None else mycol
-        mysize = 80 if mysize is None else mysize
-
-        fundmark = "*" if fundmark is None else fundmark
-        fundcol = "blue" if fundcol is None else fundcol
-
+        kwargs.setdefault("marker", "o")
+        kwargs.setdefault("facecolors", "red")
+        kwargs.setdefault("s", 20)
+        kwargs.setdefault("ec", "k")
+        kwargs.setdefault("lw", 0.5)
+        kwargs.setdefault("alpha", 0.5)
         if gaussplane:
-            markerfull = mycol if markerfull else "none"
-            sub1.scatter(evals.real, evals.imag, marker=mymark, color=mycol,
-                         facecolors=markerfull, s=mysize, alpha=alpha,
-                         label=label, **kwargs)
-            # plot fundamental
-            markerfull = fundcol if markerfull else "none"
-            sub1.scatter(show*val.real, show*val.imag, marker=fundmark,
-                         facecolors=markerfull, s=mysize, color=fundcol,
-                         alpha=alpha, **kwargs)
+            sub1.scatter(evals.real, evals.imag,label=label,
+                         **kwargs)
         else:
             sub1.scatter(np.arange(0, len(evals.real)-1), evals.real,
-                         marker=mymark, color=mycol, facecolors=markerfull,
-                         s=mysize, **kwargs)
-            # plot fundamental
-            sub1.scatter(0, show*val, marker=fundmark, facecolors=markerfull,
-                         s=mysize, color=fundcol, **kwargs)
+                         **kwargs)
+
+        # --- plot fundamental
+        fundmark = "*" if fundmark is None else fundmark
+        fundcol = "blue" if fundcol is None else fundcol
+        kwargs.update(marker=fundmark)
+        kwargs.update(facecolors=fundcol)
+        kwargs.update(alpha=1)
+        if gaussplane:
+            sub1.scatter(show*val.real, show*val.imag, **kwargs)            
+        else:
+            sub1.scatter(0, show*val, **kwargs)
 
         # --- labels and other settings
         if self.problem == "alpha":
@@ -648,12 +655,13 @@ class PhaseSpace:
         else:
             label = self.problem
 
-        xlbl = f"$Re(\{label})$" if usetex else f"Re({label})"
-        ylbl = f"$Im(\{label})$" if usetex else f"Im({label})"
+        xlbl = f"Re($\{label}$)" if usetex else f"Re({label})"
+        ylbl = f"Im($\{label}$)" if usetex else f"Im({label})"
 
         if self.problem == "alpha" or self.problem == "omega":
-            xlbl = f"{xlbl} $[s^{{-1}}]$" if usetex else f"{xlbl} [s^{-1}]"
-            ylbl = f"{ylbl} $[s^{{-1}}]$" if usetex else f"{ylbl} [s^{-1}]"
+            uom = "\\textsuperscript{-1}" if usetex else "^{-1}"
+            xlbl = rf"{xlbl} [s{uom}]"
+            ylbl = rf"{ylbl} [s{uom}]"
 
         sub1.set_xlabel(xlbl)
         sub1.set_ylabel(ylbl)
@@ -683,7 +691,7 @@ class PhaseSpace:
             xup = np.ceil(max(self.eigvals.real))
             if loglog:
                 xlo = xlo*10
-                xup = xup*10
+                xup = xup*10 if xup > 0 else 10
             else:
                 xlo *= 1.5
                 xup *= 1.5
@@ -696,10 +704,14 @@ class PhaseSpace:
             sub1.set_yscale("symlog")
             sub1.set_xscale("symlog")
             yticks = sub1.axes.get_yticks()
-            sub1.set_yticks(yticks[0::2])
+            idy = np.argwhere(yticks==0)[0][0]
+            start = 1 if idy % 2 else 0
+            sub1.set_yticks(yticks[start::2])
 
             xticks = sub1.axes.get_xticks()
-            sub1.set_xticks(xticks[0::2])
+            idx = np.argwhere(xticks==0)[0][0]
+            start = 1 if idx % 2 else 0
+            sub1.set_xticks(xticks[start::2])
         else:
             sub1.ticklabel_format(axis="x", scilimits=[-5, 5])
             sub1.ticklabel_format(axis="y", scilimits=[-5, 5])
@@ -750,13 +762,14 @@ class PhaseSpace:
             # Add right side to the figure
             fig.add_artist(con2)
 
-            sub2.set_xlabel(f"$Re({label})$")
-            sub2.set_ylabel(f"$Im({label})$")
+            sub2.set_xlabel(rf"$Re({label})$")
+            sub2.set_ylabel(rf"$Im({label})$")
             sub2.ticklabel_format(axis="x", scilimits=[-5, 5])
             sub2.ticklabel_format(axis="y", scilimits=[-5, 5])
             if grid is True:
                 sub2.grid(alpha=0.2)
 
+        plt.grid(which='both', alpha=0.2)
         if figname:
             plt.tight_layout()
             plt.savefig(f"{figname}_eig_spectrum.png")
@@ -920,7 +933,7 @@ class PhaseSpace:
                             nEv=nEv, )
         return y
 
-    def _getPN(self, group=None, angle=None, moment=0, mode=0, family=0,
+    def _getPN(self, group=None, angle=None, moment=0, mode=0, family=1,
                nEv=None, precursors=False, ):
         """
         Get spatial flux distribution for group, angle and spatial mode.
@@ -969,8 +982,10 @@ class PhaseSpace:
 
         if angle is None:
             if precursors and self.problem == "omega":
-                moment = nA
+                moment = 0
                 nF = self.nF
+                if family < 1:
+                    raise OSError(f"Family number must be >0, not {family}")
                 family = family - 1
                 iF = nS * family
             else:
@@ -985,7 +1000,11 @@ class PhaseSpace:
             y = np.zeros((nS * len(gro),))
 
             for ig, g in enumerate(gro):
-                if precursors is False:
+                if precursors:
+                    iS = (Ne * nS + No * (nS - 1)) * nE + (g - 1) * nF + iF
+                    iE = (Ne * nS + No * (nS - 1)) * \
+                        nE + (g - 1) * nF + iF + nS
+                else:
                     # compute No and Ne for the requested moment/angle
                     skip = (Ne * nS + No * (nS - 1)) * (g - 1)
                     NO = (moment + 1) // 2 if (moment -
@@ -994,10 +1013,7 @@ class PhaseSpace:
                     M = nS if moment % 2 == 0 else nS - 1
                     iS = skip + NE * nS + NO * (nS - 1)
                     iE = skip + NE * nS + NO * (nS - 1) + M
-                else:
-                    iS = (Ne * nS + No * (nS - 1)) * nE + (g - 1) * nF + iF
-                    iE = (Ne * nS + No * (nS - 1)) * \
-                        nE + (g - 1) * nF + iF + nS
+
                 # store slices
                 y[ig * dim: dim * (ig + 1)] = vect[iS:iE]
         else:
