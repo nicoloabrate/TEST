@@ -8,7 +8,7 @@ Description: Class to handle phase space operations.
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc, checkdep_usetex
-from matplotlib.ticker import FormatStrFormatter
+from matplotlib.ticker import FormatStrFormatter,LogLocator
 from matplotlib.patches import ConnectionPatch
 from scipy.special import eval_legendre
 import TEST.methods.space.FD as FD
@@ -264,7 +264,7 @@ class PhaseSpace:
 
         """
         G = self.geometry.nE
-        if self.geometry.AngOrd > 0:
+        if self.geometry.nA > 0:
             msg = ("Phase space interpolation cannot be applied yet"
                    " to transport solutions!")
             raise OSError(msg)
@@ -522,7 +522,9 @@ class PhaseSpace:
             plt.tight_layout()
             plt.savefig(f"{figname}.png")
 
-    def plotspectrum(self, loglog=False, gaussplane=True, ax=None, grid=True,
+    def plotspectrum(self, loglog=False, gaussplane=True,
+                     timelimit=None, delayed=False,
+                     ax=None, grid=True, colormap=False,
                      ylims=None, xlims=None, threshold=None, subplt=False,
                      fundmark="*", fundcol="blue", mymark="o", mycol="red",
                      markerfull=True, mysize=80, alpha=0.5, label=None,
@@ -533,48 +535,72 @@ class PhaseSpace:
         Parameters
         ----------
         loglog : TYPE, optional
-            DESCRIPTION. The default is False.
+            DESCRIPTION. The default is ``False``.
         gaussplane : TYPE, optional
-            DESCRIPTION. The default is True.
+            DESCRIPTION. The default is ``True``.
+        timelimit : bool, optional
+            Flag to display time eigenvalue limits (Corngold and decay constant).
+            The default is ``None``.
+        delayed : bool, optional
+            Flag to divide delayed and prompt spectra.
+            The default is ``False``.
         ax : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION. The default is ``None``.
         grid : TYPE, optional
-            DESCRIPTION. The default is True.
+            DESCRIPTION. The default is ``True``.
+        colormap : bool or str, optional
+            Add colormap proportional to eigenvalue magnitude.
+            The default is ``False``.
         ylims : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION. The default is `None`.
         xlims : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION. The default is ``None``.
         threshold : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION. The default is ``None``.
         subplt : TYPE, optional
-            DESCRIPTION. The default is False.
+            DESCRIPTION. The default is ``False``.
         fundmark : TYPE, optional
-            DESCRIPTION. The default is '*'.
+            DESCRIPTION. The default is `'*'`.
         fundcol : TYPE, optional
-            DESCRIPTION. The default is 'blue'.
+            DESCRIPTION. The default is `'blue'`.
         mymark : TYPE, optional
-            DESCRIPTION. The default is 'o'.
+            DESCRIPTION. The default is `'o'`.
         mycol : TYPE, optional
-            DESCRIPTION. The default is 'red'.
+            DESCRIPTION. The default is `'red'`.
         markerfull : TYPE, optional
-            DESCRIPTION. The default is True.
+            DESCRIPTION. The default is ``True``.
         mysize : TYPE, optional
-            DESCRIPTION. The default is 80.
+            DESCRIPTION. The default is ``80``.
         alpha : TYPE, optional
-            DESCRIPTION. The default is 0.5.
+            DESCRIPTION. The default is ``0.5``.
         label : TYPE, optional
-            DESCRIPTION. The default is None.
+            DESCRIPTION. The default is ``None``.
 
         Returns
         -------
         None.
 
         """
-        if self.problem == "omega":
-            lambdas = self.geometry.getxs("lambda")
-            subplt = False if subplt is False else True
-        else:
-            lambdas = None
+        if self.problem in ["alpha", "omega"]:
+            if self.problem == "omega":
+                lambdas = self.geometry.getxs("lambda")
+                subplt = False if subplt is False else True
+            else:
+                lambdas = None
+            if timelimit:
+                CorngoldLim = np.inf
+                for r in self.geometry.regions.values():
+                    if CorngoldLim > r.CorngoldLimit:
+                        CorngoldLim = r.CorngoldLimit
+
+        val, _ = self.getfundamental(lambdas)
+        evals = np.delete(self.eigvals, np.where(self.eigvals == val))
+        show = 1
+
+        if threshold is not None:
+            if abs(val) > threshold:
+                show = np.nan
+            evals = evals[abs(evals) < threshold]
 
         if subplt is True:
             fig = plt.figure(figsize=(6.4*2, 4.8))
@@ -588,14 +614,7 @@ class PhaseSpace:
                 fig = plt.figure()
                 sub1 = fig.add_subplot(1, 1, 1)
 
-        val, vect = self.getfundamental(lambdas)
-        evals = np.delete(self.eigvals, np.where(self.eigvals == val))
-
-        show = np.nan if threshold is not None and abs(val) > threshold else 1
-
-        if threshold is not None:
-            evals = evals[abs(evals) < threshold]
-
+        # --- marker settings
         mymark = "o" if mymark is None else mymark
         mycol = "red" if mycol is None else mycol
         mysize = 80 if mysize is None else mysize
@@ -603,7 +622,7 @@ class PhaseSpace:
         fundmark = "*" if fundmark is None else fundmark
         fundcol = "blue" if fundcol is None else fundcol
 
-        if gaussplane is True:
+        if gaussplane:
             markerfull = mycol if markerfull else "none"
             sub1.scatter(evals.real, evals.imag, marker=mymark, color=mycol,
                          facecolors=markerfull, s=mysize, alpha=alpha,
@@ -614,7 +633,6 @@ class PhaseSpace:
                          facecolors=markerfull, s=mysize, color=fundcol,
                          alpha=alpha, **kwargs)
         else:
-
             sub1.scatter(np.arange(0, len(evals.real)-1), evals.real,
                          marker=mymark, color=mycol, facecolors=markerfull,
                          s=mysize, **kwargs)
@@ -622,6 +640,7 @@ class PhaseSpace:
             sub1.scatter(0, show*val, marker=fundmark, facecolors=markerfull,
                          s=mysize, color=fundcol, **kwargs)
 
+        # --- labels and other settings
         if self.problem == "alpha":
             label = "alpha"
         elif self.problem == "omega":
@@ -629,29 +648,58 @@ class PhaseSpace:
         else:
             label = self.problem
 
+        xlbl = f"$Re(\{label})$" if usetex else f"Re({label})"
+        ylbl = f"$Im(\{label})$" if usetex else f"Im({label})"
+
         if self.problem == "alpha" or self.problem == "omega":
-            xlbl = f"$Re(\{label})~[s^{-1}]$" if usetex else f"Re({label}) [s^{-1}]"
-            ylbl = f"$Im(\{label})~[s^{-1}]$" if usetex else f"Im({label}) [s^{-1}]"
-            sub1.set_xlabel(xlbl)
-            sub1.set_ylabel(ylbl)
-        else:
-            xlbl = f"$Re(\{label})$" if usetex else f"Re({label})"
-            ylbl = f"$Im(\{label})$" if usetex else f"Im({label})"
-            sub1.set_xlabel(xlbl)
-            sub1.set_ylabel(ylbl)
+            xlbl = f"{xlbl} $[s^{{-1}}]$" if usetex else f"{xlbl} [s^{-1}]"
+            ylbl = f"{ylbl} $[s^{{-1}}]$" if usetex else f"{ylbl} [s^{-1}]"
+
+        sub1.set_xlabel(xlbl)
+        sub1.set_ylabel(ylbl)
+
+        if timelimit:
+            sub1.axvline(-CorngoldLim, lw=0.5, ls='--', c='k')
+            if lambdas is not None:
+                sub1.axvline(-min(lambdas), lw=0.5, ls='-.', c='k')
+                sub1.axvline(-max(lambdas), lw=0.5, ls='-.', c='k')
 
         if ylims is None:
-            sub1.set_ylim([min(self.eigvals.imag)*1.1,
-                           max(self.eigvals.imag)*1.1])
+            ylo = np.ceil(min(self.eigvals.imag))
+            yup = np.ceil(max(self.eigvals.imag))
+            if loglog:
+                ylo = ylo*10
+                yup = yup*10
+            else:
+                ylo *= 1.5
+                yup *= 1.5
+            sub1.set_ylim([ylo, yup])
         else:
             sub1.set_ylim(ylims)
+            ylo, yup = ylims
 
-        if xlims is not None:
+        if xlims is None:
+            xlo = np.ceil(min(self.eigvals.real))
+            xup = np.ceil(max(self.eigvals.real))
+            if loglog:
+                xlo = xlo*10
+                xup = xup*10
+            else:
+                xlo *= 1.5
+                xup *= 1.5
+            sub1.set_xlim([xlo, xup])
+        else:
+            xlo, xup = xlims
             sub1.set_xlim(xlims)
 
-        if loglog is True:
+        if loglog:
             sub1.set_yscale("symlog")
             sub1.set_xscale("symlog")
+            yticks = sub1.axes.get_yticks()
+            sub1.set_yticks(yticks[0::2])
+
+            xticks = sub1.axes.get_xticks()
+            sub1.set_xticks(xticks[0::2])
         else:
             sub1.ticklabel_format(axis="x", scilimits=[-5, 5])
             sub1.ticklabel_format(axis="y", scilimits=[-5, 5])
@@ -783,36 +831,41 @@ class PhaseSpace:
                 if ispos:
                     idx = np.argwhere(self.eigvals == reals[i])[0][0]
                     break
-
-        else:
-            # if self.problem == 'alpha':
-            #     # select real eigenvalues
-            #     reals = self.eigvals[self.eigvals.imag == 0]
-            #     # all negative
-            #     if np.all(reals < 0):
-            #         reals_abs = abs(self.eigvals[self.eigvals.imag == 0])
-            #         try:
-            #             whichreal = np.where(reals_abs == reals_abs.min())
-            #         except ValueError:
-            #             raise OSError('No fundamental eigenvalue detected!')
-            #     else:
-            #         reals_abs = self.eigvals[self.eigvals.imag == 0]
-            #         whichreal = np.where(reals_abs == reals_abs.max())
-
-            #     idx = np.where(self.eigvals == reals[whichreal])[0][0]
-
-            # if lambdas is not None:
-            # select real eigenvalues
+        elif self.problem == 'omega':
+            # conditions: >min(-lambdas) or <max(-lambdas), all positive
             lambdas = self.geometry.getxs("lambda")
-            choice = np.logical_and(np.greater_equal(self.eigvals.real,
-                                                     min(-lambdas)),
+            choice = np.logical_or(np.greater_equal(self.eigvals.real,
+                                                     max(-lambdas)),
                                     np.less_equal(self.eigvals.real,
-                                                  max(-lambdas)), )
-            prompt = np.extract(~choice, self.eigvals)
-            reals = prompt[prompt.imag == 0]
+                                                  min(-lambdas)), )
+            prompt = np.extract(choice, self.eigvals)
+            prompt = prompt[prompt.imag == 0]
+            # clean most of higher order delayed eigenvalues
+            eps = np.append(True, abs(np.diff(prompt)))
+            prompt = prompt[eps > 1E-6]
+            if prompt.any() > 0:
+                fundprompt = max(prompt[prompt > 0])
+            else:
+                fundprompt = min(prompt[prompt])
+
             reals_abs = abs(prompt[prompt.imag == 0])
             minreal = np.where(reals_abs == reals_abs.min())
             idx = np.where(self.eigvals == reals[minreal])[0][0]
+
+            # # select real eigenvalues
+            # reals = self.eigvals[self.eigvals.imag == 0]
+            # reals = reals[reals != 0]
+            # # select real eigenvalue with positive total flux
+            # for i in range(len(reals)):
+            #     # get total flux
+            #     ind = np.argwhere(self.eigvals == reals[i])[0][0]
+            #     v = self.get(moment=0, nEv=ind)
+            #     # fix almost zero points to avoid sign issues
+            #     v[np.abs(v) < np.finfo(float).eps] = 0
+            #     ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
+            #     if ispos:
+            #         idx = np.argwhere(self.eigvals == reals[i])[0][0]
+            #         break
 
         if idx is None:
             raise OSError("No fundamental eigenvalue detected!")
@@ -926,11 +979,10 @@ class PhaseSpace:
             No = (nA+1)//2 if nA % 2 != 0 else nA // 2
             Ne = nA+1-No
 
-            G = self.geometry.nE
-            dim = self.geometry.nS if moment % 2 == 0 else self.geometry.nS-1
+            dim = nS if moment % 2 == 0 else nS-1
             # preallocation for group-wise moments
             gro = [group] if group else np.arange(1, self.geometry.nE+1)
-            y = np.zeros((dim * len(gro),))
+            y = np.zeros((nS * len(gro),))
 
             for ig, g in enumerate(gro):
                 if precursors is False:
@@ -950,7 +1002,7 @@ class PhaseSpace:
                 y[ig * dim: dim * (ig + 1)] = vect[iS:iE]
         else:
             # build angular flux and evaluate in angle
-            tmp = np.zeros((dim * G))
+            tmp = np.zeros((nS * nE))
             for n in range(self.nA):
                 # interpolate to have consistent PN moments
                 y = vect if n % 2 == 0 else self.interp(
