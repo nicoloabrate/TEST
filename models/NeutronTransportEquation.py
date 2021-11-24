@@ -22,7 +22,6 @@ class Diffusion():
         self.nE = geom.nE
         self.geometry = geom.geometry
         self.spatial_scheme = geom.spatial_scheme
-        # geom.AngOrd = 1
         # assign operators
         self.R = MG.removal(geom, self.model, fmt=fmt)
         self.S0 = MG.scatteringTot(geom, self.model, fmt=fmt)

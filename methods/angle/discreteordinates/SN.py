@@ -26,7 +26,7 @@ def removal(obj, data, fmt='csc'):
     None.
 
     """
-    N = obj.AngOrd
+    N = obj.nA
     if N <= 1:
         raise OSError(f'Cannot build S{N}')
     model = obj.spatial_scheme
@@ -71,7 +71,7 @@ def leakage(obj, fmt='csc'):
     None.
 
     """
-    N = obj.AngOrd
+    N = obj.nA
     if N <= 1:
         raise OSError('Cannot build S_{}'.format(N))
     model = obj.spatial_scheme
@@ -145,7 +145,7 @@ def scattering(obj, sm, fmt='csc'):
     None.
 
     """
-    N = obj.AngOrd
+    N = obj.nA
     model = obj.spatial_scheme
     m = obj.nS
 
@@ -275,7 +275,7 @@ def fission(obj, xs, fmt='csc'):
     None.
 
     """
-    N = obj.AngOrd
+    N = obj.nA
     if N <= 1:
         raise OSError('Cannot build S_{}'.format(N))
     model = obj.spatial_scheme

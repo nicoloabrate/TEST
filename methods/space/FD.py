@@ -124,13 +124,13 @@ def second(obj, f, meshtype='edges'):
     N_old = 0
     for i in range(0, NL):
         dx = obj.dx[i]
-        N = int(N_old+obj.N[i])
+        N = int(N_old+obj.Nx[i])
         # upper diagonal
-        d2fdx2[0, N_old:N] = -f[i]/dx**2*np.ones((int(obj.N[i]), 1)).ravel()
+        d2fdx2[0, N_old:N] = -f[i]/dx**2*np.ones((int(obj.Nx[i]), 1)).ravel()
         # main diagonal
-        d2fdx2[1, N_old:N] = 2*f[i]/dx**2*np.ones((int(obj.N[i]), 1)).ravel()
+        d2fdx2[1, N_old:N] = 2*f[i]/dx**2*np.ones((int(obj.Nx[i]), 1)).ravel()
         # lower diagonal
-        d2fdx2[2, N_old:N] = -f[i]/dx**2*np.ones((int(obj.N[i]), 1)).ravel()
+        d2fdx2[2, N_old:N] = -f[i]/dx**2*np.ones((int(obj.Nx[i]), 1)).ravel()
 
         if NL > 1 and i < NL-1:
             d2fdx2[2, N-1] = -f[i+1]/obj.dx[i+1]/(dx/2+obj.dx[i+1]/2)
