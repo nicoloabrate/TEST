@@ -369,7 +369,7 @@ class Material():
         else:
             uom = units[what]
 
-        if 'Flx' in what and normalize:
+        if 'Flx' in what and normalise:
             whatlabel = 'Flux per unit lethargy'
 
         if usetex:
@@ -478,6 +478,7 @@ class Material():
         None.
 
         """
+        E = self.energygrid
         datadic = self.__dict__
         datavail = copy(list(datadic.keys()))
         # check basic reactions existence
@@ -500,6 +501,13 @@ class Material():
 
         self.Remxs = self.Abs+sTOT-InScatt
         self.Tot = self.Remxs+InScatt
+        if 'Invv' not in datavail:
+            avgE = 1/2*(E[:-1]+E[1:])*1.602176634E-13  # J
+            v = np.sqrt(2*avgE/1.674927351e-27)
+            self.Invv = 1/(v*100)  # s/cm
+
+        self.CorngoldLimit = min(self.Tot/self.Invv)
+
         # --- compute secondaries per collision
         self.secpercoll = (sTOT+self.Nsf)/(self.Tot)
         # --- compute mean of scattering cosine
@@ -527,8 +535,8 @@ class Material():
         # --- ensure consistency kinetic parameters (if fissile medium)
         if self.Fiss.max() > 0:
             if abs(self.Chit.sum() - 1) > 1E-5:
-                raise OSError('Total fission spectra in {} not \
-                              normalised!'.format(self.UniName))
+                print('Total fission spectra in {} not \
+                      normalised!'.format(self.UniName))
 
             # ensure pdf normalisation
             self.Chit /= self.Chit.sum()
