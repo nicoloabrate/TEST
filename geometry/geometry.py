@@ -55,7 +55,7 @@ class Slab:
 
             # assign layers coordinates
             self.layers = layers
-
+            # --- assign energy grid
             if isinstance(energygrid, (list, np.ndarray, tuple)):
                 self.nE = len(energygrid)-1
                 self.egridname = '{}G'.format(self.nE)
@@ -110,14 +110,12 @@ class Slab:
 
             # assign material properties
             self.regions = {}
+            Nxf = np.zeros((self.nLayers,), dtype=bool)
             minmfp = np.zeros((self.nLayers, ))
 
             for iLay in range(0, self.nLayers):
-
                 uniName = regions[iLay]
-
                 if uniName not in self.regions.keys():
-
                     if datapath is not None:
                         if isinstance(datapath, dict):
                             for (mat, filename) in datapath.items():
@@ -135,6 +133,9 @@ class Slab:
                     self.regions[uniName] = Material(uniName, self.energygrid,
                                                      egridname=self.egridname,
                                                      datapath=path)
+                # check if fissile
+                if self.regions[uniName].Nsf.any() > 0:
+                    Nxf[iLay] = True
 
                 # consistency check precursor families and decay constants
                 if 'lambda' in self.regions[uniName].__dict__.keys():
@@ -158,12 +159,12 @@ class Slab:
                     minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
             # assign mesh, ghost mesh and N
             self.mesher(minmfp, spatial_scheme)
-
+            self.Nxf = self.Nx[Nxf]  # fissile meshes
             self.regionwhere = OrderedDict(zip(range(len(regions)),
                                                zip(self.layers[:-1],
                                                    self.layers[1:])))
             self.regionmap = OrderedDict(zip(range(len(regions)), regions))
-            self.AngOrd = AngOrd
+            self.nA = AngOrd  # angular approximation order
             self.spatial_scheme = spatial_scheme
             self.geometry = 'slab'
 
@@ -236,7 +237,7 @@ class Slab:
             grid[grid == 0] = np.finfo(float).eps
             gridg[gridg == 0] = np.finfo(float).eps
 
-        self.N = N
+        self.Nx = N
         self.dx = dx
         self.edges = grid
         self.centers = gridg
@@ -380,7 +381,8 @@ class Slab:
             if key.startswith('S') or key.startswith('Sp'):
                 vals = np.full((self.nE, self.nE), None)
                 # loop over regions
-                vals = self.regions[reg].getxs(key, pos1, pos2)
+                for reg, ireg in self.regionmap.items():
+                    vals = self.regions[reg].getxs(key, pos1, pos2)
 
             else:
                 vals = np.full((self.nE, 1), None)
@@ -484,7 +486,7 @@ class Slab:
 
                 for iLay in range(0, self.nLayers):
                     uniName = self.regionmap[iLay]
-                    if self.AngOrd > 0:
+                    if self.nA > 0:
                         minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
                     else:
                         minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
@@ -544,17 +546,17 @@ class Slab:
         # compute Legendre expansion coefficients for SN
         sm = self.getxs('%s' % 'S')
         L = sm.shape[3]
-        mu, w = roots_legendre(self.AngOrd)
+        mu, w = roots_legendre(self.nA)
         # ensure positive and then negative directions
         mu[::-1].sort()
 
-        PL = np.zeros((L, self.AngOrd))
+        PL = np.zeros((L, self.nA))
         for order in range(0, L):
             PL[order, :] = eval_legendre(order, mu)
-        C = (2*np.arange(0, self.AngOrd)+1)/2
+        C = (2*np.arange(0, self.nA)+1)/2
         QW = {'L': L, 'mu': mu, 'w': w, 'PL': PL, 'C': C}
         self.QW = QW
 
     def updateN(self, N):
         """Update the angle order."""
-        self.AngOrd = N
+        self.nA = N
