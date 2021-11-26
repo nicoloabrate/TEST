@@ -7,7 +7,8 @@ Description: Class to handle phase space operations.
 """
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import rc, rcParams, checkdep_usetex
+from matplotlib.colors import LogNorm
+from matplotlib import rc, rcParams, checkdep_usetex, ticker
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib.patches import ConnectionPatch
 from scipy.special import eval_legendre
@@ -602,7 +603,8 @@ class PhaseSpace:
                         CorngoldLim = r.CorngoldLimit
 
         val, _ = self.getfundamental(lambdas)
-        evals = np.delete(self.eigvals, np.where(self.eigvals == val))
+        ifund = np.where(self.eigvals == val)
+        evals = np.delete(self.eigvals, ifund)
         show = 1
 
         if threshold is not None:
@@ -623,15 +625,23 @@ class PhaseSpace:
                 sub1 = fig.add_subplot(1, 1, 1)
 
         # --- marker settings
-        kwargs.setdefault("marker", "o")
-        kwargs.setdefault("facecolors", "red")
         kwargs.setdefault("s", 20)
         kwargs.setdefault("ec", "k")
-        kwargs.setdefault("lw", 0.5)
         kwargs.setdefault("alpha", 0.5)
+        kwargs.setdefault("marker", "o")
+        if colormap:
+            kwargs.setdefault("cmap", 'Spectral_r')
+            cols = abs(self.eigvals)
+            kwargs.setdefault("c", np.delete(cols, ifund))
+            kwargs.setdefault("lw", 0.1)
+            kwargs.setdefault("norm", LogNorm())
+        else:
+            kwargs.setdefault("facecolors", "red")
+            kwargs.setdefault("lw", 0.5)
+
         if gaussplane:
-            sub1.scatter(evals.real, evals.imag,label=label,
-                         **kwargs)
+            h1 = sub1.scatter(evals.real, evals.imag,label=label,
+                               **kwargs)
         else:
             sub1.scatter(np.arange(0, len(evals.real)-1), evals.real,
                          **kwargs)
@@ -639,9 +649,16 @@ class PhaseSpace:
         # --- plot fundamental
         fundmark = "*" if fundmark is None else fundmark
         fundcol = "blue" if fundcol is None else fundcol
-        kwargs.update(marker=fundmark)
-        kwargs.update(facecolors=fundcol)
         kwargs.update(alpha=1)
+        kwargs.update(s=kwargs['s']*5)
+        kwargs.update(lw=0.5)
+        kwargs.update(marker=fundmark)
+
+        if colormap:
+            kwargs.update(c=cols[ifund])
+        else:
+            kwargs.update(facecolors=fundcol)
+
         if gaussplane:
             sub1.scatter(show*val.real, show*val.imag, **kwargs)            
         else:
@@ -701,8 +718,8 @@ class PhaseSpace:
             sub1.set_xlim(xlims)
 
         if loglog:
-            sub1.set_yscale("symlog")
-            sub1.set_xscale("symlog")
+            sub1.set_yscale("symlog", subs=np.arange(2,9))
+            sub1.set_xscale("symlog", subs=np.arange(2,9))
             yticks = sub1.axes.get_yticks()
             idy = np.argwhere(yticks==0)[0][0]
             start = 1 if idy % 2 else 0
@@ -717,8 +734,13 @@ class PhaseSpace:
             sub1.ticklabel_format(axis="y", scilimits=[-5, 5])
 
         if grid is True:
-            sub1.grid(alpha=0.2)
+            sub1.grid(alpha=0.1)
 
+        if colormap:
+            cbar = plt.colorbar(h1, label='eigenvalue magnitude')
+            cbar.formatter = ticker.LogFormatterMathtext(base=10)
+            cbar.update_ticks()
+            
         if subplt is True:
             minl, maxl = min(-lambdas[:, 0]), max(-lambdas[:, 0])
             miny, maxy = min(self.eigvals.imag), max(self.eigvals.imag)
