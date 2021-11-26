@@ -96,6 +96,15 @@ class PhaseSpace:
 
                     self.eigvals = eigvals
                     self.eigvect = ev
+                    # place fundamental at first position
+                    try:
+                        eig0, ev0 = self.getfundamental()
+                        idx = np.argwhere(eigvals == eig0)[0][0]
+                        if idx != 0:
+                            self.eigvect[:,[0, idx]] = self.eigvect[:,[idx, 0]]
+                            self.eigvals[[0, idx]] = self.eigvals[[idx, 0]]
+                    except OSError as ierr:
+                        pass
 
                     if normalize is True:
                         self.normalize(which=whichnorm)
