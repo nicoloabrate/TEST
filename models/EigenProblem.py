@@ -119,7 +119,7 @@ class eigenproblem():
                 E.setTarget(self.sigma)
 
         # set spectral transformation
-        if self.which in ['alpha', 'omega', 'delta']:
+        if self.which in ['alpha', 'omega', 'delta', 'theta']:
             st.setType('sinvert')
 
         end = t.time()
@@ -348,8 +348,8 @@ class eigenproblem():
         self.B = -op.C
 
         self.which = 'theta'
-        self.whichspectrum = 'TR'  # 'SR'
-        self.sigma = 1  # 0
+        self.whichspectrum = 'TR'
+        self.sigma = 1
 
     def kappa(self):
         """
@@ -477,10 +477,7 @@ class eigenproblem():
                               'options are: {}' \
                               .format(which, (k for k in _targetdict.keys())))
             self.whichspectrum = which
-        # if shift is not None:
-        #     self.sigma = shift
-        # else:
-        #     self.sigma = None
+
         if algo == 'SLEPc':
             try:
                 start = t.time()
