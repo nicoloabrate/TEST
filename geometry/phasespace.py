@@ -851,7 +851,7 @@ class PhaseSpace:
                     idx = i
                     break
 
-        elif self.problem in ["delta", "alpha", "omega"]:
+        elif self.problem in ["delta", "alpha"]:
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
             reals = reals[reals != 0]
@@ -867,43 +867,16 @@ class PhaseSpace:
                     idx = np.argwhere(self.eigvals == reals[i])[0][0]
                     break
         elif self.problem == 'omega':
-            # conditions: >min(-lambdas) or <max(-lambdas), all positive
-            lambdas = self.geometry.getxs("lambda")
-            choice = np.logical_or(np.greater_equal(self.eigvals.real,
-                                                     max(-lambdas)),
-                                    np.less_equal(self.eigvals.real,
-                                                  min(-lambdas)), )
-            prompt = np.extract(choice, self.eigvals)
-            prompt = prompt[prompt.imag == 0]
-            # clean most of higher order delayed eigenvalues
-            eps = np.append(True, abs(np.diff(prompt)))
-            prompt = prompt[eps > 1E-6]
-            if prompt.any() > 0:
-                fundprompt = max(prompt[prompt > 0])
-            else:
-                fundprompt = min(prompt[prompt])
-
-            reals_abs = abs(prompt[prompt.imag == 0])
-            minreal = np.where(reals_abs == reals_abs.min())
-            idx = np.where(self.eigvals == reals[minreal])[0][0]
-
-            # # select real eigenvalues
-            # reals = self.eigvals[self.eigvals.imag == 0]
-            # reals = reals[reals != 0]
-            # # select real eigenvalue with positive total flux
-            # for i in range(len(reals)):
-            #     # get total flux
-            #     ind = np.argwhere(self.eigvals == reals[i])[0][0]
-            #     v = self.get(moment=0, nEv=ind)
-            #     # fix almost zero points to avoid sign issues
-            #     v[np.abs(v) < np.finfo(float).eps] = 0
-            #     ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
-            #     if ispos:
-            #         idx = np.argwhere(self.eigvals == reals[i])[0][0]
-            #         break
-
-        if idx is None:
-            raise OSError("No fundamental eigenvalue detected!")
+            reals = self.eigvals[self.eigvals.imag == 0]
+            fund = max(reals)
+            idx = np.where(self.eigvals == fund)[0][0]
+            v = self.get(moment=0, nEv=idx)
+            # fix almost zero points to avoid sign issues
+            v[np.abs(v) < np.finfo(float).eps] = 0
+            ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
+            if not ispos:
+                idx = None
+                raise OSError("No fundamental eigenvalue detected!")
 
         eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
         return eigenvalue, eigenvector
