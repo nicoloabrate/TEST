@@ -601,6 +601,8 @@ class PhaseSpace:
                 for r in self.geometry.regions.values():
                     if CorngoldLim > r.CorngoldLimit:
                         CorngoldLim = r.CorngoldLimit
+        else:
+            lambdas = None
 
         val, _ = self.getfundamental(lambdas)
         ifund = np.where(self.eigvals == val)
@@ -690,8 +692,10 @@ class PhaseSpace:
                 sub1.axvline(-max(lambdas), lw=0.5, ls='-.', c='k')
 
         if ylims is None:
-            ylo = np.ceil(min(self.eigvals.imag))
-            yup = np.ceil(max(self.eigvals.imag))
+            mineig = min(self.eigvals.imag)
+            maxeig = max(self.eigvals.imag)
+            ylo = np.sign(mineig)*np.ceil(abs(mineig))
+            yup = np.sign(maxeig)*np.ceil(abs(maxeig))
             if loglog:
                 ylo = ylo*10
                 yup = yup*10
@@ -704,11 +708,13 @@ class PhaseSpace:
             ylo, yup = ylims
 
         if xlims is None:
-            xlo = np.ceil(min(self.eigvals.real))
-            xup = np.ceil(max(self.eigvals.real))
+            mineig = min(self.eigvals.real)
+            maxeig = max(self.eigvals.real)
+            xlo = np.sign(mineig)*np.ceil(abs(mineig))
+            xup = np.sign(maxeig)*np.ceil(abs(maxeig))
             if loglog:
                 xlo = xlo*10
-                xup = xup*10 if xup > 0 else 10
+                xup = xup*10
             else:
                 xlo *= 1.5
                 xup *= 1.5
@@ -718,17 +724,21 @@ class PhaseSpace:
             sub1.set_xlim(xlims)
 
         if loglog:
-            sub1.set_yscale("symlog", subs=np.arange(2,9))
-            sub1.set_xscale("symlog", subs=np.arange(2,9))
+            sub1.set_yscale("symlog", subs=np.arange(2, 9))
+            sub1.set_xscale("symlog", subs=np.arange(2, 9))
             yticks = sub1.axes.get_yticks()
-            idy = np.argwhere(yticks==0)[0][0]
-            start = 1 if idy % 2 else 0
-            sub1.set_yticks(yticks[start::2])
+            if 0 in yticks:
+                idy = np.argwhere(yticks==0)[0][0]
+                start = 1 if idy % 2 else 0
+                yticks = yticks[start::2]
+            sub1.set_yticks(yticks)
 
             xticks = sub1.axes.get_xticks()
-            idx = np.argwhere(xticks==0)[0][0]
-            start = 1 if idx % 2 else 0
-            sub1.set_xticks(xticks[start::2])
+            if 0 in xticks:
+                idx = np.argwhere(xticks==0)[0][0]
+                start = 1 if idx % 2 else 0
+                xticks = xticks[start::2]
+            sub1.set_xticks(xticks)
         else:
             sub1.ticklabel_format(axis="x", scilimits=[-5, 5])
             sub1.ticklabel_format(axis="y", scilimits=[-5, 5])
@@ -851,7 +861,7 @@ class PhaseSpace:
                     idx = i
                     break
 
-        elif self.problem in ["delta", "alpha"]:
+        elif self.problem in ["alpha", "delta", "theta"]:
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
             reals = reals[reals != 0]
