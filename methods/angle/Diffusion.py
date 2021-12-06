@@ -9,13 +9,13 @@ import numpy as np
 from TEST.methods.space import FD, FV
 from scipy.sparse import diags
 
-def leakage(obj, dfc, fmt='csc'):
+def leakage(ge, dfc, fmt='csc'):
     """
     Assemble diffusion leakage operator (laplacian).
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     dfc : ndarray
         Diffusion coefficients for each region.
@@ -25,13 +25,13 @@ def leakage(obj, dfc, fmt='csc'):
     None.
 
     """
-    model = obj.spatial_scheme
+    model = ge.spatial_scheme
     meshtype = 'mesh'  # evaluate on standard mesh if even
 
     if model == 'FD':
-        M = FD.second(obj, dfc, meshtype)
+        M = FD.second(ge, dfc, meshtype)
     elif model == 'FV':
-        M = FV.second(obj, dfc, meshtype)
+        M = FV.second(ge, dfc, meshtype)
     else:
         raise OSError('%s model not available for spatial variable!' % model)
 
