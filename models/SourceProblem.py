@@ -19,7 +19,7 @@ from inspect import signature
 
 class sourceproblem():
 
-    def __init__(self, nte, which, geom, source):
+    def __init__(self, nte, which, ge, source):
         """
         Define the source problem to be solved.
 
@@ -29,7 +29,7 @@ class sourceproblem():
             Neutron Transport Equation object containing the discretised operators.
         which : str
             Type of source problem to be solved (static, time-dependent)
-        geom : object
+        ge : object
             Geometry object.
         source : iterable or function
             List or ndarray containing the source definition (this should match
@@ -54,14 +54,14 @@ class sourceproblem():
         self.problem = which
         self.model = nte.model
         self.operators = nte
-        self.geometry = geom
+        self.geometry = ge
         ss = self.geometry.spatial_scheme
         # --- compute source dimensions
         if self.model == 'PN':
             No = (self.nA+1)//2 if self.nA % 2 != 0 else self.nA//2
             Ne = self.nA+1-No
             dim = (No*(self.nS-1)+Ne*self.nS)*self.nE
-            NS = 1
+            NS = 10000
             mu = np.linspace(-1, 1, NS)
         elif self.model == 'SN':
             nx = self.nS
@@ -117,7 +117,7 @@ class sourceproblem():
                 elif self.model == 'PN':
                     iS = g*(Ne*self.nS+No*(self.nS-1))
                     coeff = 1 if isotropic is False else 1/2
-                    for moment in range(0, self.nA):
+                    for moment in range(self.nA+1):
                         xp = x if moment % 2 == 0 else xs
                         # compute source moments
                         for xv in xp:
@@ -139,6 +139,19 @@ class sourceproblem():
                             iS = iS+1
                         if isotropic:
                             break  # compute only 0-th moment
+                    # # impose BCs
+                    # for gro in range(self.nE):
+                    #     idg = gro*self.nS*self.nA
+                    #     for moment in range(self.nA+1):
+                    #         if moment % 2 == 0:
+                    #             M = self.nS if moment % 2 == 0 else self.nS - 1
+                    #             NO = (moment + 1) // 2 if (moment -
+                    #                                        1) % 2 != 0 else moment // 2
+                    #             NE = moment - NO
+                    #             skip = (NE*self.nS+NO*(self.nS-1))*(gro-1)
+                    #             iS = skip+NE*self.nS+NO*(self.nS-1)
+                    #             iE = skip+NE*self.nS+NO*(self.nS-1)+M
+                    #             f[[iS, iE-1]] = 0
 
                 elif self.model == 'SN':
                     iS = g*self.nS*self.nA
@@ -159,9 +172,13 @@ class sourceproblem():
                     if self.geometry.spatial_scheme == 'FD':
                         for gro in range(self.nE):
                             idg = gro*self.nS*self.nA
+                            mu = self.geometry.QW['mu']
                             for order in range(self.nA):
-                                skip = self.nS*order+idg
-                                f[skip] = 0
+                                if mu[order] == 0:
+                                    continue
+                                else:
+                                    skip = self.nS*order+idg
+                                    f[skip] = 0
 
         else:
             raise OSError('Source cannot be of type {}'.format(type(source)))
