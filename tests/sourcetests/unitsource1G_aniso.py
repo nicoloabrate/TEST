@@ -14,7 +14,7 @@ from TEST.models.EigenProblem import eigenproblem
 from TEST.models.SourceProblem import sourceproblem
 import matplotlib.pyplot as plt
 
-M = -5
+M = -10
 N = 1
 G = 1
 bc = 'Mark'
@@ -76,34 +76,15 @@ for i in range(1, myslab.nS):
 phiS2_g1 = sS.solution.get(group=1, moment=0, mode=0)
 
 # plt.plot(myslabD.mesh, sD.solution.flux, label='Diff')
-
-phi1P = sP.solution.get(1, angle=0)
-phi2P = sP.solution.get(1, angle=1)
-plt.plot(myslab.mesh, phi1P+phi2P, label='PN-FD-2', c='b', marker='o')
-plt.plot(myslab.mesh, sP.solution.flux[0:myslab.nS], label='PN-FD', c='r', marker='o')
-plt.plot(myslab2.mesh, phiS2_g1, label='SN-FD 1', ls='--', marker='s')
+plt.plot(myslab.mesh, sP.solution.flux[0:myslab.nS], label='PN-FD', c='r')
+plt.plot(myslab2.mesh, phiS2_g1, label='SN-FD 1', ls='--')
 # plt.plot(myslab.mesh, phiT(myslab.mesh), '--', label='exact', c='b')
 plt.plot(myslab.mesh, phi1_num+phi2_num, label='SN-FD', ls='-.')
 # plt.plot(np.linspace(0, H/2, 1000), tmp, label='Diff. analytical')
 plt.legend()
 plt.show()
 
-sS.solution.xplot(1, moment=1, marker='s', label='S J')
-sP.solution.xplot(1, moment=1, label='P J', ls='-.', marker='o')
-plt.legend()
-plt.show()
 
-
-sS.solution.xplot(1, angle=0, marker='s', label='S mu1')
-sS.solution.xplot(1, angle=1, marker='s', label='S -mu1')
-plt.plot(myslab.mesh, phi1_num, label='SN-num mu1', ls='-.')
-plt.plot(myslab.mesh, phi2_num, label='SN-num mu 2', ls='-.')
-plt.plot(myslab.mesh, phi1P, label='PN-num mu1')
-plt.plot(myslab.mesh, phi2P, label='PN-num mu 2')
-sP.solution.xplot(1, angle=0, label='P mu1', ls='--', marker='o')
-sP.solution.xplot(1, angle=1, label='P -mu1', ls='-.', marker='o')
-plt.legend()
-plt.show()
 
 L = mySN.L.todense()
 S = mySN.S.todense()
