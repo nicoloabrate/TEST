@@ -16,12 +16,11 @@ except ImportError:
 import os
 import time as t
 import numpy as np
-from copy import copy
 from scipy.linalg import eig
 from scipy.sparse.linalg import eigs, inv
-from scipy.sparse import block_diag, bmat, csr_matrix, hstack, vstack
 from TEST.geometry.phasespace import PhaseSpace
 from TEST.models.NeutronPrecursorsEquation import NPE as npe
+from TEST.models.NeutronTransportEquation import couple2NPE
 from matplotlib.pyplot import spy
 
 
@@ -32,7 +31,7 @@ _targetdict = {'SM': 'SMALLEST_MAGNITUDE', 'SR': 'SMALLEST_REAL',
 
 class eigenproblem():
 
-    def __init__(self, nte, which, geom, nev=1, generalisedTime=False):
+    def __init__(self, nte, which, ge, nev=1, generalisedTime=False):
 
         # --- problem settings
         self.nS = nte.nS
@@ -42,10 +41,7 @@ class eigenproblem():
         self.problem = which
         self.model = nte.model
         self.operators = nte
-        self.geometry = geom
-
-        if which == 'omega':
-            self.operatorsPrec = npe(geom, fmt='csc')
+        self.geometry = ge
 
         if 2*nev+1 >= self.operators.S.shape[0]:
             raise OSError('Too many eigenvalues required! 2*nev+1 should be \
@@ -56,11 +52,12 @@ class eigenproblem():
         # --- call eigenvalue problem
         try:
             evp = getattr(self, which)
-            if which == 'alpha':
+            if which in ['alpha', 'omega']:
                 evp(generalised=generalisedTime)
             else:
                 evp()
-        except AttributeError:
+        except AttributeError as ierr:
+            print(ierr)
             raise OSError('{} eigenproblem not available!'.format(which))
 
     def _slepc(self, verbose=False, tol=1E-8, monitor=True, sigma=None,
@@ -80,9 +77,13 @@ class eigenproblem():
         # explicitly force 0 on diagonal
         A[idL, idL] = 0
 
+        invert = False  # invert eigenvalues (shift-and-invert)
         if B is not None:
             if B.format != 'csr':
                 B = B.tocsr()
+            if self.which in ['omega', 'alpha']:
+                invert = True
+
             diagB = B.diagonal()
             idP = np.array(np.where([diagB == 0])[1])
             B[idP, idP] = 0
@@ -180,7 +181,11 @@ class eigenproblem():
             res = np.asarray(err)
 
             # create native phase space
-            myeigpair = {'eigenvalues': np.asarray(vals),
+            if invert:
+                conv_eigvals = 1/np.asarray(vals)
+            else:
+                conv_eigvals = np.asarray(vals)
+            myeigpair = {'eigenvalues': conv_eigvals,
                          'eigenvectors' : eigvect,
                          'problem': self.which}
             self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
@@ -190,6 +195,10 @@ class eigenproblem():
                 nofund = False
             else:
                 self.nev = 2*self.nev
+                if self.nev > self.A.shape[0]:
+                    print('WARNING: No fundamental eigenvalue'
+                                  'in the full spectrum!')
+                    break
                 print('No eigenvalue converged! Looking for ' \
                       '{} eigvalues...'.format(self.nev))
                 E.setDimensions(nev=self.nev)
@@ -272,13 +281,12 @@ class eigenproblem():
         else:
             B = op.S+op.F-op.F0-op.S0-op.C-op.L  # destruction operator
 
-
-        if generalised is False:
+        if generalised:
+            T = op.T
+        else:
             T = None
             invT = inv(op.T)
             B = invT.dot(B)
-        else:
-            T = op.T
 
         self.A = B
         self.B = T
@@ -346,6 +354,9 @@ class eigenproblem():
             self.A = op.L+op.S0+op.F0-op.S-op.F  # destruction operator
 
         self.B = -op.C
+        if self.B.nnz == 0:
+            raise OSError("Theta eigenvalue cannot be solved since"
+                          " the capture cross section is apparently zero!")
 
         self.which = 'theta'
         self.whichspectrum = 'TR'
@@ -385,82 +396,27 @@ class eigenproblem():
         None.
 
         """
-        self.nF = self.operatorsPrec.nF
-        # get dimensions
-        nS, nE, nF = self.nS, self.nE, self.nF
-        nA = self.operators.nA
-        n = self.operators.Fp.shape[0]
-        m = nE*nF*nS
-
-        # odd and even eqs.
-        No = (nA+1)//2 if nA % 2 != 0 else nA//2
-        Ne = nA+1-No
-
-        # define matrices to fill blocks
-        A1 = csr_matrix((n, m))
-        A2 = csr_matrix((m, m))
-        A3 = csr_matrix((m, n))
-        A4 = csr_matrix((n, n))
-
-        # --- time
-        T = block_diag([self.operators.T, self.operatorsPrec.T])
-        # --- prompt fission
-        self.Fp = bmat([[self.operators.Fp, A1], [A1.T, A2]])
-        # --- delayed fission
-        Fd1 = self.operators.Fd.tocsr()
-        tmp = copy(A3)
-        # loop over each group
-        for g in range(0, nE):
-            skip = (Ne*nS+No*(nS-1))*g
-            tmp[:, skip:nS+skip] = Fd1[:, nS*g:nS*(g+1)]
-
-        self.Fd = bmat([[A4, A3.T], [tmp.copy(), A2]])
-        # --- scattering
-        self.S = bmat([[self.operators.S, A1], [A1.T, A2]])
-        # --- removal
-        tmp1, tmp2 = hstack([self.operators.R, A1]), hstack([A1.T, A2])
-        self.R = vstack(([tmp1.copy(), tmp2.copy()]))
-        # --- total fission
-        tmp1, tmp2 = hstack([self.operators.F0, A1]), hstack([A1.T, A2])
-        self.F0 = vstack(([tmp1.copy(), tmp2.copy()]))
-        # --- total scattering
-        tmp1, tmp2 = hstack([self.operators.S0, A1]), hstack([A1.T, A2])
-        self.S0 = vstack(([tmp1.copy(), tmp2.copy()]))
-        # --- capture
-        tmp1, tmp2 = hstack([self.operators.C, A1]), hstack([A1.T, A2])
-        self.C = vstack(([tmp1.copy(), tmp2.copy()]))
-
-        # --- leakage
-        self.L = bmat([[self.operators.L, A1], [A1.T, A2]])
-
-        # --- emission
-        tmp = copy(A1)
-        # loop over each group
-        for gro in range(0, nE):
-            skip = (No*(nS-1)+Ne*nS)*gro
-            tmp[skip:nS+skip, :] = self.operatorsPrec.E[nS*gro:nS*(gro+1), :]
-
-        self.E = bmat([[A4, tmp.copy()], [A3, A2]])
-        # --- decay
-        self.D = block_diag(([A4, self.operatorsPrec.D]))
+        self.nF = self.geometry.NPF
+        NPEoperators = npe(self.geometry, self.model, N=self.nA, fmt='csc')
+        T, F0, S0, C, Fd, Fp, S, E, D, L = couple2NPE(self.operators,
+                                                      NPEoperators, self.nF,
+                                                      self.model)
 
         # define alpha delayed eigenproblem operators
         if self.nev == 0 or self.BC is False:  # omega infinite S+Fp+Fd+E-(R+D)
             # no leakage, inf medium
-            self.A = self.S+self.Fp+self.Fd+self.E-self.C-self.F0-self.S0 \
-                    -self.D
+            self.A = S+Fp+Fd+E-C-F0-S0-D
             self.nev = 1
-
         else:
-            self.A = self.S+self.Fp+self.Fd+self.E-self.C-self.F0-self.S0 \
-                    -self.D-self.L
+            self.A = S+Fp+Fd+E-C-F0-S0-D-L
 
-        if generalised is False:
+        if generalised:
+            self.B = T
+        else:
             self.B = None
             invT = inv(T)
             self.A = invT.dot(self.A)
-        else:
-            self.B = T
+
         self.which = 'omega'
         self.whichspectrum = 'TR'
         self.sigma = 0
