@@ -10,13 +10,13 @@ from TEST.methods.space import FD, FV
 from scipy.sparse import diags, block_diag, bmat, vstack
 
 
-def removal(obj, xs, fmt='csc'):
+def removal(ge, xs, fmt='csc'):
     """
     Assemble spherical harmonics approximation for time/rem/capt/... operator.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     N : int
         Spherical harmonics approximation order.
@@ -26,10 +26,10 @@ def removal(obj, xs, fmt='csc'):
     None.
 
     """
-    N = obj.nA
+    N = ge.nA
     if N < 0:
         raise OSError('Cannot build P_{}'.format(N))
-    model = obj.spatial_scheme
+    model = ge.spatial_scheme
     M = []
     appM = M.append
 
@@ -41,9 +41,9 @@ def removal(obj, xs, fmt='csc'):
             meshtype = 'centers'  # evaluate on staggered mesh if odd
 
         if model == 'FD':
-            r = FD.zero(obj, xs, meshtype)
+            r = FD.zero(ge, xs, meshtype)
         elif model == 'FV':
-            r = FV.zero(obj, xs, meshtype)
+            r = FV.zero(ge, xs, meshtype)
         else:
             raise OSError('%s model not available for spatial variable!' % model)
 
@@ -56,13 +56,13 @@ def removal(obj, xs, fmt='csc'):
     return M
 
 
-def leakage(obj, fmt='csc'):
+def leakage(ge, fmt='csc'):
     """
     Assemble spherical harmonics approximation leakage operator.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     N : int
         Spherical harmonics approximation order.
@@ -72,10 +72,10 @@ def leakage(obj, fmt='csc'):
     None.
 
     """
-    N = obj.nA
+    N = ge.nA
     if N < 0:
         raise OSError('Cannot build P_{}'.format(N))
-    model = obj.spatial_scheme
+    model = ge.spatial_scheme
     M = []
     appM = M.append
 
@@ -96,11 +96,12 @@ def leakage(obj, fmt='csc'):
         if coeffs[0] == 0:  # 0-th order moment
 
             if model == 'FD':
-                u1, u2 = FD.first(obj, coeffs[1], meshtype)
+                u1, u2 = FD.first(ge, coeffs[1], meshtype)
                 n = u2.shape[0]
-                upp = [u1[1:], u2]
+                u1 = u1[1:]
+                upp = [u1, u2]
             elif model == 'FV':
-                upp = FV.first(obj, coeffs[1], meshtype)
+                upp = FV.first(ge, coeffs[1], meshtype)
                 m, n = upp.shape
             else:
                 raise OSError('%s model not available for spatial variable!' % model)
@@ -112,9 +113,9 @@ def leakage(obj, fmt='csc'):
         elif coeffs[1] == 0:  # (N+1)-th order moment
 
             if model == 'FD':
-                low = FD.first(obj, coeffs[0], meshtype)
+                low = FD.first(ge, coeffs[0], meshtype)
             elif model == 'FV':
-                low = FV.first(obj, coeffs[0], meshtype)
+                low = FV.first(ge, coeffs[0], meshtype)
             else:
                 raise OSError('%s model not available for spatial variable!' % model)
 
@@ -133,11 +134,11 @@ def leakage(obj, fmt='csc'):
         else:
 
             if model == 'FD':
-                upp = FD.first(obj, coeffs[1], meshtype)
-                low = FD.first(obj, coeffs[0], meshtype)
+                upp = FD.first(ge, coeffs[1], meshtype)
+                low = FD.first(ge, coeffs[0], meshtype)
             elif model == 'FV':
-                upp = FV.first(obj, coeffs[1], meshtype)
-                low = FV.first(obj, coeffs[0], meshtype)
+                upp = FV.first(ge, coeffs[1], meshtype)
+                low = FV.first(ge, coeffs[0], meshtype)
             else:
                 raise OSError('%s model not available for spatial variable!' % model)
 
@@ -152,8 +153,10 @@ def leakage(obj, fmt='csc'):
                 pos = np.array([-1, 0])
                 u1, u2 = upp
                 l1, l2 = low
-                upp = [u1[1:], u2]
-                low = [l1[1:], l2]
+                u1 = u1[1:]
+                l1 = l1[1:]
+                upp = [u1, u2]
+                low = [l1, l2]
                 UP = diags(upp, pos, (n, n-1), format=fmt)
                 LO = diags(low, pos, (m, m-1), format=fmt)
 
@@ -175,13 +178,13 @@ def leakage(obj, fmt='csc'):
     return M
 
 
-def scattering(obj, sm, fmt='csc'):
+def scattering(ge, sm, fmt='csc'):
     """
     Assemble multi-group scattering operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     N : int
         Spherical harmonics approximation order.
@@ -196,10 +199,10 @@ def scattering(obj, sm, fmt='csc'):
     None.
 
     """
-    N = obj.nA
+    N = ge.nA
     if N < 0:
         raise OSError('Cannot build P_{}'.format(N))
-    model = obj.spatial_scheme
+    model = ge.spatial_scheme
     L = sm.shape[1]
     M = []
     appM = M.append
@@ -212,14 +215,14 @@ def scattering(obj, sm, fmt='csc'):
             meshtype = 'centers'  # evaluate on standard mesh if even
 
         if moment >= L:
-            xs = np.zeros((obj.nLayers,))
+            xs = np.zeros((ge.nLayers,))
         else:
             xs = sm[:, moment]
 
         if model == 'FD':
-            s = FD.zero(obj, xs, meshtype)
+            s = FD.zero(ge, xs, meshtype)
         elif model == 'FV':
-            s = FV.zero(obj, xs, meshtype)
+            s = FV.zero(ge, xs, meshtype)
         else:
             raise OSError('%s model not available for spatial variable!' % model)
 
@@ -231,13 +234,13 @@ def scattering(obj, sm, fmt='csc'):
     return M
 
 
-def fission(obj, xs, fmt='csc'):
+def fission(ge, xs, fmt='csc'):
     """
     Assemble multi-group total fission operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     N : int
         Spherical harmonics approximation order.
@@ -247,10 +250,10 @@ def fission(obj, xs, fmt='csc'):
     None.
 
     """
-    N = obj.nA
+    N = ge.nA
     if N < 0:
         raise OSError('Cannot build P_{}'.format(N))
-    model = obj.spatial_scheme
+    model = ge.spatial_scheme
     M = []
     appM = M.append
 
@@ -262,9 +265,9 @@ def fission(obj, xs, fmt='csc'):
             meshtype = 'centers'
 
         if model == 'FD':
-            f = FD.zero(obj, xs, meshtype)
+            f = FD.zero(ge, xs, meshtype)
         elif model == 'FV':
-            f = FV.zero(obj, xs, meshtype)
+            f = FV.zero(ge, xs, meshtype)
         else:
             raise OSError('%s model not available for spatial variable!' % model)
 
@@ -279,13 +282,13 @@ def fission(obj, xs, fmt='csc'):
     return M
 
 
-def delfission(obj, beta, xs, fmt='csc'):
+def delfission(ge, beta, xs, fmt='csc'):
     """
     Assemble multi-group delayed fission operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     N : int
         Spherical harmonics approximation order.
@@ -295,7 +298,7 @@ def delfission(obj, beta, xs, fmt='csc'):
     None.
 
     """
-    model = obj.spatial_scheme
+    model = ge.spatial_scheme
     NPF = beta.shape[0]
     MPF = []
     MPFapp = MPF.append
@@ -305,9 +308,9 @@ def delfission(obj, beta, xs, fmt='csc'):
         meshtype = 'edges'
 
         if model == 'FD':
-            f = FD.zero(obj, beta[family, :]*xs, meshtype)
+            f = FD.zero(ge, beta[family, :]*xs[family, :], meshtype)
         elif model == 'FV':
-            f = FV.zero(obj, beta[family, :]*xs, meshtype)
+            f = FV.zero(ge, beta[family, :]*xs[family, :], meshtype)
         else:
             raise OSError('%s model not available for spatial variable!' % model)
 
@@ -317,3 +320,85 @@ def delfission(obj, beta, xs, fmt='csc'):
 
     MPF = vstack((MPF))
     return MPF
+
+
+def ptime(ge, fmt='csc'):
+    """
+    Assemble precursors time operator.
+
+    Parameters
+    ----------
+    ge : object
+        Geometry object.
+
+    Returns
+    -------
+    None.
+
+    """
+    M = []
+    Mapp = M.append
+    xs = np.ones((1, ge.nLayers))
+    for family in range(ge.NPF):  # precursor family
+        e = FD.zero(ge, xs, 'edges')
+        if family == 0:
+            m = e.shape[1]
+            n = m
+        # move along columns
+        Mapp(diags(e, [0], (m, n), format=fmt))
+
+    # move along columns
+    return M
+
+
+def emission(ge, fmt='csc'):
+    """
+    Assemble precursors emission operator.
+
+    Parameters
+    ----------
+    ge : object
+        Geometry object.
+
+    Returns
+    -------
+    None.
+
+    """
+    M = []
+    Mapp = M.append
+    lambdas = ge.getxs('lambda')
+    for family in range(ge.NPF):  # precursor family
+        e = FD.zero(ge, lambdas[family, :], 'edges')
+        if family == 0:
+            m = e.shape[1]
+            n = m
+        # move along columns
+        Mapp(diags(e, [0], (m, n), format=fmt))
+    return M
+
+def decay(ge, fmt='csc'):
+    """
+    Assemble precursors emission operator.
+
+    Parameters
+    ----------
+    ge : object
+        Geometry object.
+
+    Returns
+    -------
+    None.
+
+    """
+    M = []
+    Mapp = M.append
+    lambdas = ge.getxs('lambda')
+    for family in range(ge.NPF):  # precursor family
+        e = FD.zero(ge, lambdas[family, :], 'edges')
+        if family == 0:
+            m = e.shape[1]
+            n = m
+        # move along columns
+        Mapp(diags(e, [0], (m, n), format=fmt))
+    return M
