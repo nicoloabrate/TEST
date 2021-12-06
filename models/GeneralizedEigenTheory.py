@@ -26,7 +26,7 @@ from matplotlib.pyplot import spy
 
 class GET():
 
-    def __init__(self, nte, which, geom, nev=1, setPhaseSpace=None, group=None):
+    def __init__(self, nte, which, ge, nev=1, setPhaseSpace=None, group=None):
 
         # --- problem settings
         self.nS = nte.nS
@@ -36,7 +36,7 @@ class GET():
         self.problem = which
         self.model = nte.model
         self.operators = nte
-        self.geometry = geom
+        self.geometry = ge
 
         if 2*nev+1 >= self.operators.S.shape[0]:
             raise OSError('Too many eigenvalues required! 2*nev+1 should be < rank(operator)')
@@ -46,9 +46,9 @@ class GET():
         # --- define new operators
         self.LHS = deepcopy(self.operators)
         if setPhaseSpace is not None:
-            voidgeom = deepcopy(geom)
+            voidgeom = deepcopy(ge)
             isnewmaterial = True
-            for reg in geom.regions.keys():
+            for reg in ge.regions.keys():
                 if reg not in setPhaseSpace['which']:  # set region to void
                     voidgeom.regions[reg].void()
                 else:  # set to void except in specified region/channel/group

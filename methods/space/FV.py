@@ -8,13 +8,13 @@ Description: Finite Volumes scheme for spatial derivates.
 import numpy as np
 
 
-def zero(obj, f, meshtype='edges'):
+def zero(ge, f, meshtype='edges'):
     """
     Evaluate a function on cell center.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     f : list[float]
         List of coefficient fues.
@@ -27,16 +27,16 @@ def zero(obj, f, meshtype='edges'):
         1-D array with function/constant efuated over the mesh.
 
     """
-    dicob = obj.__dict__
+    dicob = ge.__dict__
     N = len(dicob[meshtype])
     fx = np.zeros((1, N))
     q = 0
-    NL = obj.nLayers
+    NL = ge.nLayers
     if isinstance(f, (int, float, np.float)):
         f = [f]*NL
     for i in range(0, NL):
         pts = dicob[meshtype][q::]
-        bord = obj.layers[i+1]
+        bord = ge.layers[i+1]
         inner_pts = np.where(pts <= bord)[0]+q*(i > 0)
         q = q+len(inner_pts)
         fx[0, inner_pts[0]:inner_pts[-1]+1] = f[i]*np.ones((1, len(inner_pts)))
@@ -44,13 +44,13 @@ def zero(obj, f, meshtype='edges'):
     return fx
 
 
-def first(obj, f, meshtype='edges', stag=True):
+def first(ge, f, meshtype='edges', stag=True):
     """
     Evaluate first-order derivatives on cell centers.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     f : list[float]
         List of coefficient fues.
@@ -67,11 +67,11 @@ def first(obj, f, meshtype='edges', stag=True):
         N-D array approximating a first-order derivative in space.
 
     """
-    dicob = obj.__dict__
+    dicob = ge.__dict__
     N = len(dicob[meshtype])
     dfdx = np.zeros((2, N))
     q = 0
-    NL = obj.nLayers
+    NL = ge.nLayers
     mesh = dicob[meshtype]
     # ensure dimension consistency
     f = [f]*NL if isinstance(f, (int, float)) else f
@@ -79,15 +79,15 @@ def first(obj, f, meshtype='edges', stag=True):
 
     for i in range(0, NL):
         pts = mesh[q::]
-        dx = obj.dx
-        bord = obj.layers[i+1]
+        dx = ge.dx
+        bord = ge.layers[i+1]
         inner_pts = np.where(pts <= bord)[0]+q*(i > 0)
         P = len(inner_pts)
         q = q+P
 
         dfdx[0, inner_pts[0]:inner_pts[-1]+1] = -f[i]/(m*dx[i])*np.ones((P, 1)).ravel()
         # at the boundaries both right and left dxs are needed
-        if NL > 1 and i < NL-1 and mesh[inner_pts[-1]] <= obj.layers[i+1]:
+        if NL > 1 and i < NL-1 and mesh[inner_pts[-1]] <= ge.layers[i+1]:
             dfdx[0, inner_pts[-1]] = -f[i]/(m*(dx[i]/2+dx[i+1]/2))
 
         dfdx[1, :] = -dfdx[0, :]
@@ -95,13 +95,13 @@ def first(obj, f, meshtype='edges', stag=True):
     return dfdx
 
 
-def second(obj, f, meshtype='edges'):
+def second(ge, f, meshtype='edges'):
     """
     Evaluate second-order derivatives on cell center.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     f : list[float]
         List of coefficient fues.
@@ -114,25 +114,25 @@ def second(obj, f, meshtype='edges'):
         N-D array approximating a second-order derivative in space.
 
     """
-    dicob = obj.__dict__
+    dicob = ge.__dict__
     N = len(dicob[meshtype])
-    NL = obj.nLayers
+    NL = ge.nLayers
     d2fdx2 = np.zeros((3, N))
     N_old = 0
     for i in range(0, NL):
-        dx = obj.dx[i]
-        N = int(N_old+obj.Nx[i])
+        dx = ge.dx[i]
+        N = int(N_old+ge.Nx[i])
         # upper diagonal
-        d2fdx2[0, N_old:N] = -f[i]/dx**2*np.ones((int(obj.Nx[i]), 1)).ravel()
+        d2fdx2[0, N_old:N] = -f[i]/dx**2*np.ones((int(ge.Nx[i]), 1)).ravel()
         # main diagonal
-        d2fdx2[1, N_old:N] = 2*f[i]/dx**2*np.ones((int(obj.Nx[i]), 1)).ravel()
+        d2fdx2[1, N_old:N] = 2*f[i]/dx**2*np.ones((int(ge.Nx[i]), 1)).ravel()
         # lower diagonal
-        d2fdx2[2, N_old:N] = -f[i]/dx**2*np.ones((int(obj.Nx[i]), 1)).ravel()
+        d2fdx2[2, N_old:N] = -f[i]/dx**2*np.ones((int(ge.Nx[i]), 1)).ravel()
 
         if NL > 1 and i < NL-1:
-            d2fdx2[2, N-1] = -f[i+1]/obj.dx[i+1]/(dx/2+obj.dx[i+1]/2)
-            d2fdx2[1, N-1] = (f[i]/dx+f[i+1]/obj.dx[i+1])/(dx/2+obj.dx[i+1]/2)
-            d2fdx2[0, N-1] = -f[i]/dx/(dx/2+obj.dx[i+1]/2)
+            d2fdx2[2, N-1] = -f[i+1]/ge.dx[i+1]/(dx/2+ge.dx[i+1]/2)
+            d2fdx2[1, N-1] = (f[i]/dx+f[i+1]/ge.dx[i+1])/(dx/2+ge.dx[i+1]/2)
+            d2fdx2[0, N-1] = -f[i]/dx/(dx/2+ge.dx[i+1]/2)
 
         N_old = N
     # shift sub-diagonal
