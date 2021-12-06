@@ -5,20 +5,20 @@ File: multigroup.py
 
 Description: Class for multi-energy group operators.
 """
-from numpy import newaxis, asarray
-from scipy.sparse import block_diag, bmat
+from numpy import newaxis, asarray, ones
+from scipy.sparse import block_diag, bmat, hstack
 from TEST.methods.angle import Diffusion
 from TEST.methods.angle.discreteordinates import SN
 from TEST.methods.angle.sphericalharmonics import PN
 
 
-def time(obj, model, fmt='csc'):
+def time(ge, model, fmt='csc'):
     """
     Assemble multi-group time operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     meshtype : string, optional
         Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
@@ -31,16 +31,16 @@ def time(obj, model, fmt='csc'):
     """
     TMG = []
     TMGapp = TMG.append
-    invv = obj.getxs('Invv')
+    invv = ge.getxs('Invv')
 
-    for gro in range(obj.nE):
+    for gro in range(ge.nE):
 
         if model == 'PN':
-            TMGapp(PN.removal(obj, invv[gro, :], fmt=fmt))
+            TMGapp(PN.removal(ge, invv[gro, :], fmt=fmt))
         elif model == 'SN':
-            TMGapp(SN.removal(obj, invv[gro, :], fmt=fmt))
+            TMGapp(SN.removal(ge, invv[gro, :], fmt=fmt))
         elif model == 'Diffusion':
-            TMGapp(PN.removal(obj, invv[gro, :], fmt=fmt))
+            TMGapp(PN.removal(ge, invv[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available for angular variable!' % model)
 
@@ -48,13 +48,13 @@ def time(obj, model, fmt='csc'):
     return TMG
 
 
-def removal(obj, model, fmt='csc'):
+def removal(ge, model, fmt='csc'):
     """
     Assemble multi-group removal operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     meshtype : string, optional
         Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
@@ -67,16 +67,16 @@ def removal(obj, model, fmt='csc'):
     """
     RMG = []
     RMGapp = RMG.append
-    totxs = obj.getxs('Tot')   # if model != 'Diffusion' else obj.getxs('Abs')
+    totxs = ge.getxs('Tot')   # if model != 'Diffusion' else ge.getxs('Abs')
 
-    for gro in range(obj.nE):
+    for gro in range(ge.nE):
 
         if model == 'PN':
-            RMGapp(PN.removal(obj, totxs[gro, :], fmt=fmt))
+            RMGapp(PN.removal(ge, totxs[gro, :], fmt=fmt))
         elif model == 'SN':
-            RMGapp(SN.removal(obj, totxs[gro, :], fmt=fmt))
+            RMGapp(SN.removal(ge, totxs[gro, :], fmt=fmt))
         elif model == 'Diffusion':
-            RMGapp(PN.removal(obj, totxs[gro, :], fmt=fmt))
+            RMGapp(PN.removal(ge, totxs[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available!' % model)
 
@@ -84,13 +84,13 @@ def removal(obj, model, fmt='csc'):
     return RMG
 
 
-def capture(obj, model, fmt='csc'):
+def capture(ge, model, fmt='csc'):
     """
     Assemble multi-group capture operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     meshtype : string, optional
         Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
@@ -103,16 +103,16 @@ def capture(obj, model, fmt='csc'):
     """
     CMG = []
     CMGapp = CMG.append
-    captxs = obj.getxs('Capt')   # if model != 'Diffusion' else obj.getxs('Abs')
+    captxs = ge.getxs('Capt')   # if model != 'Diffusion' else ge.getxs('Abs')
 
-    for gro in range(obj.nE):
+    for gro in range(ge.nE):
 
         if model == 'PN':
-            CMGapp(PN.removal(obj, captxs[gro, :], fmt=fmt))
+            CMGapp(PN.removal(ge, captxs[gro, :], fmt=fmt))
         elif model == 'SN':
-            CMGapp(SN.removal(obj, captxs[gro, :], fmt=fmt))
+            CMGapp(SN.removal(ge, captxs[gro, :], fmt=fmt))
         elif model == 'Diffusion':
-            CMGapp(PN.removal(obj, captxs[gro, :], fmt=fmt))
+            CMGapp(PN.removal(ge, captxs[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available!' % model)
 
@@ -120,13 +120,13 @@ def capture(obj, model, fmt='csc'):
     return CMG
 
 
-def fission(obj, model, fmt='csc'):
+def fission(ge, model, fmt='csc'):
     """
     Assemble multi-group fission operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     meshtype : string, optional
         Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
@@ -139,16 +139,16 @@ def fission(obj, model, fmt='csc'):
     """
     FMG = []
     FMGapp = FMG.append
-    fissxs = obj.getxs('Fiss')   # if model != 'Diffusion' else obj.getxs('Abs')
+    fissxs = ge.getxs('Fiss')   # if model != 'Diffusion' else ge.getxs('Abs')
 
-    for gro in range(obj.nE):
+    for gro in range(ge.nE):
 
         if model == 'PN':
-            FMGapp(PN.removal(obj, fissxs[gro, :], fmt=fmt))
+            FMGapp(PN.removal(ge, fissxs[gro, :], fmt=fmt))
         elif model == 'SN':
-            FMGapp(SN.removal(obj, fissxs[gro, :], fmt=fmt))
+            FMGapp(SN.removal(ge, fissxs[gro, :], fmt=fmt))
         elif model == 'Diffusion':
-            FMGapp(PN.removal(obj, fissxs[gro, :], fmt=fmt))
+            FMGapp(PN.removal(ge, fissxs[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available!' % model)
 
@@ -156,13 +156,13 @@ def fission(obj, model, fmt='csc'):
     return FMG
 
 
-def scatteringTot(obj, model, fmt='csc'):
+def scatteringTot(ge, model, fmt='csc'):
     """
     Assemble multi-group total scattering operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     meshtype : string, optional
         Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
@@ -175,16 +175,16 @@ def scatteringTot(obj, model, fmt='csc'):
     """
     SMG = []
     SMGapp = SMG.append
-    scatxs = obj.getxs('S0').sum(axis=0)
+    scatxs = ge.getxs('S0').sum(axis=0)
 
-    for gro in range(obj.nE):
+    for gro in range(ge.nE):
 
         if model == 'PN':
-            SMGapp(PN.removal(obj, scatxs[gro, :], fmt=fmt))
+            SMGapp(PN.removal(ge, scatxs[gro, :], fmt=fmt))
         elif model == 'SN':
-            SMGapp(SN.removal(obj, scatxs[gro, :], fmt=fmt))
+            SMGapp(SN.removal(ge, scatxs[gro, :], fmt=fmt))
         elif model == 'Diffusion':
-            SMGapp(PN.removal(obj, scatxs[gro, :], fmt=fmt))
+            SMGapp(PN.removal(ge, scatxs[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available!' % model)
 
@@ -192,13 +192,13 @@ def scatteringTot(obj, model, fmt='csc'):
     return SMG
 
 
-def leakage(obj, model, fmt='csc'):
+def leakage(ge, model, fmt='csc'):
     """
     Assemble multi-group leakage operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     meshtype : string, optional
         Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
@@ -210,20 +210,20 @@ def leakage(obj, model, fmt='csc'):
     """
     LMG = []
     LMGapp = LMG.append
-    for gro in range(obj.nE):
+    for gro in range(ge.nE):
 
         if model == 'PN':
-            LMGapp(PN.leakage(obj, fmt=fmt))
+            LMGapp(PN.leakage(ge, fmt=fmt))
         elif model == 'SN':
-            LMGapp(SN.leakage(obj, fmt=fmt))
+            LMGapp(SN.leakage(ge, fmt=fmt))
         elif model == 'Diffusion':
             # diffusion coefficient is needed
             try:
-                dfc = obj.getxs('Diffcoef')
+                dfc = ge.getxs('Diffcoef')
             except KeyError:
-                dfc = 1/(3*obj.getxs('Tot'))
+                dfc = 1/(3*ge.getxs('Tot'))
             # build leakage operator
-            LMGapp(Diffusion.leakage(obj, dfc[gro, :], fmt=fmt))
+            LMGapp(Diffusion.leakage(ge, dfc[gro, :], fmt=fmt))
         else:
             raise OSError('%s model not available!' % model)
 
@@ -232,13 +232,13 @@ def leakage(obj, model, fmt='csc'):
     return LMG
 
 
-def scattering(obj, model, prod=True, fmt='csc', adjoint=False):
+def scattering(ge, model, prod=True, fmt='csc', adjoint=False):
     """
     Assemble multi-group scattering operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     N : int
         Scattering Legendre moment.
@@ -256,22 +256,22 @@ def scattering(obj, model, prod=True, fmt='csc', adjoint=False):
     SMG = []
     SMGapp = SMG.append
     key = 'Sp' if prod is True else 'S'
-    sm = obj.getxs('%s' % key)
+    sm = ge.getxs('%s' % key)
 
-    for dep_gro in range(obj.nE):  # departure group
+    for dep_gro in range(ge.nE):  # departure group
 
         M = []
         Mapp = M.append
 
-        for arr_gro in range(obj.nE):  # arrival group
+        for arr_gro in range(ge.nE):  # arrival group
 
             if model == 'PN':
-                Mapp(PN.scattering(obj, sm[dep_gro, arr_gro, :, :], fmt=fmt))
+                Mapp(PN.scattering(ge, sm[dep_gro, arr_gro, :, :], fmt=fmt))
             elif model == 'SN':
-                Mapp(SN.scattering(obj, sm[dep_gro, arr_gro, :, :], fmt=fmt))
+                Mapp(SN.scattering(ge, sm[dep_gro, arr_gro, :, :], fmt=fmt))
             elif model == 'Diffusion':
                 # only isotropic scattering is handled
-                Mapp(PN.scattering(obj, sm[dep_gro, arr_gro, :, 0, newaxis],
+                Mapp(PN.scattering(ge, sm[dep_gro, arr_gro, :, 0, newaxis],
                                    fmt=fmt))
             else:
                 raise OSError('%s model not available!' % model)
@@ -287,13 +287,13 @@ def scattering(obj, model, prod=True, fmt='csc', adjoint=False):
     return SMG
 
 
-def fissionprod(obj, model, fmt='csc', adjoint=False):
+def fissionprod(ge, model, fmt='csc', adjoint=False):
     """
     Assemble multi-group total fission operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     meshtype : string, optional
         Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
@@ -306,23 +306,23 @@ def fissionprod(obj, model, fmt='csc', adjoint=False):
     """
     FMG = []
     FMGapp = FMG.append
-    fxs = obj.getxs('Fiss')
-    nub = obj.getxs('Nubar')
-    chi = obj.getxs('Chit')
-    for emi_gro in range(obj.nE):  # emission
+    fxs = ge.getxs('Fiss')
+    nub = ge.getxs('Nubar')
+    chi = ge.getxs('Chit')
+    for emi_gro in range(ge.nE):  # emission
 
         M = []
         Mapp = M.append
 
-        for dep_gro in range(obj.nE):  # departure
+        for dep_gro in range(ge.nE):  # departure
 
             chinusf = chi[emi_gro, :]*nub[dep_gro, :]*fxs[dep_gro, :]
             if model == 'PN':
-                Mapp(PN.fission(obj, chinusf, fmt=fmt))
+                Mapp(PN.fission(ge, chinusf, fmt=fmt))
             elif model == 'SN':
-                Mapp(SN.fission(obj, chinusf, fmt=fmt))
+                Mapp(SN.fission(ge, chinusf, fmt=fmt))
             elif model == 'Diffusion':
-                Mapp(PN.fission(obj, chinusf, fmt=fmt))
+                Mapp(PN.fission(ge, chinusf, fmt=fmt))
             else:
                 raise OSError('%s model not available!' % model)
 
@@ -337,13 +337,13 @@ def fissionprod(obj, model, fmt='csc', adjoint=False):
     return FMG
 
 
-def promptfiss(obj, model, fmt='csc', adjoint=False):
+def promptfiss(ge, model, fmt='csc', adjoint=False):
     """
     Assemble multi-group prompt fission operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     meshtype : string, optional
         Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
@@ -356,26 +356,26 @@ def promptfiss(obj, model, fmt='csc', adjoint=False):
     """
     PMG = []
     PMGapp = PMG.append
-    fxs = obj.getxs('Fiss')
-    nub = obj.getxs('Nubar')
-    chi = obj.getxs('Chip')
-    beta = obj.getxs('beta')
+    fxs = ge.getxs('Fiss')
+    nub = ge.getxs('Nubar')
+    chi = ge.getxs('Chip')
+    beta = ge.getxs('beta')
 
 
-    for emi_gro in range(obj.nE):  # emission
+    for emi_gro in range(ge.nE):  # emission
 
         M = []
         Mapp = M.append
 
-        for dep_gro in range(obj.nE):  # departure
+        for dep_gro in range(ge.nE):  # departure
 
             chinusf = chi[emi_gro, :]*nub[dep_gro, :]*fxs[dep_gro, :]
             if model == 'PN':
-                Mapp(PN.fission(obj, (1-sum(beta))*chinusf, fmt=fmt))
+                Mapp(PN.fission(ge, (1-sum(beta))*chinusf, fmt=fmt))
             elif model == 'SN':
-                Mapp(SN.fission(obj, (1-sum(beta))*chinusf, fmt=fmt))
+                Mapp(SN.fission(ge, (1-sum(beta))*chinusf, fmt=fmt))
             elif model == 'Diffusion':
-                Mapp(PN.fission(obj, (1-sum(beta))*chinusf, fmt=fmt))
+                Mapp(PN.fission(ge, (1-sum(beta))*chinusf, fmt=fmt))
             else:
                 raise OSError('%s model not available!' % model)
 
@@ -390,13 +390,13 @@ def promptfiss(obj, model, fmt='csc', adjoint=False):
     return PMG
 
 
-def delfiss(obj, model, fmt='csc'):
+def delfiss(ge, model, fmt='csc'):
     """
     Assemble multi-group delayed fission operator sub-matrix.
 
     Parameters
     ----------
-    obj : object
+    ge : object
         Geometry object.
     meshtype : string, optional
         Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
@@ -407,28 +407,27 @@ def delfiss(obj, model, fmt='csc'):
     None.
 
     """
-    fxs = obj.getxs('Fiss')
-    nub = obj.getxs('Nubar')
-    chi = obj.getxs('Chid')
-    beta = obj.getxs('beta')
+    fxs = ge.getxs('Fiss')
+    nub = ge.getxs('Nubar')
+    chi = ge.getxs('Chid')
+    beta = ge.getxs('beta')
 
     MG = []
     MGapp = MG.append
 
-    for emi_gro in range(obj.nE):  # emission
+    for emi_gro in range(ge.nE):  # emission
 
         M = []
         Mapp = M.append
 
-        for dep_gro in range(obj.nE):  # departure
-            # /2 for fission isotropic emission
-            chinusf = chi[emi_gro, :]*nub[dep_gro, :]*fxs[dep_gro, :]/2
+        for dep_gro in range(ge.nE):  # departure
+            chinusf = chi[emi_gro, :]*nub[dep_gro, :]*fxs[dep_gro, :]
             if model == 'PN':
-                Mapp(PN.delfission(obj, beta, chinusf, fmt=fmt))
+                Mapp(PN.delfission(ge, beta, chinusf, fmt=fmt))
             elif model == 'SN':
-                Mapp(SN.delfission(obj, beta, chinusf, fmt=fmt))
+                Mapp(SN.delfission(ge, beta, chinusf, fmt=fmt))
             elif model == 'Diffusion':
-                Mapp(PN.delfission(obj, beta, chinusf, fmt=fmt))
+                Mapp(PN.delfission(ge, beta, chinusf, fmt=fmt))
             else:
                 raise OSError('%s model not available!' % model)
 
@@ -438,3 +437,105 @@ def delfiss(obj, model, fmt='csc'):
     MG = bmat((MG), format=fmt)
 
     return MG
+
+
+def ptime(ge, model, fmt):
+    """
+    Define precursors balance time operator.
+
+    Parameters
+    ----------
+    ge : object
+        Geometry object.
+
+    Returns
+    -------
+    None.
+
+    """
+    APF = []
+    APFapp = APF.append
+
+    for g in range(ge.nE):  # emission group
+
+        if model == 'PN':
+            M = PN.ptime(ge, fmt=fmt)
+        elif model == 'SN':
+            M = SN.ptime(ge, fmt=fmt)
+        elif model == 'Diffusion':
+            M = PN.ptime(ge, fmt=fmt)
+        else:
+            raise OSError('%s model not available!' % model)
+
+        # move along rows
+        APFapp(block_diag((M), format=fmt))
+
+    APF = block_diag((APF), format=fmt)
+    return APF
+
+
+def emission(ge, model, fmt):
+    """
+    Define precursors balance emission operator (in neutron transport eq).
+
+    Parameters
+    ----------
+    ge : object
+        Geometry object.
+
+    Returns
+    -------
+    None.
+
+    """
+    APF = []
+    APFapp = APF.append
+
+    for g in range(ge.nE):  # emission group
+
+        if model == 'PN':
+            M = PN.emission(ge, fmt=fmt)
+        elif model == 'SN':
+            M = SN.emission(ge, fmt=fmt)
+        elif model == 'Diffusion':
+            M = PN.emission(ge, fmt=fmt)
+        else:
+            raise OSError('%s model not available!' % model)
+
+        # move along rows
+        APFapp(hstack((M), format=fmt))
+
+    APF = block_diag((APF), format=fmt)
+    return APF
+
+
+def decay(ge, model, fmt):
+    """
+    Define precursors balance time decay operator.
+
+    Parameters
+    ----------
+    ge : object
+        Geometry object.
+
+    Returns
+    -------
+    None.
+
+    """
+    APF = []
+    APFapp = APF.append
+    for g in range(ge.nE):  # emission group
+        if model == 'PN':
+            M = PN.decay(ge, fmt=fmt)
+        elif model == 'SN':
+            M = SN.decay(ge, fmt=fmt)
+        elif model == 'Diffusion':
+            M = PN.decay(ge, fmt=fmt)
+        else:
+            raise OSError('%s model not available!' % model)
+        # move along rows
+        APFapp(block_diag((M), format=fmt))
+
+    APF = block_diag((APF), format=fmt)
+    return APF
