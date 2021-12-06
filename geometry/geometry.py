@@ -233,9 +233,9 @@ class Slab:
                 N[iLay] = N[iLay]-1
                 grid = np.unique(grid)
 
-        if np.any(grid) or np.any(gridg):
-            grid[grid == 0] = np.finfo(float).eps
-            gridg[gridg == 0] = np.finfo(float).eps
+        # if np.any(grid) or np.any(gridg):
+        #     grid[grid == 0] = np.finfo(float).eps
+        #     gridg[gridg == 0] = np.finfo(float).eps
 
         self.Nx = N
         self.dx = dx
@@ -536,7 +536,7 @@ class Slab:
     def computeQW(self):
         """
         Compute the set of quadrature weights and normalisation coefficients
-        needed for the PN approximation.
+        needed for the SN approximation.
 
         Returns
         -------
