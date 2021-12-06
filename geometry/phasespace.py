@@ -11,7 +11,7 @@ from matplotlib.colors import LogNorm
 from matplotlib import rc, rcParams, checkdep_usetex, ticker
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib.patches import ConnectionPatch
-from scipy.special import eval_legendre
+from scipy.special import roots_legendre, eval_legendre
 import TEST.methods.space.FD as FD
 import TEST.methods.space.FV as FV
 import TEST.utils.h5 as myh5
@@ -103,7 +103,7 @@ class PhaseSpace:
                         if idx != 0:
                             self.eigvect[:,[0, idx]] = self.eigvect[:,[idx, 0]]
                             self.eigvals[[0, idx]] = self.eigvals[[idx, 0]]
-                    except OSError as ierr:
+                    except OSError:
                         pass
 
                     if normalize is True:
@@ -279,10 +279,6 @@ class PhaseSpace:
 
         """
         G = self.geometry.nE
-        if self.geometry.nA > 0:
-            msg = ("Phase space interpolation cannot be applied yet"
-                   " to transport solutions!")
-            raise OSError(msg)
 
         if isref is True:
             x = self.geometry.mesh
@@ -545,7 +541,7 @@ class PhaseSpace:
                      timelimit=None, delayed=False,
                      ax=None, grid=True, colormap=False,
                      ylims=None, xlims=None, threshold=None, subplt=False,
-                     fundmark="*", fundcol="blue", markerfull=True, 
+                     fundmark="*", fundcol="blue", markerfull=True,
                      label=None, figname=None, **kwargs):
         """
         Plot operator spectrum (i.e. all eigenvalues).
@@ -671,7 +667,7 @@ class PhaseSpace:
             kwargs.update(facecolors=fundcol)
 
         if gaussplane:
-            sub1.scatter(show*val.real, show*val.imag, **kwargs)            
+            sub1.scatter(show*val.real, show*val.imag, **kwargs)
         else:
             sub1.scatter(0, show*val, **kwargs)
 
@@ -759,7 +755,7 @@ class PhaseSpace:
             cbar = plt.colorbar(h1, label='eigenvalue magnitude')
             cbar.formatter = ticker.LogFormatterMathtext(base=10)
             cbar.update_ticks()
-            
+
         if subplt is True:
             minl, maxl = min(-lambdas[:, 0]), max(-lambdas[:, 0])
             miny, maxy = min(self.eigvals.imag), max(self.eigvals.imag)
@@ -874,28 +870,33 @@ class PhaseSpace:
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
             reals = reals[reals != 0]
-            # select real eigenvalue with positive total flux
-            for i in range(len(reals)):
-                # get total flux
-                ind = np.argwhere(self.eigvals == reals[i])[0][0]
-                v = self.get(moment=0, nEv=ind)
+            if reals.size != 0:
+                # select real eigenvalue with positive total flux
+                for i in range(len(reals)):
+                    # get total flux
+                    ind = np.argwhere(self.eigvals == reals[i])[0][0]
+                    v = self.get(moment=0, nEv=ind)
+                    # fix almost zero points to avoid sign issues
+                    v[np.abs(v) < np.finfo(float).eps] = 0
+                    ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
+                    if ispos:
+                        idx = np.argwhere(self.eigvals == reals[i])[0][0]
+                        break
+
+        elif self.problem == 'omega':
+            reals = self.eigvals[self.eigvals.imag == 0]
+            if reals.size != 0:
+                fund = max(reals)
+                idx = np.where(self.eigvals == fund)[0][0]
+                v = self.get(moment=0, nEv=idx)
                 # fix almost zero points to avoid sign issues
                 v[np.abs(v) < np.finfo(float).eps] = 0
                 ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
-                if ispos:
-                    idx = np.argwhere(self.eigvals == reals[i])[0][0]
-                    break
-        elif self.problem == 'omega':
-            reals = self.eigvals[self.eigvals.imag == 0]
-            fund = max(reals)
-            idx = np.where(self.eigvals == fund)[0][0]
-            v = self.get(moment=0, nEv=idx)
-            # fix almost zero points to avoid sign issues
-            v[np.abs(v) < np.finfo(float).eps] = 0
-            ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
-            if not ispos:
-                idx = None
-                raise OSError("No fundamental eigenvalue detected!")
+                if ~ispos:
+                    idx = None
+
+        if idx is None:
+            raise OSError("No fundamental eigenvalue detected!")
 
         eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
         return eigenvalue, eigenvector
@@ -954,7 +955,7 @@ class PhaseSpace:
 
         Parameters
         ----------
-        geom : object
+        ge : object
             Geometry object.
         angle : int
             Moment/direction number.
@@ -1011,7 +1012,7 @@ class PhaseSpace:
             dim = nS if moment % 2 == 0 else nS-1
             # preallocation for group-wise moments
             gro = [group] if group else np.arange(1, self.geometry.nE+1)
-            y = np.zeros((nS * len(gro),))
+            y = np.zeros((dim*len(gro), ))
 
             for ig, g in enumerate(gro):
                 if precursors:
@@ -1032,15 +1033,25 @@ class PhaseSpace:
                 y[ig * dim: dim * (ig + 1)] = vect[iS:iE]
         else:
             # build angular flux and evaluate in angle
-            tmp = np.zeros((nS * nE))
-            for n in range(self.nA):
+            if isinstance(angle, int):
+                idx = angle
+                mu, _ = roots_legendre(self.nA+1)
+                # ensure positive and then negative directions
+                mu[::-1].sort()
+                angle = mu[idx]
+            elif isinstance(angle, float):
+                # look for closest direction
+                mu = angle
+
+            y = np.zeros((nS * nE))
+            for n in range(self.nA+1):
                 # interpolate to have consistent PN moments
-                y = vect if n % 2 == 0 else self.interp(
-                    vect, self.geometry.stag_mesh)
-                tmp = tmp + (2 * n + 1) / 2 * eval_legendre(n, angle) * y
+                mom = self.get(moment=n)
+                if n % 2 != 0:
+                    mom = self.interp(mom, self.geometry.ghostmesh)
+                y = y+(2*n+1)/2*eval_legendre(n, angle)*mom
             # get values for requested groups
-            iS, iE = (nS * (group - 1), nS * (group - 1) +
-                      nS) if group else (0, -1)
+            iS, iE = (nS*(group-1), nS*(group-1)+nS) if group else (0, -1)
             y = y[iS:iE]
         return y
 
@@ -1051,7 +1062,7 @@ class PhaseSpace:
 
         Parameters
         ----------
-        geom : object
+        ge : object
             Geometry object.
         angle : int
             Moment/direction number.
@@ -1090,10 +1101,11 @@ class PhaseSpace:
 
         gro = [group] if group else np.arange(1, self.geometry.nE + 1)
 
-        if angle:
+        if angle is not None:
 
             if isinstance(angle, int):
                 idx = angle
+                angle = mu[idx]
             elif isinstance(angle, float):
                 # look for closest direction
                 idx = np.argmin(abs(mu - angle))
