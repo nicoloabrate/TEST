@@ -6,130 +6,41 @@ File: NeutronPrecursorsEquation.py
 Description: Class that defines numerically approximated neutron precursors
              operators.
 """
-from numpy import ones
-from TEST.methods.space import FD, FV
-from scipy.sparse import diags, block_diag, vstack, hstack
-# TODO add choice between FD and FV
+from TEST.methods.energy import multigroup as MG
+from TEST.methods.BCs import DiffusionBCs, PNBCs, SNBCs
+from matplotlib.pyplot import spy
+
 
 class NPE():
 
-    def __init__(self, geom, fmt='csr'):
+    def __init__(self, ge, model, N=None, BC=True, fmt='csr'):
+        self.model = model
+        self.nS = ge.nS
+        if model == 'Diffusion':
+            self.nA = 0
+        else:
+            if N is None:
+                raise OSError('NPE: angular approx. order missing!')
+            self.nA = N
+        self.nE = ge.nE
+        self.nF = ge.NPF
+        self.geometry = ge.geometry
+        self.spatial_scheme = ge.spatial_scheme
+        # assign operators
+        self.D = MG.decay(ge, self.model, fmt=fmt)
+        self.E = MG.emission(ge, self.model, fmt=fmt)
+        self.T = MG.ptime(ge, self.model, fmt=fmt)
 
-        self.nS = geom.nS  # spatial points
-        self.nE = geom.nE  # energy groups
-        self.nF = geom.NPF  # number of families
-        self.geometry = geom.geometry
+        # if BC is True or 'zero' in ge.BC:
+        #     self.BC = ge.BC
+        #     if model == 'Diffusion':
+        #         self = DiffusionBCs.setBCs(self, ge)
+        #     elif model == 'PN':
+        #         self = PNBCs.setBCs(self, ge)
+        #     elif model == 'SN':
+        #         self = SNBCs.setBCs(self, ge)
+        # else:
+        #     self.BC = False
 
-        # --- assign operators
-        self.T = NPE.ptime(geom, fmt)  # time
-        self.D = NPE.decay(geom, fmt)  # decay
-        self.E = NPE.emission(geom, fmt)  # emission
-
-    def ptime(geom, fmt):
-        """
-        Define precursors balance time operator.
-
-        Parameters
-        ----------
-        geom : object
-            Geometry object.
-
-        Returns
-        -------
-        None.
-
-        """
-        APF = []
-        APFapp = APF.append
-
-        for g in range(0, geom.nE):  # emission group
-
-            M = []
-            Mapp = M.append
-
-            for family in range(0, geom.NPF):  # precursor family
-                e = FD.zero(geom, ones((1, geom.nLayers)), 'mesh')
-                if g == 0 and family == 0:
-                    m = e.shape[1]
-                    n = m
-                # move along columns
-                Mapp(diags(e, [0], (m, n), format=fmt))
-            # move along rows
-            APFapp(block_diag((M), format=fmt))
-
-        APF = block_diag((APF), format=fmt)
-        return APF
-
-    def emission(geom, fmt):
-        """
-        Define precursors balance emission operator (in neutron transport eq).
-
-        Parameters
-        ----------
-        geom : object
-            Geometry object.
-
-        Returns
-        -------
-        None.
-
-        """
-        APF = []
-        APFapp = APF.append
-        lambdas = geom.getxs('lambda')
-        # chid = geom.getxs('Chid')  chid[g, :]*
-
-        for g in range(0, geom.nE):  # emission group
-
-            M = []
-            Mapp = M.append
-
-            for family in range(0, geom.NPF):  # precursor family
-                # *2 for integration over all directions (emission isotropic)
-                e = FD.zero(geom, 2*lambdas[family, :], 'mesh')
-                if g == 0 and family == 0:
-                    m = e.shape[1]
-                    n = m
-                # move along columns
-                Mapp(diags(e, [0], (m, n), format=fmt))
-            # move along rows
-            APFapp(hstack((M), format=fmt))
-
-        APF = block_diag((APF), format=fmt)
-        return APF
-
-    def decay(geom, fmt):
-        """
-        Define precursors balance time decay operator.
-
-        Parameters
-        ----------
-        geom : object
-            Geometry object.
-
-        Returns
-        -------
-        None.
-
-        """
-        APF = []
-        APFapp = APF.append
-        lambdas = geom.getxs('lambda')
-
-        for g in range(0, geom.nE):  # emission group
-
-            M = []
-            Mapp = M.append
-
-            for family in range(0, geom.NPF):  # precursor family
-                e = FD.zero(geom, lambdas[family, :], 'mesh')
-                if g == 0 and family == 0:
-                    m = e.shape[1]
-                    n = m
-                # move along columns
-                Mapp(diags(e, [0], (m, n), format=fmt))
-            # move along rows
-            APFapp(block_diag((M), format=fmt))
-
-        APF = block_diag((APF), format=fmt)
-        return APF
+    def spy(self, what, markersize=2):
+        spy(self.__dict__[what], markersize=markersize)
