@@ -832,6 +832,14 @@ class PhaseSpace:
         val, vect = self.getfundamental()
         plt.polar(np.angle(val), abs(val), marker="*", color="blue")
 
+    @property
+    def fundeig(self):
+        e0, _ = self.getfundamental()
+        if self.which in ['alpha', 'omega']:
+            return f"${:.8e}"
+        else:
+            return f"${:.8f}"
+
     def getfundamental(self, lambdas=None):
         """
         Get fundamental eigenpair.
