@@ -836,9 +836,9 @@ class PhaseSpace:
     def fundeig(self):
         e0, _ = self.getfundamental()
         if self.which in ['alpha', 'omega']:
-            return f"${:.8e}"
+            return f"${e0:.8e}"
         else:
-            return f"${:.8f}"
+            return f"${e0:.8f}"
 
     def getfundamental(self, lambdas=None):
         """
