@@ -54,7 +54,10 @@ class Slab:
             self.datapath = datapath
 
             # assign layers coordinates
-            self.layers = layers
+            if (np.diff(layers) > 0).all() > 0:
+                self.layers = layers
+            else:
+                raise OSError('Slab layers must be monotonic increasing!')
             # --- assign energy grid
             if isinstance(energygrid, (list, np.ndarray, tuple)):
                 self.nE = len(energygrid)-1

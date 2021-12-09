@@ -835,7 +835,7 @@ class PhaseSpace:
     @property
     def fundeig(self):
         e0, _ = self.getfundamental()
-        if self.which in ['alpha', 'omega']:
+        if self.problem in ['alpha', 'omega']:
             return f"${e0:.8e}"
         else:
             return f"${e0:.8f}"
