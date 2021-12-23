@@ -1016,8 +1016,12 @@ class PhaseSpace:
             else:
                 iF = 0
 
-            No = (nA+1)//2 if nA % 2 != 0 else nA // 2
-            Ne = nA+1-No
+            if nA is None:
+                No = 0
+                Ne = 1
+            else:
+                No = (nA+1)//2 if nA % 2 != 0 else nA // 2
+                Ne = nA+1-No
 
             dim = nS if moment % 2 == 0 else nS-1
             # preallocation for group-wise moments
@@ -1031,13 +1035,20 @@ class PhaseSpace:
                         nE + (g - 1) * nF + iF + nS
                 else:
                     # compute No and Ne for the requested moment/angle
-                    skip = (Ne * nS + No * (nS - 1)) * (g - 1)
-                    NO = (moment + 1) // 2 if (moment -
-                                               1) % 2 != 0 else moment // 2
-                    NE = moment - NO
-                    M = nS if moment % 2 == 0 else nS - 1
-                    iS = skip + NE * nS + NO * (nS - 1)
-                    iE = skip + NE * nS + NO * (nS - 1) + M
+                    if nA is None:
+                        NO = 0
+                        NE = 1
+                        skip = nS*(g-1)
+                        iS = skip
+                        iE = skip + nS
+                    else:
+                        skip = (Ne * nS + No * (nS - 1)) * (g - 1)
+                        NO = (moment + 1) // 2 if (moment -
+                                                1) % 2 != 0 else moment // 2
+                        NE = moment - NO
+                        M = nS if moment % 2 == 0 else nS - 1
+                        iS = skip + NE * nS + NO * (nS - 1)
+                        iE = skip + NE * nS + NO * (nS - 1) + M
 
                 # store slices
                 y[ig * dim: dim * (ig + 1)] = vect[iS:iE]
