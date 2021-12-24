@@ -470,7 +470,7 @@ def delfission(ge, beta, xs, fmt='csc'):
     for family in range(NPF):  # precursors
 
         if xs.any() == 0:  # empty operator
-            M = csc_matrix((m*N, m*N))
+            M = csc_matrix((m, m*N))
         else:
             w = ge.QW['w']
             mu = ge.QW['mu']
@@ -507,7 +507,7 @@ def delfission(ge, beta, xs, fmt='csc'):
                         dmat_fl = dmat_fl[:, ::-1]
                 appM(dmat)
 
-        M = hstack((M), format=fmt)
+            M = hstack((M), format=fmt)
         MPFapp(M)
 
     MPF = vstack((MPF))

@@ -26,7 +26,7 @@ class NTE():
                     N = int(model.split('P')[1])
                     self.model = 'PN'
                 elif 'S' in model:
-                    N = int(model.split('S')[1]) 
+                    N = int(model.split('S')[1])
                     self.model = 'SN'
                 else:
                     raise OSError('Specify angular approximation order!')
@@ -34,7 +34,7 @@ class NTE():
         if self.model == 'SN':
             ge.computeQW()
 
-        self.nA = N        
+        self.nA = N
         self.nS = ge.nS
         self.nE = ge.nE
         self.geometry = ge.geometry
@@ -45,21 +45,21 @@ class NTE():
         self.C = MG.capture(ge, self.model, fmt=fmt)
         self.S = MG.scattering(ge, self.model, prod=prod, fmt=fmt)
 
-        if allope is True:
+        if allope:
             self.Fp = MG.promptfiss(ge, self.model, fmt=fmt)
             self.Fd = MG.delfiss(ge, self.model, fmt=fmt)
             self.F = MG.fissionprod(ge, self.model, fmt=fmt)
             self.T = MG.time(ge, self.model, fmt=fmt)
 
         else:
-            if steady is True:
+            if steady:
                 self.F = MG.fissionprod(ge, self.model, fmt=fmt)
                 self.state = 'steady'
 
             else:
                 self.T = MG.time(ge, self.model, fmt=fmt)
 
-                if prompt is True:
+                if prompt:
                     self.F = MG.fissionprod(ge, self.model, fmt=fmt)
                 else:
                     self.Fd = MG.delfiss(ge, self.model, fmt=fmt)
@@ -67,7 +67,7 @@ class NTE():
 
                 self.state = 'transient'
 
-        if BC is True or 'zero' in ge.BC:
+        if BC or 'zero' in ge.BC:
             self.BC = ge.BC
             self.Linf = MG.leakage(ge, self.model, fmt=fmt)
             if model == 'Diffusion':
