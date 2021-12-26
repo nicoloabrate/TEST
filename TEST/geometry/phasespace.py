@@ -30,7 +30,7 @@ class PhaseSpace:
     """Define phase space object."""
 
     def __init__(self, geometry=None, solution=None, operators=None,
-                 h5name=None, energygrid=None, source=False, normalize=False,
+                 h5name=None, energygrid=None, source=False, normalise=False,
                  whichnorm="phasespace"):
         """
         Initialise phase space object.
@@ -106,8 +106,8 @@ class PhaseSpace:
                     except OSError:
                         pass
 
-                    if normalize is True:
-                        self.normalize(which=whichnorm)
+                    if normalise:
+                        self.normalise(which=whichnorm)
             else:
                 msg = "Type {} cannot be handled by phase" "space!".format(
                         type(solution))
@@ -294,9 +294,9 @@ class PhaseSpace:
 
         return y
 
-    def normalize(self, which="phasespace", adjoint=None, power=None, A=None):
+    def normalise(self, which="phasespace", adjoint=None, power=None, A=None):
         """
-        Normalize eigenvectors according to a user-defined criterion.
+        normalise eigenvectors according to a user-defined criterion.
 
         Parameters
         ----------
@@ -690,7 +690,7 @@ class PhaseSpace:
         sub1.set_xlabel(xlbl)
         sub1.set_ylabel(ylbl)
 
-        if timelimit:
+        if timelimit and self.problem in ["alpha", "omega"]:
             sub1.axvline(-CorngoldLim, lw=0.5, ls='--', c='k')
             if lambdas is not None:
                 sub1.axvline(-min(lambdas), lw=0.5, ls='-.', c='k')
@@ -718,8 +718,8 @@ class PhaseSpace:
             xlo = np.sign(mineig)*np.ceil(abs(mineig))
             xup = np.sign(maxeig)*np.ceil(abs(maxeig))
             if loglog:
-                xlo = xlo*10
-                xup = xup*10
+                xlo = xlo*10 if xlo < 0 else xlo/10
+                xup = xup*10 if xup > 0 else xup/10
             else:
                 xlo *= 1.5
                 xup *= 1.5
@@ -877,7 +877,7 @@ class PhaseSpace:
         elif self.problem in ["alpha", "delta", "theta"]:
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
-            reals = reals[reals != 0]
+            # reals = reals[reals != 0]
             if reals.size != 0:
                 # select real eigenvalue with positive total flux
                 for i in range(len(reals)):
@@ -946,7 +946,7 @@ class PhaseSpace:
             normalise = False
         if normalise is not False:
             which = "phasespace" if normalise is True else normalise
-            self.normalize(which=which)
+            self.normalise(which=which)
 
         if self.model == "PN" or self.model == "Diffusion":
             y = self._getPN(group=group, angle=angle, moment=moment,
