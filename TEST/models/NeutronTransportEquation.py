@@ -15,8 +15,8 @@ from matplotlib.pyplot import spy
 
 class NTE():
 
-    def __init__(self, ge, model, steady, N=None, prod=None, BC=True, fmt='csr',
-                 prompt=False, allope=False):
+    def __init__(self, ge, model, steady, N=None, prod=None, BC=True,
+                 fmt='csr', prompt=False, allope=False):
         self.model = model
         if model == 'Diffusion':
             self.nA = 0

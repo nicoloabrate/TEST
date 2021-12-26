@@ -31,7 +31,7 @@ _targetdict = {'SM': 'SMALLEST_MAGNITUDE', 'SR': 'SMALLEST_REAL',
 
 class eigenproblem():
 
-    def __init__(self, *, nte, which, ge, nev=1, 
+    def __init__(self, *, nte, which, ge, nev=1,
                  generalisedTime=False):
 
         # --- problem settings
@@ -190,7 +190,7 @@ class eigenproblem():
                          'eigenvectors' : eigvect,
                          'problem': self.which}
             self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
-                                       normalize=None)
+                                       normalise=None)
 
             if self.fundamentalconverged():
                 nofund = False
@@ -205,7 +205,7 @@ class eigenproblem():
                 E.setDimensions(nev=self.nev)
                 E.solve()
 
-        self.solution.normalize(which=normalisation)
+        self.solution.normalise(which=normalisation)
         end = t.time()
 
         if verbose:
@@ -475,11 +475,11 @@ class eigenproblem():
 
             # create native phase space
             myeigpair = {'eigenvalues': eigvals[0:self.nev],
-                         'eigenvectors' : eigvect,
+                         'eigenvectors': eigvect,
                          'problem': self.which}
-            self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
-                                       normalize=True, whichnorm=normalisation)
-
+            self.solution = PhaseSpace(self.geometry, myeigpair,
+                                       self.operators, normalise=True,
+                                       whichnorm=normalisation)
 
         elif algo == 'eig':
 
@@ -507,7 +507,7 @@ class eigenproblem():
                          'eigenvectors' : eigvect,
                          'problem': self.which}
             self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
-                                       normalize=True, whichnorm=normalisation)
+                                       normalise=True, whichnorm=normalisation)
 
         else:
             if algo != 'SLEPc':
