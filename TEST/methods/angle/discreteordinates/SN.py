@@ -58,6 +58,53 @@ def removal(ge, data, fmt='csc'):
     M = block_diag((M))
     return M
 
+def time(ge, data, fmt='csc'):
+    """
+    Assemble discrete ordinates approximation for time/rem/capt/... operator.
+
+    Parameters
+    ----------
+    ge : object
+        Geometry object.
+    N : int
+        Number of discrete ordinates.
+
+    Returns
+    -------
+    None.
+
+    """
+    N = ge.nA
+    if N <= 1:
+        raise OSError(f'Cannot build S{N}')
+    model = ge.spatial_scheme
+    mu = ge.QW['mu']
+    M = []
+    appM = M.append
+    for order in range(N):
+        if model == 'FD':
+            t = FD.zero(ge, data, meshtype='centers')*1/2  # DD scheme
+            if mu[order] < 0: t = np.flip(t)
+            t = np.insert(t, 0, t[0, 0], axis=1)
+            m = t.shape[1]
+            if mu[order] != 0:
+                dia, pos = [t, t[:, 1:]], [0, -1]
+            else:
+                t0 = FD.zero(ge, data, meshtype='edges')
+                dia, pos = [t0], [0]
+        elif model == 'FV':
+            t = FV.zero(ge, data, meshtype='centers')
+            if mu[order] < 0: t = np.flip(t)
+            dia, pos = t, [0]
+            m = t.shape[1]
+        else:
+            raise OSError(f'{model} model not available for spatial variable!')
+
+        tmp = diags(dia, pos, (m, m), format=fmt)
+        appM(tmp)
+
+    M = block_diag((M))
+    return M
 
 def leakage(ge, fmt='csc'):
     """

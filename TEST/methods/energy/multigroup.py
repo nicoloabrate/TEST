@@ -38,7 +38,8 @@ def time(ge, model, fmt='csc'):
         if model == 'PN':
             TMGapp(PN.removal(ge, invv[gro, :], fmt=fmt))
         elif model == 'SN':
-            TMGapp(SN.removal(ge, invv[gro, :], fmt=fmt))
+            # FIXME no BCs in time operator, temporary patch
+            TMGapp(SN.time(ge, invv[gro, :], fmt=fmt))
         elif model == 'Diffusion':
             TMGapp(PN.removal(ge, invv[gro, :], fmt=fmt))
         else:
