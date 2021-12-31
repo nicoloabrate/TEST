@@ -721,8 +721,8 @@ class PhaseSpace:
                 xlo = xlo*10 if xlo < 0 else xlo/10
                 xup = xup*10 if xup > 0 else xup/10
             else:
-                xlo *= 1.5
-                xup *= 1.5
+                xlo = xlo*1.5 if xlo < 0 else xlo/1.5
+                xup = xup*1.5 if xup > 0 else xup/1.5
             sub1.set_xlim([xlo, xup])
         else:
             xlo, xup = xlims
