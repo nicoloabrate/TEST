@@ -63,7 +63,10 @@ class PhaseSpace:
             self.nA = operators.nA
             self.nE = operators.nE
             self.nS = operators.nS
-            self.nF = geometry.NPF
+            try:
+                self.nF = geometry.NPF
+            except AttributeError:
+                pass
 
             if energygrid is not None:
                 self.energygrid = energygrid
@@ -189,7 +192,7 @@ class PhaseSpace:
                 if hasattr(phasespacevolume["g"], "__iter__"):
                     if len(phasespacevolume["g"]) > 2:
                         raise OSError("g must consist of only two elements!")
-                    phasespacevolume["g"].sort()
+                    phasespacevolume["g"].sort(reverse=True)
                     e1, e2 = phasespacevolume["g"]
                     ide1 = np.argmin(abs(egrid - e1))
                     ide2 = np.argmin(abs(egrid - e2))
@@ -221,7 +224,7 @@ class PhaseSpace:
                 II = 0
                 for g in range(G):
                     skip = g*S
-                    if g >= ide1 and g <= ide2:
+                    if g >= ide1 and g < ide2:
                         iS = skip+idx1
                         iE = skip+idx2
                         II = II+np.trapz(v1[iS:iE], x=xgrid[idx1:idx2])
