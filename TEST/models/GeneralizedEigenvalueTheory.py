@@ -52,15 +52,21 @@ class GET(eigenproblem):
                         self.eigposition = setPhaseSpace['reaction']
 
             if isnewmaterial:  # replace newmaterial to void
+                if 'datapath' not in setPhaseSpace.keys():
+                    if isinstance(setPhaseSpace['where'], list):
+                        setPhaseSpace['datapath'] = [None]*len(setPhaseSpace['where'])
+                    else:
+                        setPhaseSpace['datapath'] = None
                 if isinstance(setPhaseSpace['where'], list):
                     if isinstance(setPhaseSpace['which'], list):
-                        for where, which in zip(setPhaseSpace['where'], setPhaseSpace['which']):
-                            voidgeom.replace({'where': where, 'which': which})
+                        for where, which, path in zip(setPhaseSpace['where'], setPhaseSpace['which'], setPhaseSpace['datapath']):
+                            voidgeom.replace({'where': where, 'which': which, 'path': path})
                     else:
                         raise OSError('setPhaseSpace: both where and which field should be of type list!')
                 else:
                     voidgeom.replace({'where': setPhaseSpace['where'],
-                                      'which': setPhaseSpace['which']})
+                                      'which': setPhaseSpace['which'],
+                                      'path': setPhaseSpace['datapath']})
 
             if nte.model == 'PN':
                 self.RHS = NTE(voidgeom, 'PN', N=nte.nA, steady=True, fmt='csc')
