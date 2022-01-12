@@ -171,7 +171,7 @@ class PhaseSpace:
         S = self.geometry.nS
         xgrid = self.geometry.mesh
         egrid = self.geometry.energygrid
-        idx1, idx2 = 0, S
+        idx1, idx2 = 0, S-1
         ide1, ide2 = 0, G
 
         if isinstance(phasespacevolume, dict):
@@ -214,7 +214,7 @@ class PhaseSpace:
                     skip = g * S
                     iS = skip+idx1
                     iE = skip+idx2
-                    II[g] = np.trapz(v1[iS:iE], x=xgrid[idx1:idx2])
+                    II[g] = np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
             elif (idx1, idx2) == (None, None):  # integrate over energy
                 n = S if "nS" in dims else 1
                 II = np.zeros((n,))
@@ -227,7 +227,7 @@ class PhaseSpace:
                     if g >= ide1 and g < ide2:
                         iS = skip+idx1
                         iE = skip+idx2
-                        II = II+np.trapz(v1[iS:iE], x=xgrid[idx1:idx2])
+                        II = II+np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
         else:  # ndarray
             if (ide1, ide2) == (None, None):  # integrate over space
                 j = 0
