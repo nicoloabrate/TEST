@@ -8,13 +8,20 @@ Description: Class for simplified 1D geometries.
 import json
 import numpy as np
 from matplotlib.pyplot import gca
-from matplotlib import rcParams
+from matplotlib import rc, rcParams, checkdep_usetex
 from TEST.material import Material
 from collections import OrderedDict
 from pathlib import Path
 from copy import deepcopy as cp
 from scipy.special import roots_legendre, eval_legendre
 
+usetex = checkdep_usetex(True)
+rc('text', usetex=usetex)
+rc('font', **{'family' : "sans-serif"})
+if usetex:
+    rc('font', **{'family' : "sans-serif"})
+    params= {'text.latex.preamble' : r'\usepackage{libertinus}'}
+    rcParams.update(params)
 
 class Slab:
     """Define slab geometry object."""
@@ -116,7 +123,7 @@ class Slab:
             Nxf = np.zeros((self.nLayers,), dtype=bool)
             minmfp = np.zeros((self.nLayers, ))
             path = None
-            for iLay in range(0, self.nLayers):
+            for iLay in range(self.nLayers):
                 uniName = regions[iLay]
                 if uniName not in self.regions.keys():
                     if datapath is not None:
@@ -213,13 +220,16 @@ class Slab:
                                     N[iLay])
             else:
                 if iLay == self.nLayers-1:
-                    ngrid = np.arange(self.layers[iLay], self.layers[iLay+1],
+                    ngrid = np.arange(self.layers[iLay], self.layers[iLay+1]+dx[iLay]/2,
                                       dx[iLay])
                     ngrid = np.append(ngrid, self.layers[iLay+1])
                     N[iLay] = N[iLay]+1
                 else:
-                    ngrid = np.arange(self.layers[iLay], self.layers[iLay+1],
+                    ngrid = np.arange(self.layers[iLay], self.layers[iLay+1]+dx[iLay]/2,
                                       dx[iLay])
+                    nnz_dig = abs(round(np.log10(abs(dx[iLay]))))
+                    ngrid = ngrid.round(decimals=nnz_dig)
+                    N[iLay] = len(ngrid)
 
             grid = np.concatenate((old_grid, ngrid))
             old_grid = grid
@@ -231,8 +241,8 @@ class Slab:
             old_grid_stag = gridg
 
             if len(np.unique(grid)) < len(grid):
-                N[iLay] = N[iLay]-1
                 grid = np.unique(grid)
+                N[iLay] = N[iLay]-1
 
         # if np.any(grid) or np.any(gridg):
         #     grid[grid == 0] = np.finfo(float).eps
@@ -240,16 +250,20 @@ class Slab:
 
         self.Nx = N
         self.dx = dx
-        self.edges = grid
-        self.centers = gridg
+        self.edges = np.unique(grid)
+        self.centers = np.unique(gridg)
         if spatial_scheme == 'FV':
-            self.mesh = gridg
-            self.ghostmesh = grid
+            self.mesh = np.unique(gridg)
+            self.ghostmesh = np.unique(grid)
             self.nS = int(sum(N))-1
         else:
-            self.mesh = grid
-            self.ghostmesh = gridg
+            self.mesh = np.unique(grid)
+            self.ghostmesh = np.unique(gridg)
             self.nS = int(sum(N))
+            # FIXME tmp patch for dx-driven mesh
+            if self.nS > len(self.mesh):
+                N[0] = 1
+                self.nS = int(sum(N))
 
     def plotmesh(self, ax=None, yVals=None, xlabel=None):
         """Plot mesh grid."""
@@ -270,7 +284,7 @@ class Slab:
         ax.set_xlabel(xlabel)
         ax.set_xticks(self.layers)
 
-    def displaygeom(self, ax=None, xlabel=None, labels=None):
+    def displaygeom(self, ax=None, xlabel=None, labels=None, ncols=None):
         """Plot regions."""
         ax = ax or gca()
         c = ['royalblue', 'firebrick',
@@ -298,13 +312,16 @@ class Slab:
                         labels.append(labeldict[which])
                 else:
                     labels.append(which)
-
+        if ncols is None:
+            ncols = 4 if len(self.regions.keys()) > 2 else 2
         xlabel = xlabel if xlabel is not None else 'x coordinate [cm]'
         ax.set_xlabel(xlabel)
         # ax.set_xticks(self.layers)
-        leg = ax.legend(labels, bbox_to_anchor=(1.05, 1))
+        leg = ax.legend(labels, bbox_to_anchor=(0, -0.2, 1, 0), 
+                        mode="expand", ncol=ncols, framealpha=1, shadow=1)
         ax.add_artist(leg)
-        
+        ax.set_xlim((self.layers[0], self.layers[-1]))
+
     def getxs(self, key, pos1=None, pos2=None, region=None):
         """
         Get material data for a certain region and energy group.
