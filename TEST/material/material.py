@@ -117,8 +117,11 @@ class Material():
                 raise OSError('{datapath} path not valid!')
 
             if reader == 'json':
-                fname = path.join(datapath, "json", filename)
-                fname = '{}.{}'.format(str(fname), reader)
+                if '.json' not in str(filename):
+                    fname = path.join(datapath, "json", filename)
+                    fname = '{}.{}'.format(str(fname), reader)
+                else:
+                    fname = filename
                 if path.exists(fname):
                     self._readjson(fname)
                 else:
@@ -633,7 +636,7 @@ class Material():
                 else:
                     mydic[what][:] = 0
 
-    def to_json(self):
+    def to_json(self, fname=None):
         """
         Dump object to json file.
 
@@ -642,8 +645,10 @@ class Material():
         None.
 
         """
+        if fname is None:
+            '{}_{}.json'.format(self.UniName, self.egridname)
         tmp = {}
-        with open('{}_{}.json'.format(self.UniName, self.egridname), 'w') as f:
+        with open(fname, 'w') as f:
 
             for k, v in self.__dict__.items():
                 if isinstance(v, (np.ndarray)):
@@ -813,7 +818,7 @@ class Mix(Material):
         materials = dict(zip(universes, densities))
         for k, v in materials.items():
             if datapath is not None:
-                kpath = datapath[idx]
+                kpath = datapath[k]
             else:
                 kpath = None
 
