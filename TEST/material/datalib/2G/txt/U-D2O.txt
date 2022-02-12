@@ -1,0 +1,37 @@
+# U-D2O Isotropic Benchmark at https://www.sciencedirect.com/science/article/pii/S0149197002000987
+# half thickness [cm] 846.632726
+# Groups in energy decreasing order
+
+# Capt
+0.0087078 0.02518
+
+#  Fiss
+0.002817 0.097
+
+# Remxs
+0.33588 0.54628
+
+# Chit
+1 0
+
+#  Chip
+1 0
+
+#  Nubar
+2.5 2.5
+
+#  Kappa
+2.08077000e+02 2.08077000e+02
+
+#  Invv
+4.54545454e-06 4.54545454e-06
+
+#  S0
+0.31980   0
+0.0045552 0.42410
+
+#  beta
+0
+
+#  lambda
+0
