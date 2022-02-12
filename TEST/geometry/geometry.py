@@ -298,26 +298,30 @@ class Slab:
             labeldict = None
 
         labels = []
+        handles = []
         for i in range(self.nLayers):
             which = self.regionmap[i]
             try:
                 col = c[which]
             except KeyError:
                 col = np.random.rand(3,1)
-            ax.axvspan(self.layers[i], self.layers[i+1],
-                       alpha=0.5, color=col)
+            h1 = ax.axvspan(self.layers[i], self.layers[i+1],
+                            alpha=0.5, color=col)
+
             if which not in labels:
                 if labeldict is not None:
                     if labeldict[which] not in labels:
                         labels.append(labeldict[which])
+                        handles.append(h1)
                 else:
                     labels.append(which)
+                    handles.append(h1)
         if ncols is None:
             ncols = 4 if len(self.regions.keys()) > 2 else 2
         xlabel = xlabel if xlabel is not None else 'x coordinate [cm]'
         ax.set_xlabel(xlabel)
         # ax.set_xticks(self.layers)
-        leg = ax.legend(labels, bbox_to_anchor=(0, -0.2, 1, 0), 
+        leg = ax.legend(handles, labels, bbox_to_anchor=(0, -0.2, 1, 0),
                         mode="expand", ncol=ncols, framealpha=1, shadow=1)
         ax.add_artist(leg)
         ax.set_xlim((self.layers[0], self.layers[-1]))

@@ -121,7 +121,7 @@ class eigenproblem():
                 E.setTarget(self.sigma)
 
         # set spectral transformation
-        if self.which in ['alpha', 'omega', 'delta', 'theta']:
+        if self.which in ['alpha', 'omega', 'delta', 'zeta', 'theta']:
             st.setType('sinvert')
 
         end = t.time()
@@ -453,7 +453,7 @@ class eigenproblem():
                 if B.format != 'csc':
                     B = B.tocsc()
 
-            if self.which in ['kappa', 'delta', 'gamma']:
+            if self.which in ['kappa', 'delta', 'zeta', 'gamma']:
                 self.whichspectrum = 'LR'
                 M1, M2 = B, A
             elif self.which == 'theta':
@@ -485,7 +485,7 @@ class eigenproblem():
 
             if self.which in ['kappa', 'gamma']:
                 M1, M2 = B, A
-            elif self.which in ['alpha', 'delta', 'omega', 'theta']:
+            elif self.which in ['alpha', 'delta', 'zeta', 'omega', 'theta']:
                 M1, M2 = A, B
 
             start = t.time()
@@ -497,7 +497,7 @@ class eigenproblem():
             end = t.time()
             self.nev = len(eigvals)
 
-            if self.which in ['delta', 'theta']:
+            if self.which in ['delta', 'zeta', 'theta']:
                 eigvals = 1/eigvals
             if verbose:
                 print("ELAPSED TIME: %f [s]" % (end-start))
