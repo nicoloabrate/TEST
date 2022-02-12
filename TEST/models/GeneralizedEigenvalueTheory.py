@@ -57,10 +57,14 @@ class GET(eigenproblem):
                         setPhaseSpace['datapath'] = [None]*len(setPhaseSpace['where'])
                     else:
                         setPhaseSpace['datapath'] = None
+                else:
+                    if isinstance(setPhaseSpace['where'], list):
+                        if isinstance(setPhaseSpace['datapath'], list) is False:
+                            setPhaseSpace['datapath'] = [setPhaseSpace['datapath']]*len(setPhaseSpace['where'])
                 if isinstance(setPhaseSpace['where'], list):
                     if isinstance(setPhaseSpace['which'], list):
-                        for where, which, path in zip(setPhaseSpace['where'], setPhaseSpace['which'], setPhaseSpace['datapath']):
-                            voidgeom.replace({'where': where, 'which': which, 'path': path})
+                        for where, whichmat, path in zip(setPhaseSpace['where'], setPhaseSpace['which'], setPhaseSpace['datapath']):
+                            voidgeom.replace({'where': tuple([where]), 'which': whichmat, 'path': path})
                     else:
                         raise OSError('setPhaseSpace: both where and which field should be of type list!')
                 else:
@@ -95,6 +99,22 @@ class GET(eigenproblem):
 
         super().__init__(nte=nte, which=which, ge=ge,
                          nev=nev, generalisedTime=generalisedTime)
+
+    def zeta(self):
+        """
+        Cast operators into the streaming/density eigenvalue problem "zeta".
+
+        Returns
+        -------
+        None.
+
+        """
+        RHS, LHS = self.RHS, self.LHS
+        self.A = LHS.L-LHS.F-LHS.S+LHS.F0+LHS.S0+LHS.C  # leakage operator
+        self.B = RHS.F+RHS.S-RHS.F0-RHS.S0-RHS.C  # material operator
+        self.which = 'zeta'
+        self.whichspectrum = 'TR'
+        self.sigma = 1
 
     def delta(self):
         """
