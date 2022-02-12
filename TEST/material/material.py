@@ -98,28 +98,28 @@ class Material():
             elif isinstance(h5file, str):
                 print('To do')
             else:
-                msg = "h5file must be dict or str, not {}".format(type(h5file))
+                msg = f"h5file must be dict or str, not {type(h5file)}"
                 raise TypeError(msg)
         else:
             nE = len(energygrid)-1
-            egridname = egridname if egridname else "{}G".format(nE)
+            egridname = egridname if egridname else f"{nE}G"
             pwd = Path(__file__).parent
 
             if datapath is None:
                 pwd = Path(__file__).parent
-                datapath = pwd.joinpath('datalib', '{}'.format(egridname))
+                datapath = pwd.joinpath('datalib', f'{egridname}')
                 filename = uniName
             elif path.isdir(datapath) is False:
                 pwd = Path(__file__).parent
                 filename = copy(datapath)
-                datapath = pwd.joinpath('datalib', '{}'.format(egridname))
+                datapath = pwd.joinpath('datalib', f'{egridname}')
             else:
-                raise OSError('{datapath} path not valid!')
+                raise OSError(f'{datapath} path not valid!')
 
             if reader == 'json':
                 if '.json' not in str(filename):
                     fname = path.join(datapath, "json", filename)
-                    fname = '{}.{}'.format(str(fname), reader)
+                    fname = f'{str(fname)}.{reader}'
                 else:
                     fname = filename
                 if path.exists(fname):
@@ -129,7 +129,7 @@ class Material():
 
             if reader == 'serpent':
                 fname = path.join(datapath, "serpent", filename)
-                fname = '{}{}'.format(str(fname), "_res.m")
+                fname = f'{str(fname)}_res.m'
 
                 if path.exists(fname):
                     self._readserpentres(fname, uniName, nE, egridname)
@@ -138,11 +138,11 @@ class Material():
 
             if reader == 'txt':
                 fname = path.join(datapath, "txt", filename)
-                fname = '{}.{}'.format(str(fname), reader)
+                fname = f'{str(fname)}.{reader}'
                 if path.exists(fname):
                     self._readtxt(fname, nE)
                 else:
-                    raise OSError('{} not found!'.format(fname))
+                    raise OSError(f'{fname} not found!')
 
             self.nE = nE
             self.egridname = egridname
@@ -193,12 +193,12 @@ class Material():
             univ.append(key[0])
 
         if uniName not in univ:
-            raise OSError('GC_UNIVERSE {} not in {}'.format(uniName, datapath))
+            raise OSError(f'GC_UNIVERSE {uniName} not in {datapath}')
         else:
             data = res.getUniv(uniName, 0, 0, 0)
         if len(data.infExp['infAbs']) != nE:
-            raise OSError('{} energy groups do not match with \
-                          input grid!'.format(datapath))
+            raise OSError(f'{datapath} energy groups do not match with \
+                          input grid!')
 
         selfdic = self.__dict__
         for my_key in serp_keys:
@@ -332,7 +332,7 @@ class Material():
                     # set higher moments to zero if not available
                     vals = self.__dict__['S0']*0
                 else:
-                    raise OSError('{} data not available!'.format(key))
+                    raise OSError(f'{key} data not available!')
         else:
             if key.startswith('S') or key.startswith('Sp'):
                 if pos2 is None:
@@ -457,8 +457,8 @@ class Material():
 
                 else:
                     if sanitycheck:
-                        raise OSError('{} cannot be perturbed \
-                                      directly!'.format(what))
+                        raise OSError(f'{what} cannot be perturbed \
+                                      directly!')
                     else:
                         # update perturbed parameter
                         if depgro is None:
@@ -471,7 +471,10 @@ class Material():
         if sanitycheck:
             # force normalisation
             if abs(self.Chit.sum() - 1) > 1E-5:
-                self.Chit = self.Chit/self.Chit.sum()
+                if np.any(self.Chit == 0) :
+                    pass
+                else:
+                    self.Chit = self.Chit/self.Chit.sum()
 
             self.datacheck()
 
@@ -528,8 +531,8 @@ class Material():
             self.mu0 = np.zeros((self.nE, ))
         # check consistency
         if abs(self.mu0).max() > 1:
-            raise OSError('Average cosine larger than 1! Check {} \
-                          data!'.format(self.UniName))
+            raise OSError(f'Average cosine larger than 1! Check \
+                          {self.UniName} data!')
         # --- compute transport xs
         self.Transpxs = self.Tot-self.mu0*sTOT
         # --- compute diffusion coefficient
@@ -541,8 +544,8 @@ class Material():
         # --- ensure consistency kinetic parameters (if fissile medium)
         if self.Fiss.max() > 0:
             if abs(self.Chit.sum() - 1) > 1E-5:
-                print('Total fission spectra in {} not \
-                      normalised!'.format(self.UniName))
+                print(f'Total fission spectra in {self.UniName} not \
+                      normalised!')
 
             # ensure pdf normalisation
             self.Chit /= self.Chit.sum()
@@ -558,16 +561,16 @@ class Material():
                         # each family has same emission spectrum
                         self.Chid = np.asarray([self.Chid]*self.NPF)
                     elif self.Chid.shape != (self.NPF, self.nE):
-                        raise OSError('Delayed fiss. spectrum should be \
-                                      ({}, {})'.format(self.NPF, self.nE))
+                        raise OSError(f'Delayed fiss. spectrum should be \
+                                      ({self.NPF}, {self.nE})')
 
                     for g in range(0, self.nE):
                         chit = (1-self.beta.sum())*self.Chip[g] + \
                                 np.dot(self.beta, self.Chid[:, g])
                         if abs(self.Chit[g]-chit) > 1E-3:
-                            raise OSError('Fission spectra or delayed \
-                                          fractions in {} not \
-                                          consistent!'.format(self.UniName))
+                            raise OSError(f'Fission spectra or delayed \
+                                          fractions in {self.UniName} not \
+                                          consistent!')
 
                 except AttributeError as err:
                     if "'Material' object has no attribute 'Chid'" in str(err):
@@ -603,8 +606,8 @@ class Material():
         """
         # add anisotropic XS
         for ll in range(self.L):
-            new = 'S{}'.format(ll)
-            newP = 'Sp{}'.format(ll)
+            new = f'S{ll}'
+            newP = f'Sp{ll}'
             if new not in alldata:
                 alldata.append(new)
             if newP not in alldata:
@@ -646,7 +649,7 @@ class Material():
 
         """
         if fname is None:
-            '{}_{}.json'.format(self.UniName, self.egridname)
+            f'{self.UniName}_{self.egridname}.json'
         tmp = {}
         with open(fname, 'w') as f:
 
@@ -681,8 +684,8 @@ class Material():
             flx = spectrum
         else:
             if 'Flx' not in self.__dict__.keys():
-                raise OSError('Collapsing failed: weighting flux missing in'
-                              '{}'.format(self.UniName))
+                raise OSError(f'Collapsing failed: weighting flux missing in'
+                              '{self.UniName}')
             else:
                 flx = self.Flx
 
@@ -695,8 +698,8 @@ class Material():
         G = len(fewgrp)-1
         # sanity check
         if G > H:
-            raise OSError('Collapsing failed: few-group structure should \
-                          have less than {} group'.format(H))
+            raise OSError(f'Collapsing failed: few-group structure should \
+                          have less than {H} group')
         if multigrp[0] != fewgrp[0] or multigrp[0] != fewgrp[0]:
             raise OSError('Collapsing failed: few-group structure  \
                           boundaries do not match with multi-group \
@@ -766,7 +769,7 @@ class Material():
         # overwrite data
         self.energygrid = fewgrp
         self.nE = G
-        self.egridname = egridname if egridname else '{}G'.format(G)
+        self.egridname = egridname if egridname else f'{G}G'
         for key in self.__dict__.keys():
             if key in collapsed.keys():
                 self.__dict__[key] = collapsed[key]
@@ -806,7 +809,7 @@ class Mix(Material):
 
         """
         nE = len(energygrid)-1
-        egridname = egridname if egridname else "{}G".format(nE)
+        egridname = egridname if egridname else f"{nE}G"
 
         if densities is not None:
             if len(universes) != len(densities):
@@ -815,39 +818,80 @@ class Mix(Material):
             densities = np.ones(len(universes))
 
         idx = 0
+        nMat = len(universes)
         materials = dict(zip(universes, densities))
+        xsf = {}
+        fissionprod = np.zeros((nE, nMat))
+        totfissxs = np.zeros((nE, ))
+        betatot = np.zeros((nMat, ))
+        beta = []
         for k, v in materials.items():
+            xsf[k] = {}
             if datapath is not None:
                 kpath = datapath[k]
             else:
                 kpath = None
 
             mat = Material(uniName=k, energygrid=energygrid, datapath=kpath,
-                           egridname=egridname,
-                           reader=reader)
-
+                           egridname=egridname, reader=reader)
             # density multiplication and summation
             for s in mat.__dict__.keys():
                 if s in collapse_xs:
                     if idx == 0:
                         self.__dict__[s] = densities[idx]*mat.__dict__[s]
                     else:
-                        self.__dict__[s] = self.__dict__[s]+densities[idx]*mat.__dict__[s]
-                # TODO FIXME
-                if s in collapse_xsf:
-                    if idx == 0:
-                        nu = mat.__dict__['Nubar'] if 'Chi' in s else 1
-                        self.__dict__[s] = mat.__dict__['Fiss']*mat.__dict__[s]*nu
-                    else:
-                        self.__dict__[s] = self.__dict__[s]+mat.__dict__['Fiss'] * \
-                                            mat.__dict__[s]*nu
+                        self.__dict__[s] += densities[idx]*mat.__dict__[s]
+
+            fissionprod[:, idx] = mat.Nubar*mat.Fiss
+            totfissxs += mat.Fiss
+            xsf[k]['Fiss'] = mat.Fiss
+            for s in collapse_xsf:
+                xsf[k][s] = mat.__dict__[s]
+                self.__dict__[s] = np.zeros(mat.__dict__[s].shape)
+
+            if 'beta' in mat.__dict__.keys():
+                NPF = mat.NPF
+                self.beta = np.zeros((NPF, ))
+                self.Chid = np.zeros((NPF, nE))
+                beta.append(mat.beta)
+            if 'lambda' in mat.__dict__.keys():
+                self.__dict__['lambda'] = np.zeros((mat.NPF, ))
+                xsf[k]['lambda'] = mat.__dict__['lambda']
 
             idx += 1
-        # TODO FIXME
+
+        beta = np.asarray(beta)
         if self.Fiss.max() > 0:
-            for s in collapse_xsf:
-                nu = mat.__dict__['Nubar'] if 'Chi' in s else 1
-                self.__dict__[s] = self.__dict__[s]/np.sum(mat.__dict__['Fiss']*nu)
+            for i, k in enumerate(materials.keys()):
+                fiss = xsf[k]['Fiss']
+                nuba = xsf[k]['Nubar']
+                # mix Nubar
+                self.Nubar += fiss*nuba
+                # mix emission spectra            
+                self.Chit += xsf[k]['Chit']*np.sum(fiss*nuba)
+                if beta.max() > 0:
+                    self.beta += beta[i, :]*np.sum(fiss*nuba)
+                    betatot[i] = beta[i, :].sum()
+                    self.Chip += xsf[k]['Chip']*np.sum(fiss*nuba*(1-betatot[i]))
+                    for f in range(NPF):
+                        self.Chid[f, :] += xsf[k]['Chid'][f, :]*np.sum(fiss*nuba*beta[i, f])
+                if 'lambda' in xsf[k].keys():
+                    self.__dict__['lambda'] = xsf[k]['lambda']
+                # mix fission heat
+
+            self.Nubar = self.Nubar/totfissxs
+            self.beta = self.beta/fissionprod.sum()
+            self.Chit = self.Chit/fissionprod.sum()
+            self.Chip = self.Chip/(fissionprod*(1-betatot)).sum()
+            # FIXME Fission energy is missing!
+            for f in range(NPF):
+                self.Chid[f, :] = self.Chid[f, :]/(fissionprod*beta[:, f]).sum()
+      
+        # # TODO FIXME
+        # if self.Fiss.max() > 0:
+        #     for s in collapse_xsf:
+        #         nu = mat.__dict__['Nubar'] if 'Chi' in s else 1
+        #         self.__dict__[s] = self.__dict__[s]/np.sum(mat.__dict__['Fiss']*nu)
 
         if mixname is None:
             mixname = '_'.join(universes)
