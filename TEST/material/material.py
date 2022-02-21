@@ -204,7 +204,7 @@ class Material():
         for my_key in serp_keys:
 
             if my_key.startswith('infS') or my_key.startswith('infSp'):
-                vals = np.reshape(data.infExp[my_key], (nE, nE))
+                vals = np.reshape(data.infExp[my_key], (nE, nE), order='F')
             else:
                 vals = data.infExp[my_key]
 
@@ -527,6 +527,9 @@ class Material():
         elif 'Diffcoef' in datavail:
             tmp = 1/(3*self.Diffcoef)
             self.mu0 = (self.Tot-tmp)/sTOT
+            for imu, mu in enumerate(self.mu0):
+                if mu > 1 or mu < -1:
+                    self.mu0[imu] = 0
         else:
             self.mu0 = np.zeros((self.nE, ))
         # check consistency
