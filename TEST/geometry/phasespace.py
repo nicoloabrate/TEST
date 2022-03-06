@@ -9,7 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib import rc, rcParams, checkdep_usetex, ticker
-from matplotlib.ticker import FormatStrFormatter
+from matplotlib.ticker import FormatStrFormatter, MultipleLocator
+from matplotlib import ticker as tkr
 from matplotlib.patches import ConnectionPatch
 from scipy.special import roots_legendre, eval_legendre
 from cycler import cycler
@@ -19,20 +20,20 @@ import TEST.methods.space.FV as FV
 import TEST.utils.h5 as myh5
 from TEST.geometry import Slab
 
-usetex = checkdep_usetex(True)
-rc('text', usetex=usetex)
-rc('font', **{'family' : "sans-serif"})
-if usetex:
-    rc('font', **{'family' : "sans-serif"})
-    params= {'text.latex.preamble' : r'\usepackage{libertinus}'}
-    rcParams.update(params)
+# usetex = checkdep_usetex(True)
+# rc('text', usetex=usetex)
+# rc('font', **{'family' : "sans-serif"})
+# if usetex:
+#     rc('font', **{'family' : "sans-serif"})
+#     params= {'text.latex.preamble' : r'\usepackage{libertinus}'}
+#     rcParams.update(params)
 
 
 class PhaseSpace:
     """Define phase space object."""
 
     def __init__(self, geometry=None, solution=None, operators=None,
-                 h5name=None, energygrid=None, source=False, normalise=False,
+                 h5name=None, energygrid=None, source=False, normalisation=False,
                  whichnorm="phasespace"):
         """
         Initialise phase space object.
@@ -135,8 +136,8 @@ class PhaseSpace:
                     except OSError:
                         pass
 
-                    if normalise:
-                        self.normalise(which=whichnorm)
+                    if normalisation:
+                        self.normalisation(which=whichnorm)
             else:
                 msg = "Type {} cannot be handled by phase" "space!".format(
                         type(solution))
@@ -205,6 +206,8 @@ class PhaseSpace:
                 if hasattr(phasespacevolume["x"], "__iter__"):
                     if len(phasespacevolume["x"]) > 2:
                         raise OSError("x must consist of only two elements!")
+                    if not isinstance(phasespacevolume["x"], list):
+                        phasespacevolume["x"] = list(phasespacevolume["x"])
                     phasespacevolume["x"].sort()
                     x1, x2 = phasespacevolume["x"]
                     idx1 = np.argmin(abs(xgrid - x1))
@@ -232,52 +235,35 @@ class PhaseSpace:
                             "not of type {}!".format(type(phasespacevolume())))
 
         # --- perform integration
-        if len(vdim) == 1:  # 1D array (flattened)
-            if (ide1, ide2) == (None, None):  # integrate over space
-                n = G if "nE" in dims else 1
-                II = np.zeros((n,))
-                for g in range(n):
-                    skip = g * S
+        if len(vdim) != 1:  # 1D array (flattened)
+            # TODO FIXME this is hardcoded and assumes no angular flux is given as v1
+            if dims == ('nS', 'nE'):
+                order = 'F'
+            else:
+                order = 'C'
+            v1 = v1.flatten(order=order)
+
+        if (ide1, ide2) == (None, None):  # integrate over space
+            n = G if "nE" in dims else 1
+            II = np.zeros((n,))
+            for g in range(n):
+                skip = g * S
+                iS = skip+idx1
+                iE = skip+idx2
+                II[g] = np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
+        elif (idx1, idx2) == (None, None):  # integrate over energy
+            n = S if "nS" in dims else 1
+            II = np.zeros((n,))
+            for idx in range(n):
+                II[idx] = v1[range(idx, idx + (G) * S, S)].sum()
+        else:  # integrate in energy and space
+            II = 0
+            for g in range(G):
+                skip = g*S
+                if g >= ide1 and g < ide2:
                     iS = skip+idx1
                     iE = skip+idx2
-                    II[g] = np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
-            elif (idx1, idx2) == (None, None):  # integrate over energy
-                n = S if "nS" in dims else 1
-                II = np.zeros((n,))
-                for idx in range(n):
-                    II[idx] = v1[range(idx, idx + (G) * S, S)].sum()
-            else:  # integrate in energy and space
-                II = 0
-                for g in range(G):
-                    skip = g*S
-                    if g >= ide1 and g < ide2:
-                        iS = skip+idx1
-                        iE = skip+idx2
-                        II = II+np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
-        else:  # ndarray
-            if (ide1, ide2) == (None, None):  # integrate over space
-                j = 0
-                for i, d in enumerate(dims):
-                    if d == "nE":
-                        continue
-                    else:
-                        v1 = v1.sum(axis=j)
-                        j = j-1  # TODO debug
-                II = v1
-            elif (idx1, idx2) == (None, None):  # integrate over energy
-                j = 0
-                for i, d in enumerate(dims):
-                    if d == "nS":
-                        continue
-                    else:
-                        v1 = v1.sum(axis=j)
-                        j = j-1  # TODO debug
-                II = v1
-            else:  # integrate in energy and space
-                for i, d in enumerate(dims):
-                    v1 = v1.sum(axis=j)
-                    j = j-1
-                II = v1
+                    II = II+np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
 
         return II
 
@@ -323,9 +309,9 @@ class PhaseSpace:
 
         return y
 
-    def normalise(self, which="phasespace", adjoint=None, power=None, A=None):
+    def normalisation(self, which="phasespace", adjoint=None, power=None, A=None):
         """
-        normalise eigenvectors according to a user-defined criterion.
+        normalisation eigenvectors according to a user-defined criterion.
 
         Parameters
         ----------
@@ -354,31 +340,31 @@ class PhaseSpace:
 
                 if len(y.shape) > 1:
                     skip = []
-                    # normalise all positive eigenf
+                    # normalisation all positive eigenf
                     for ic, col in enumerate(y.T):
                         ivpos = np.argwhere(self.eigvals == eig[ic])[0][0]
                         skip.append(ivpos)
                         if which == 'totalflux':
-                            # normalise total flux
+                            # normalisation total flux
                             self.eigvect[:, ivpos] /= self.braket(col)
                         elif which == 'phasespace':
-                            # normalise on the inner product over the phase space
+                            # normalisation on the inner product over the phase space
                             self.eigvect[:, ivpos] /= np.sqrt(self.braket(col, col))
                 else:
                     if which == 'totalflux':
-                        # normalise total flux
+                        # normalisation total flux
                         self.eigvect[:, iv] = v/self.braket(y)
                     elif which == 'phasespace':
-                        # normalise on the inner product over the phase space
+                        # normalisation on the inner product over the phase space
                         self.eigvect[:, iv] = v/np.sqrt(self.braket(y, y))
 
         elif which == "norm2":
-            # normalise to have unitary euclidean norm
+            # normalisation to have unitary euclidean norm
             for iv, v in enumerate(self.eigvect.T):
                 self.eigvect[:, iv] = v/np.linalg.norm(v)
 
         elif which == "power":
-            # normalise to have fixed power
+            # normalisation to have fixed power
             power = 1 if power is None else power
 
             fisxs = self.geometry.getxs("Fiss")
@@ -403,7 +389,7 @@ class PhaseSpace:
                 self.eigvect[:, iv] = v*C
 
         elif which == "totalflux":
-            # normalise total flux
+            # normalisation total flux
             skip = None
             for iv, v in enumerate(self.eigvect.T):
                 if skip is not None:
@@ -414,7 +400,7 @@ class PhaseSpace:
                 y = self.get(moment=0, mode=iv)
                 if len(y.shape) > 1:
                     skip = []
-                    # normalise all positive eigenf
+                    # normalisation all positive eigenf
                     for ic, col in enumerate(y.T):
                         ivpos = np.argwhere(self.eigvals == eig[ic])[0][0]
                         skip.append(ivpos)
@@ -423,18 +409,18 @@ class PhaseSpace:
                     self.eigvect[:, iv] = v/self.braket(y)
 
         elif which == "peaktotalflux":
-            # normalise peak total flux
+            # normalisation peak total flux
             for iv, v in enumerate(self.eigvect.T):
                 y = self.get(moment=0, mode=iv)
                 self.eigvect[:, iv] = v/y.max()
 
         elif which == "reaction":
-            # normalise to have unitary reaction rate
+            # normalisation to have unitary reaction rate
             for iv, v in enumerate(self.eigvect.T):
                 self.eigvect[:, iv] = v/self.braket(A.dot(v))
 
         elif which == "biorthogonal":
-            # normalise to have <phix, F*phi>=<FX*phix, phi>=1
+            # normalisation to have <phix, F*phi>=<FX*phix, phi>=1
             n, m = self.solution.eigvect.shape[1], self.eigvect.shape[1]
             # check consistency
             if adjoint is None:
@@ -461,7 +447,7 @@ class PhaseSpace:
             print(msg)
 
     def xplot(self, group, angle=None, mode=0, moment=0, family=0, ax=None,
-              precursors=False, title=None, imag=False, normalise=True,
+              precursors=False, title=None, imag=False, normalisation="peaktotalflux",
               figname=None, **kwargs):
         """
         Plot solution along space for a certain portion of the phase space.
@@ -486,7 +472,7 @@ class PhaseSpace:
             DESCRIPTION. The default is None.
         imag : TYPE, optional
             DESCRIPTION. The default is False.
-        normalise : TYPE, optional
+        normalisation : TYPE, optional
             DESCRIPTION. The default is True.
         **kwargs : TYPE
             DESCRIPTION.
@@ -498,7 +484,7 @@ class PhaseSpace:
         """
         y = self.get(group, angle=angle, mode=mode, family=family,
                      precursors=precursors, moment=moment,
-                     normalise=normalise, )
+                     normalisation=normalisation, )
         yr, yi = y.real, y.imag
         if len(yr) == self.geometry.nS:
             x = self.geometry.mesh
@@ -534,7 +520,7 @@ class PhaseSpace:
 
     def eplot(self, x=None, angle=None, mode=0, moment=0, family=0, ax=None,
               precursors=False, title=None, figname=None, imag=False,
-              normalise=True, **kwargs, ):
+              normalisation=True, **kwargs, ):
         """
         Plot solution along energy for a certain portion of the phase space.
 
@@ -558,7 +544,7 @@ class PhaseSpace:
             DESCRIPTION. The default is None.
         imag : TYPE, optional
             DESCRIPTION. The default is False.
-        normalise : TYPE, optional
+        normalisation : TYPE, optional
             DESCRIPTION. The default is True.
         **kwargs : TYPE
             DESCRIPTION.
@@ -575,7 +561,7 @@ class PhaseSpace:
             for g in range(self.nE):
                 y = self.get(g+1, angle=angle, mode=mode, family=family,
                              precursors=precursors, moment=moment,
-                             normalise=normalise,)
+                             normalisation=normalisation,)
                 mesh = self.geometry.mesh
                 eflx[g] = y[np.argmin(abs(mesh-x))]
         else:  # space integration
@@ -583,11 +569,11 @@ class PhaseSpace:
             for g in range(self.nE):
                 y = self.get(g+1, angle=angle, mode=mode, family=family,
                              precursors=precursors, moment=moment,
-                             normalise=normalise,)
+                             normalisation=normalisation,)
                 eflx[g] = self.braket(y, dims='nS',
                                       phasespacevolume={'g': None})
 
-        if normalise:
+        if normalisation:
             u = np.log(E/E[0])
             eflx = eflx/np.diff(-u)
         yr, yi = eflx.real, eflx.imag
@@ -614,12 +600,13 @@ class PhaseSpace:
             plt.tight_layout()
             plt.savefig(f"{figname}.pdf")
 
-    def plotspectrum(self, loglog=False, gaussplane=True,
-                     timelimit=None, delayed=False,
+    def plotspectrum(self, loglog=False, semilogy=False, semilogx=False,
+                     gaussplane=True, timelimit=None, delayed=False,
                      ax=None, grid=True, colormap=False,
                      ylims=None, xlims=None, threshold=None, subplt=False,
                      fundmark="*", fundcol="blue", fundsize=None,
-                     markerfull=True,
+                     markerfull=True, fillalpha=0.15, usetex=True,
+                     linthreshx=None, linthreshy=None,
                      label=None, figname=None, **kwargs):
         """
         Plot operator spectrum (i.e. all eigenvalues).
@@ -690,6 +677,12 @@ class PhaseSpace:
         val, _ = self.getfundamental(lambdas)
         ifund = np.where(self.eigvals == val)
         evals = np.delete(self.eigvals, ifund)
+        
+        # eliminate nans and inf
+        inan = np.where(evals == np.nan)        
+        evals = np.delete(evals, inan)
+        iinf = np.where(abs(evals) == np.inf)        
+        evals = np.delete(evals, iinf)        
         show = 1
 
         if threshold is not None:
@@ -710,19 +703,12 @@ class PhaseSpace:
                 sub1 = fig.add_subplot(1, 1, 1)
 
         # --- marker settings
-        kwargs.setdefault("s", 20)
-        kwargs.setdefault("ec", "k")
-        kwargs.setdefault("alpha", 0.5)
-        kwargs.setdefault("marker", "o")
         if colormap:
             kwargs.setdefault("cmap", 'Spectral_r')
-            cols = abs(self.eigvals)
-            kwargs.setdefault("c", np.delete(cols, ifund))
+            cols = abs(evals)
             kwargs.setdefault("lw", 0.1)
-            kwargs.setdefault("norm", LogNorm())
-        else:
-            kwargs.setdefault("facecolors", "red")
-            kwargs.setdefault("lw", 0.5)
+            kwargs.update({"c": cols})
+            kwargs.update({"norm": LogNorm()})
 
         if gaussplane:
             h1 = sub1.scatter(evals.real, evals.imag,label=label,
@@ -736,7 +722,7 @@ class PhaseSpace:
         fundcol = "blue" if fundcol is None else fundcol
         fundsize = 5 if fundsize is None else fundsize
         kwargs.update(alpha=1)
-        kwargs.update(s=kwargs['s']*fundsize)
+        kwargs.update(s=rcParams['lines.markersize']** 2*fundsize)
         kwargs.update(lw=0.5)
         kwargs.update(marker=fundmark)
 
@@ -758,8 +744,12 @@ class PhaseSpace:
         else:
             label = self.problem
 
-        xlbl = f"Re($\{label}$)" if usetex else f"Re({label})"
-        ylbl = f"Im($\{label}$)" if usetex else f"Im({label})"
+        if self.problem != 'kappa':
+            xlbl = f"Re($\{label}$)" if usetex else f"Re({label})"
+            ylbl = f"Im($\{label}$)" if usetex else f"Im({label})"
+        else:
+            xlbl = f"Re(k)"
+            ylbl = f"Im(k)"
 
         if self.problem == "alpha" or self.problem == "omega":
             uom = "\\textsuperscript{-1}" if usetex else "^{-1}"
@@ -776,8 +766,8 @@ class PhaseSpace:
                 sub1.axvline(-max(lambdas), lw=0.5, ls='-.', c='k')
 
         if ylims is None:
-            mineig = min(self.eigvals.imag)
-            maxeig = max(self.eigvals.imag)
+            mineig = min(evals.imag)
+            maxeig = max(evals.imag)
             ylo = np.sign(mineig)*np.ceil(abs(mineig))
             yup = np.sign(maxeig)*np.ceil(abs(maxeig))
             if loglog:
@@ -792,8 +782,10 @@ class PhaseSpace:
             ylo, yup = ylims
 
         if xlims is None:
-            mineig = min(self.eigvals.real)
-            maxeig = max(self.eigvals.real)
+            mineig = min(evals.real)
+            maxeig = max(evals.real)
+            mineig = val if mineig > val else mineig
+            maxeig = val if maxeig < val else maxeig
             xlo = np.sign(mineig)*np.ceil(abs(mineig))
             xup = np.sign(maxeig)*np.ceil(abs(maxeig))
             if loglog:
@@ -808,47 +800,87 @@ class PhaseSpace:
             sub1.set_xlim(xlims)
 
         if loglog:
-            im = self.eigvals.imag
-            im = im[im != 0]
-            linscale = min(abs(im))/100
-            sub1.set_yscale("symlog", subs=np.arange(2, 9), linscale=linscale)
-            sub1.set_xscale("symlog", subs=np.arange(2, 9))
+            if linthreshy is None:
+                im = evals.imag
+                im = im[im != 0]
+                linthreshy = min(abs(im))/100 if len(im) != 0 else 1
+            
+            if linthreshx is None:
+                re = evals.real
+                re = re[re != 0]
+                linthreshx = min(abs(re))/100 if len(re) != 0 else 1
+
+            sub1.set_yscale("symlog", subs=np.arange(2, 9), linthresh=linthreshy)
             yticks = sub1.axes.get_yticks()
-            if 0 in yticks:
-                idy = np.argwhere(yticks==0)[0][0]
-                start = 1 if idy % 2 else 0
-                yticks = yticks[start::2]
+            while len(yticks) > 7:
+                if 0 in yticks:
+                    idy = np.argwhere(yticks==0)[0][0]
+                    start = 1 if idy % 2 else 0
+                    yticks = yticks[start::2]
+                else:
+                    yticks = np.insert(yticks, 0, 0)
             sub1.set_yticks(yticks)
 
+            sub1.set_xscale("symlog", subs=np.arange(2, 9), linthresh=linthreshx)
             xticks = sub1.axes.get_xticks()
-            if 0 in xticks:
-                idx = np.argwhere(xticks==0)[0][0]
+            while len(xticks) > 7:
+                if 0 in xticks:
+                    idx = np.argwhere(xticks==0)[0][0]
+                else:
+                    idx = np.round(len(xticks))
                 start = 1 if idx % 2 else 0
                 xticks = xticks[start::2]
             sub1.set_xticks(xticks)
         else:
-            sub1.ticklabel_format(axis="x", scilimits=[-5, 5])
-            sub1.ticklabel_format(axis="y", scilimits=[-5, 5])
+            # y-axis
+            if semilogy:
+                if linthreshy is None:
+                    im = evals.imag
+                    im = im[im != 0]
+                    linthreshy = min(abs(im))/100 if len(im) != 0 else 1
+                
+                sub1.set_yscale("symlog", subs=np.arange(2, 9), linthresh=linthreshy)
+                yticks = sub1.axes.get_yticks()
+                while len(yticks) > 7:
+                    if 0 in yticks:
+                        idy = np.argwhere(yticks==0)[0][0]
+                        start = 1 if idy % 2 else 0
+                        yticks = yticks[start::2]
+                        
+                sub1.set_yticks(yticks)
+            else:
+                sub1.ticklabel_format(axis="y", scilimits=[-5, 5])
+            # x-axis
+            if semilogx:                
+                if linthreshx is None:
+                    re = evals.real
+                    re = re[re != 0]
+                    linthreshx = min(abs(re))/100 if len(re) != 0 else 1
 
-        if grid is True:
+                linthreshx = 1E-10
+                sub1.set_xscale("symlog", subs=np.arange(2, 9), linthresh=linthreshx)
+            else:
+                sub1.ticklabel_format(axis="x", scilimits=[-5, 5])
+            
+        if grid:
             sub1.grid(alpha=0.1)
 
         if colormap:
             cbar = plt.colorbar(h1, label='eigenvalue magnitude')
-            cbar.formatter = ticker.LogFormatterMathtext(base=10)
+            cbar.formatter = tkr.LogFormatterMathtext(base=10)
             cbar.update_ticks()
 
-        if subplt is True:
+        if subplt:
             minl, maxl = min(-lambdas[:, 0]), max(-lambdas[:, 0])
-            miny, maxy = min(self.eigvals.imag), max(self.eigvals.imag)
-            maxx = max(self.eigvals.real)
+            miny, maxy = min(evals.imag), max(evals.imag)
+            maxx = max(evals.real)
             # plot blocked area
             sub1.fill_between((minl*maxx/10, -minl*maxx/10), miny*1.1,
-                              maxy*1.1, facecolor="red", alpha=0.15, )
+                              maxy*1.1, facecolor="red", alpha=fillalpha, )
 
-            choice = np.logical_and(np.greater_equal(self.eigvals.real, minl),
-                                    np.less_equal(self.eigvals.real, maxl))
-            delayed = np.extract(choice, self.eigvals.real)
+            choice = np.logical_and(np.greater_equal(evals.real, minl),
+                                    np.less_equal(evals.real, maxl))
+            delayed = np.extract(choice, evals.real)
             sub2.scatter(delayed.real, delayed.imag, marker="o", color="red")
 
             # add fundamental
@@ -1020,7 +1052,7 @@ class PhaseSpace:
                 return eigenvalue, eigenvector
 
     def get(self, group=None, angle=None, moment=0, mode=0, family=0,
-            nEv=None, normalise=False, precursors=False, ):
+            nEv=None, normalisation=False, precursors=False, ):
         """
         Get spatial flux distribution for group, angle/moment and spatial mode.
 
@@ -1051,10 +1083,10 @@ class PhaseSpace:
 
         """
         if self.problem == "static":
-            normalise = False
-        if normalise is not False:
-            which = "phasespace" if normalise else normalise
-            self.normalise(which=which)
+            normalisation = False
+        if normalisation is not False:
+            which = "phasespace" if normalisation else normalisation
+            self.normalisation(which=which)
 
         if self.model == "PN" or self.model == "Diffusion":
             y = self._getPN(group=group, angle=angle, moment=moment,
@@ -1314,6 +1346,6 @@ class PhaseSpace:
             if k == 'geometry':
                 self.geometry = Slab(h5file=v)
             else:
-                if type(v) is bytes:
-                    v = v.decode()
+                # if type(v) is bytes:
+                #     v = v.decode()
                 self.__dict__[k] = v
