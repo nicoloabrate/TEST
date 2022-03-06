@@ -338,7 +338,7 @@ def ptime(ge, fmt='csc'):
     """
     M = []
     Mapp = M.append
-    xs = np.ones((1, ge.nLayers))
+    xs = np.ones((ge.nLayers, ))
     for family in range(ge.NPF):  # precursor family
         e = FD.zero(ge, xs, 'edges')
         if family == 0:
@@ -376,6 +376,7 @@ def emission(ge, fmt='csc'):
         # move along columns
         Mapp(diags(e, [0], (m, n), format=fmt))
     return M
+
 
 def decay(ge, fmt='csc'):
     """
