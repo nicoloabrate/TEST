@@ -40,7 +40,7 @@ kinetics = ['lambda', 'beta']
 alldata = list(set([*sumxs, *indepdata, *basicdata, *kinetics]))
 
 collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(0, 8))),
-               *list(map(lambda z: "Sp"+str(z), range(0, 8))), 'Invv']
+               *list(map(lambda z: "Sp"+str(z), range(0, 8))), 'Invv', 'Transpxs']
 collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'Kappa']
 
 units = {'Chid': '-', 'Chit': '-', 'Chip': '-', 'Tot': 'cm^{-1}',
@@ -524,6 +524,8 @@ class Material():
             sTOT1 = self.S1.sum(axis=0) if len(self.S1.shape) > 1 else self.S1
             self.mu0 = 0*self.Tot if np.isnan((sTOT1/sTOT).sum()) \
                 else sTOT1/sTOT
+        elif 'Transpxs' in datavail:
+             self.mu0 = (self.Tot- self.Transpxs)/sTOT
         elif 'Diffcoef' in datavail:
             tmp = 1/(3*self.Diffcoef)
             self.mu0 = (self.Tot-tmp)/sTOT
@@ -582,10 +584,57 @@ class Material():
                     else:
                         print(err)
 
-                # ensure pdf normalisation
+        # --- ensure consistency kinetic parameters (if fissile medium)
+        isFiss = self.Fiss.max() > 0
+        if isFiss:
+            if abs(self.Chit.sum() - 1) > 1E-5:
+                print(f'Total fission spectra in {self.UniName} not \
+                      normalised!')
+            # ensure pdf normalisation
+            self.Chit /= self.Chit.sum()
+            if "Kappa" not in self.__dict__.keys():
+                self.Kappa = np.array([200]*self.nE)
+        else:
+            self.Kappa = np.array([0]*self.nE)
+
+        kincons = True
+        for s in kinetics:
+            if s not in datavail:
+                kincons = False
+                self.__dict__[s] = [0]
+
+        if kincons:
+            try:
+                self.beta_tot = self.beta.sum()
+                if len(self.Chid.shape) == 1:
+                    # each family has same emission spectrum
+                    self.Chid = np.asarray([self.Chid]*self.NPF)
+                elif self.Chid.shape != (self.NPF, self.nE):
+                    raise OSError(f'Delayed fiss. spectrum should be \
+                                    ({self.NPF}, {self.nE})')
+
+                for g in range(0, self.nE):
+                    chit = (1-self.beta.sum())*self.Chip[g] + \
+                            np.dot(self.beta, self.Chid[:, g])
+                    if abs(self.Chit[g]-chit) > 1E-3:
+                        raise OSError(f'Fission spectra or delayed \
+                                        fractions in {self.UniName} not \
+                                        consistent!')
+            except AttributeError as err:
+                if "'Material' object has no attribute 'Chid'" in str(err) or 'Chip' in str(err):
+                    self.Chid = np.asarray([self.Chit]*self.NPF)
+                    self.Chip = self.Chit
+                else:
+                    print(err)
+
+            # ensure pdf normalisation
+            if isFiss:
                 self.Chip /= self.Chip.sum()
                 for p in range(self.NPF):
                     self.Chid[p, :] /= self.Chid[p, :].sum()
+        else:
+            self.Chip = self.Chit
+            self.Chid = self.Chit
 
     def void(self, keepXS=None, sanitycheck=True):
         """
@@ -687,8 +736,8 @@ class Material():
             flx = spectrum
         else:
             if 'Flx' not in self.__dict__.keys():
-                raise OSError(f'Collapsing failed: weighting flux missing in'
-                              '{self.UniName}')
+                raise OSError('Collapsing failed: weighting flux missing in'
+                              f'{self.UniName}')
             else:
                 flx = self.Flx
 
@@ -870,7 +919,7 @@ class Mix(Material):
                 nuba = xsf[k]['Nubar']
                 # mix Nubar
                 self.Nubar += fiss*nuba
-                # mix emission spectra            
+                # mix emission spectra
                 self.Chit += xsf[k]['Chit']*np.sum(fiss*nuba)
                 if beta.max() > 0:
                     self.beta += beta[i, :]*np.sum(fiss*nuba)
@@ -889,7 +938,7 @@ class Mix(Material):
             # FIXME Fission energy is missing!
             for f in range(NPF):
                 self.Chid[f, :] = self.Chid[f, :]/(fissionprod*beta[:, f]).sum()
-      
+
         # # TODO FIXME
         # if self.Fiss.max() > 0:
         #     for s in collapse_xsf:
