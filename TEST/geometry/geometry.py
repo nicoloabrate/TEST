@@ -360,20 +360,19 @@ class Slab:
                     for ireg, reg in self.regionmap.items():
                         S = self.regions[reg].L
                         L = S if S > L else L  # get maximum scattering order
-                    L = 1 if L == 0 else L
-                    shape = (self.nE, self.nE, self.nLayers, L)
+                    shape = (self.nE, self.nE, self.nLayers, L+1)
                     allL = True
                 else:
                     shape = (self.nE, self.nE, self.nLayers)
                     allL = False
 
-                vals = np.full(shape, -1000.)
+                vals = np.full(shape, np.nan)
                 # loop over regions
                 for ireg, reg in self.regionmap.items():
-                    if allL is True:
+                    if allL:
                         old_key = 'S'
                         # get all scattering order matrices for each region
-                        for ll in range(L):
+                        for ll in range(L+1):
                             key = '%s%d' % (old_key, ll)
                             vals[:, :, ireg, ll] = self.regions[reg].\
                                 getxs(key, pos1, pos2)
@@ -454,6 +453,8 @@ class Slab:
                     raise OSError('The perturbation intensities required \
                                   should be {}'.format(self.nE))
 
+            if isinstance(x, list):
+                x = tuple(x)
             if isinstance(x, tuple):
                 x = [x]
 
