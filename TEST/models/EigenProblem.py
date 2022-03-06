@@ -190,7 +190,7 @@ class eigenproblem():
                          'eigenvectors' : eigvect,
                          'problem': self.which}
             self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
-                                       normalise=None)
+                                       normalisation=None)
 
             if self.fundamentalconverged():
                 nofund = False
@@ -205,7 +205,7 @@ class eigenproblem():
                 E.setDimensions(nev=self.nev)
                 E.solve()
 
-        self.solution.normalise(which=normalisation)
+        self.solution.normalisation(which=normalisation)
         end = t.time()
 
         if verbose:
@@ -478,7 +478,7 @@ class eigenproblem():
                          'eigenvectors': eigvect,
                          'problem': self.which}
             self.solution = PhaseSpace(self.geometry, myeigpair,
-                                       self.operators, normalise=True,
+                                       self.operators, normalisation=True,
                                        whichnorm=normalisation)
 
         elif algo == 'eig':
@@ -507,7 +507,7 @@ class eigenproblem():
                          'eigenvectors' : eigvect,
                          'problem': self.which}
             self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
-                                       normalise=True, whichnorm=normalisation)
+                                       normalisation=True, whichnorm=normalisation)
 
         else:
             if algo != 'SLEPc':
