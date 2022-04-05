@@ -19,7 +19,7 @@ class NTE():
                  fmt='csr', prompt=False, allope=False):
         self.model = model
         if model == 'Diffusion':
-            self.nA = 0
+            N = 0
         else:
             if N is None:
                 if 'P' in model:
@@ -35,6 +35,7 @@ class NTE():
             ge.computeQW()
 
         self.nA = N
+        ge.nA = N
         self.nS = ge.nS
         self.nE = ge.nE
         self.geometry = ge.geometry
@@ -84,6 +85,12 @@ class NTE():
     def spy(self, what, markersize=2):
         spy(self.__dict__[what], markersize=markersize)
 
+    def todense(self):
+        operators = ["F0", "C", "S0", "L", "S", "F", "Fp", "Fd", "T"]
+        for ope in operators:
+            if hasattr(self, ope):
+                self.__dict__[ope] = self.__dict__[ope].todense()
+
 
 def couple2NPE(nteOper, npeOper, nF, model):
         # get dimensions
@@ -101,8 +108,8 @@ def couple2NPE(nteOper, npeOper, nF, model):
             No = (nA+1)//2 if nA % 2 != 0 else nA//2
             Ne = nA+1-No
         elif model == 'Diffusion':
-            No = 1
-            Ne = 0
+            No = 0
+            Ne = 1
         else: # SN
             No = nA
             Ne = 0
@@ -137,13 +144,17 @@ def couple2NPE(nteOper, npeOper, nF, model):
         # leakage
         L = bmat([[nteOper.L, A1], [A1.T, A2]])
         # emission
-        if 'S' in model:
+        if 'S' in model:  # SN
             tmp = npeOper.E
         else:
             tmp = csr_matrix((n, m))
             for gro in range(nE):
                 skip = (No*(nS-1)+Ne*nS)*gro
                 tmp[skip:nS+skip, :] = npeOper.E[nS*gro:nS*(gro+1), :]
+                # FIXME TODO: define class for operator handling allowing to impose BCs
+                # impose BCs in Diffusion case
+                if model == "Diffusion":
+                    tmp[[skip, skip+nS-1], :] = 0
         E = bmat([[A4, tmp.copy()], [A3, A2]])
         # decay
         D = block_diag(([A4, npeOper.D]))
