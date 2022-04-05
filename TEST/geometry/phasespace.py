@@ -20,21 +20,13 @@ import TEST.methods.space.FV as FV
 import TEST.utils.h5 as myh5
 from TEST.geometry import Slab
 
-# usetex = checkdep_usetex(True)
-# rc('text', usetex=usetex)
-# rc('font', **{'family' : "sans-serif"})
-# if usetex:
-#     rc('font', **{'family' : "sans-serif"})
-#     params= {'text.latex.preamble' : r'\usepackage{libertinus}'}
-#     rcParams.update(params)
-
 
 class PhaseSpace:
     """Define phase space object."""
 
     def __init__(self, geometry=None, solution=None, operators=None,
                  h5name=None, energygrid=None, source=False, normalisation=False,
-                 whichnorm="phasespace"):
+                 whichnorm="phasespace", **kwargs):
         """
         Initialise phase space object.
 
@@ -137,7 +129,7 @@ class PhaseSpace:
                         pass
 
                     if normalisation:
-                        self.normalisation(which=whichnorm)
+                        self.normalisation(which=whichnorm, **kwargs)
             else:
                 msg = "Type {} cannot be handled by phase" "space!".format(
                         type(solution))
@@ -309,7 +301,8 @@ class PhaseSpace:
 
         return y
 
-    def normalisation(self, which="phasespace", adjoint=None, power=None, A=None):
+    def normalisation(self, which="phasespace", mode=None, adjoint=None,
+                      power=None, A=None):
         """
         normalisation eigenvectors according to a user-defined criterion.
 
@@ -328,15 +321,17 @@ class PhaseSpace:
         """
         # FIXME TODO reduce lines, only one loop over eigenfunctions
         nS, nE = self.geometry.nS, self.geometry.nE
+        modes = range(len(self.eigvals)) if mode is None else [mode]
         if which in ["phasespace", "totalflux"]:
             skip = None
-            for iv, v in enumerate(self.eigvect.T):
+            for iv in modes:
                 if skip is not None:
                     if iv in skip:
                         continue
                 if iv == 0:
                     eig, _ = self.getfundamental()
                 y = self.get(moment=0, mode=iv)
+                v = self.eigvect[:, iv]
 
                 if len(y.shape) > 1:
                     skip = []
@@ -360,16 +355,16 @@ class PhaseSpace:
 
         elif which == "norm2":
             # normalisation to have unitary euclidean norm
-            for iv, v in enumerate(self.eigvect.T):
+            for iv in modes:
+                v = self.eigvect[:, iv]
                 self.eigvect[:, iv] = v/np.linalg.norm(v)
 
         elif which == "power":
             # normalisation to have fixed power
             power = 1 if power is None else power
-
             fisxs = self.geometry.getxs("Fiss")
             try:
-                kappa = self.geometry.getxs("Kappa")*1.6e-13  # [J]
+                kappa = self.geometry.getxs("Kappa")*1.60217653e-13  # [J]
             except KeyError:
                 kappa = 200*1.6e-13  # J
 
@@ -385,19 +380,20 @@ class PhaseSpace:
 
             y = self.get(moment=0, mode=0)
             C = power/self.braket(KFiss*y)
-            for iv, v in enumerate(self.eigvect.T):
-                self.eigvect[:, iv] = v*C
+            for iv in modes:
+                self.eigvect[:, iv] *= C
 
         elif which == "totalflux":
             # normalisation total flux
             skip = None
-            for iv, v in enumerate(self.eigvect.T):
+            for iv in modes:
                 if skip is not None:
                     if iv in skip:
                         continue
                 if iv == 0:
                     eig, _ = self.getfundamental()
                 y = self.get(moment=0, mode=iv)
+                v = self.eigvect[:, iv]
                 if len(y.shape) > 1:
                     skip = []
                     # normalisation all positive eigenf
@@ -410,13 +406,15 @@ class PhaseSpace:
 
         elif which == "peaktotalflux":
             # normalisation peak total flux
-            for iv, v in enumerate(self.eigvect.T):
+            for iv in modes:
+                v = self.eigvect[:, iv]
                 y = self.get(moment=0, mode=iv)
                 self.eigvect[:, iv] = v/y.max()
 
         elif which == "reaction":
             # normalisation to have unitary reaction rate
-            for iv, v in enumerate(self.eigvect.T):
+            for iv in modes:
+                v = self.eigvect[:, iv]
                 self.eigvect[:, iv] = v/self.braket(A.dot(v))
 
         elif which == "biorthogonal":
@@ -436,7 +434,8 @@ class PhaseSpace:
                        "for steady state condition!")
                 raise OSError(msg)
 
-            for iv, v in enumerate(self.eigvect.T):
+            for iv in modes:
+                v = self.eigvect[:, iv]
                 v_adj = self.solution.eigvect[:, iv]
                 F = self.operators.F
                 self.eigvect[:, iv] = v/self.braket(F.dot(v_adj), v)
@@ -447,7 +446,7 @@ class PhaseSpace:
             print(msg)
 
     def xplot(self, group, angle=None, mode=0, moment=0, family=0, ax=None,
-              precursors=False, title=None, imag=False, normalisation="peaktotalflux",
+              precursors=False, title=None, imag=False, normalisation="peaktotalflux", power=None,
               figname=None, **kwargs):
         """
         Plot solution along space for a certain portion of the phase space.
@@ -484,7 +483,7 @@ class PhaseSpace:
         """
         y = self.get(group, angle=angle, mode=mode, family=family,
                      precursors=precursors, moment=moment,
-                     normalisation=normalisation, )
+                     normalisation=normalisation, power=power)
         yr, yi = y.real, y.imag
         if len(yr) == self.geometry.nS:
             x = self.geometry.mesh
@@ -510,7 +509,7 @@ class PhaseSpace:
         # ax.set_ylim(y.min())
         # ax.set_xlim([min(self.geometry.layers), max(self.geometry.layers)])
         ax.xaxis.set_major_formatter(FormatStrFormatter("%g"))
-        ax.yaxis.set_major_formatter(FormatStrFormatter("%.2f"))
+        ax.yaxis.set_major_formatter(FormatStrFormatter("%.2e"))
         if title is not None:
             ax.set_title(title)
         plt.grid(which='both', alpha=0.2)
@@ -518,9 +517,9 @@ class PhaseSpace:
             plt.tight_layout()
             plt.savefig(f"{figname}.pdf")
 
-    def eplot(self, x=None, angle=None, mode=0, moment=0, family=0, ax=None,
+    def eplot(self, eflx=None, x=None, angle=None, mode=0, moment=0, family=0, ax=None,
               precursors=False, title=None, figname=None, imag=False,
-              normalisation=True, **kwargs, ):
+              lethargynorm=True, logx=True, logy=True, **kwargs, ):
         """
         Plot solution along energy for a certain portion of the phase space.
 
@@ -554,44 +553,59 @@ class PhaseSpace:
         None.
 
         """
+        if logx and logy:
+            loglog = True
+        else:
+            loglog = False
+
         E = self.geometry.energygrid
+        if eflx is None:
+            if x:
+                eflx = np.zeros((self.nE, ))
+                for g in range(self.nE):
+                    y = self.get(g+1, angle=angle, mode=mode, family=family,
+                                precursors=precursors, moment=moment,
+                                **kwargs,)
+                    mesh = self.geometry.mesh
+                    eflx[g] = y[np.argmin(abs(mesh-x))]
+            else:  # space integration
+                eflx = np.zeros((self.nE,))
+                for g in range(self.nE):
+                    y = self.get(g+1, angle=angle, mode=mode, family=family,
+                                precursors=precursors, moment=moment,
+                                **kwargs,)
+                    eflx[g] = self.braket(y, dims='nS',
+                                        phasespacevolume={'g': None})
 
-        if x:
-            eflx = np.zeros((self.nE, ))
-            for g in range(self.nE):
-                y = self.get(g+1, angle=angle, mode=mode, family=family,
-                             precursors=precursors, moment=moment,
-                             normalisation=normalisation,)
-                mesh = self.geometry.mesh
-                eflx[g] = y[np.argmin(abs(mesh-x))]
-        else:  # space integration
-            eflx = np.zeros((self.nE,))
-            for g in range(self.nE):
-                y = self.get(g+1, angle=angle, mode=mode, family=family,
-                             precursors=precursors, moment=moment,
-                             normalisation=normalisation,)
-                eflx[g] = self.braket(y, dims='nS',
-                                      phasespacevolume={'g': None})
-
-        if normalisation:
-            u = np.log(E/E[0])
-            eflx = eflx/np.diff(-u)
+        if lethargynorm:
+            u = np.log(E[0]/E)
+            eflx = eflx/np.diff(u)
         yr, yi = eflx.real, eflx.imag
         ax = ax or plt.gca()
 
-        if np.any(yi):
-            plt.stairs(yr, edges=E, baseline=None, **kwargs)
+        yr = np.zeros((len(eflx.real)+1,))
+        yr[0] = eflx.real[0]
+        yr[1:] = eflx.real
+
+        if np.any(eflx.imag):
+            yi = np.zeros((len(eflx.imag)+1,))
+            yi[0] = eflx.imag[0]
+            yi[1:] = eflx.imag
+            plt.step(E, yr, where='mid', **kwargs)
             if "label" in kwargs.keys():
                 kwargs["label"] = "{} real".format(kwargs["label"])
 
             if "label" in kwargs.keys():
                 kwargs["label"] = "{} imag".format(kwargs["label"])
-            plt.stairs(yi, edges=E, baseline=None, **kwargs)
+            plt.step(E, yi, where='mid', **kwargs)
         else:
-            plt.stairs(yr, edges=E, baseline=None, **kwargs)
+            plt.step(E, yr, where='mid', **kwargs)
 
-        ax.set_xscale('log')
-        ax.set_yscale('log')
+        if loglog or logx:
+            ax.set_xscale('log')
+        if loglog or logy:
+            ax.set_yscale('log')
+
         plt.grid(which='both', alpha=0.2)
         ax.set_xlabel('E [MeV]')
         if title is not None:
@@ -606,7 +620,7 @@ class PhaseSpace:
                      ylims=None, xlims=None, threshold=None, subplt=False,
                      fundmark="*", fundcol="blue", fundsize=None,
                      markerfull=True, fillalpha=0.15, usetex=True,
-                     linthreshx=None, linthreshy=None,
+                     linthreshx=None, linthreshy=None, plotfund=True,
                      label=None, figname=None, **kwargs):
         """
         Plot operator spectrum (i.e. all eigenvalues).
@@ -674,20 +688,22 @@ class PhaseSpace:
         else:
             lambdas = None
 
-        val, _ = self.getfundamental(lambdas)
-        ifund = np.where(self.eigvals == val)
-        evals = np.delete(self.eigvals, ifund)
-        
+        if plotfund:
+            val, _ = self.getfundamental()
+            ifund = np.where(self.eigvals == val)
+            evals = np.delete(self.eigvals, ifund)
+        else:
+            evals = self.eigvals
         # eliminate nans and inf
-        inan = np.where(evals == np.nan)        
-        evals = np.delete(evals, inan)
-        iinf = np.where(abs(evals) == np.inf)        
-        evals = np.delete(evals, iinf)        
+        evals = evals[~np.isnan(evals)]
+        iinf = np.where(abs(evals) == np.inf)
+        evals = np.delete(evals, iinf)
         show = 1
 
         if threshold is not None:
-            if abs(val) > threshold:
-                show = np.nan
+            if plotfund:
+                if abs(val) > threshold:
+                    show = np.nan
             evals = evals[abs(evals) < threshold]
 
         if subplt:
@@ -718,23 +734,24 @@ class PhaseSpace:
                          **kwargs)
 
         # --- plot fundamental
-        fundmark = "*" if fundmark is None else fundmark
-        fundcol = "blue" if fundcol is None else fundcol
-        fundsize = 5 if fundsize is None else fundsize
-        kwargs.update(alpha=1)
-        kwargs.update(s=rcParams['lines.markersize']** 2*fundsize)
-        kwargs.update(lw=0.5)
-        kwargs.update(marker=fundmark)
+        if plotfund:
+            fundmark = "*" if fundmark is None else fundmark
+            fundcol = "blue" if fundcol is None else fundcol
+            fundsize = 5 if fundsize is None else fundsize
+            kwargs.update(alpha=1)
+            kwargs.update(s=rcParams['lines.markersize']** 2*fundsize)
+            kwargs.update(lw=0.5)
+            kwargs.update(marker=fundmark)
 
-        if colormap:
-            kwargs.update(c=cols[ifund])
-        else:
-            kwargs.update(facecolors=fundcol)
+            if colormap:
+                kwargs.update(c=cols[ifund])
+            else:
+                kwargs.update(facecolors=fundcol)
 
-        if gaussplane:
-            sub1.scatter(show*val.real, show*val.imag, **kwargs)
-        else:
-            sub1.scatter(0, show*val, **kwargs)
+            if gaussplane:
+                sub1.scatter(show*val.real, show*val.imag, **kwargs)
+            else:
+                sub1.scatter(0, show*val, **kwargs)
 
         # --- labels and other settings
         if self.problem == "alpha":
@@ -762,8 +779,14 @@ class PhaseSpace:
         if timelimit and self.problem in ["alpha", "omega"]:
             sub1.axvline(-CorngoldLim, lw=0.5, ls='--', c='k')
             if lambdas is not None:
-                sub1.axvline(-min(lambdas), lw=0.5, ls='-.', c='k')
-                sub1.axvline(-max(lambdas), lw=0.5, ls='-.', c='k')
+                if len(lambdas.shape) > 1:
+                    minlambda = lambdas[0].min()
+                    maxlambda = lambdas[0].max()
+                else:
+                    minlambda = lambdas.min()
+                    maxlambda = lambdas.max()
+                sub1.axvline(-minlambda, lw=0.5, ls='-.', c='k')
+                sub1.axvline(-maxlambda, lw=0.5, ls='-.', c='k')
 
         if ylims is None:
             mineig = min(evals.imag)
@@ -784,8 +807,9 @@ class PhaseSpace:
         if xlims is None:
             mineig = min(evals.real)
             maxeig = max(evals.real)
-            mineig = val if mineig > val else mineig
-            maxeig = val if maxeig < val else maxeig
+            if plotfund:
+                mineig = val if mineig > val else mineig
+                maxeig = val if maxeig < val else maxeig
             xlo = np.sign(mineig)*np.ceil(abs(mineig))
             xup = np.sign(maxeig)*np.ceil(abs(maxeig))
             if loglog:
@@ -804,7 +828,7 @@ class PhaseSpace:
                 im = evals.imag
                 im = im[im != 0]
                 linthreshy = min(abs(im))/100 if len(im) != 0 else 1
-            
+
             if linthreshx is None:
                 re = evals.real
                 re = re[re != 0]
@@ -838,7 +862,7 @@ class PhaseSpace:
                     im = evals.imag
                     im = im[im != 0]
                     linthreshy = min(abs(im))/100 if len(im) != 0 else 1
-                
+
                 sub1.set_yscale("symlog", subs=np.arange(2, 9), linthresh=linthreshy)
                 yticks = sub1.axes.get_yticks()
                 while len(yticks) > 7:
@@ -846,12 +870,12 @@ class PhaseSpace:
                         idy = np.argwhere(yticks==0)[0][0]
                         start = 1 if idy % 2 else 0
                         yticks = yticks[start::2]
-                        
+
                 sub1.set_yticks(yticks)
             else:
                 sub1.ticklabel_format(axis="y", scilimits=[-5, 5])
             # x-axis
-            if semilogx:                
+            if semilogx:
                 if linthreshx is None:
                     re = evals.real
                     re = re[re != 0]
@@ -861,7 +885,7 @@ class PhaseSpace:
                 sub1.set_xscale("symlog", subs=np.arange(2, 9), linthresh=linthreshx)
             else:
                 sub1.ticklabel_format(axis="x", scilimits=[-5, 5])
-            
+
         if grid:
             sub1.grid(alpha=0.1)
 
@@ -884,8 +908,9 @@ class PhaseSpace:
             sub2.scatter(delayed.real, delayed.imag, marker="o", color="red")
 
             # add fundamental
-            val, vect = self.getfundamental(lambdas)
-            sub2.scatter(0, val, marker="*", s=100, color="blue")
+            if plotfund:
+                val, vect = self.getfundamental()
+                sub2.scatter(0, val, marker="*", s=100, color="blue")
 
             # plot fundamental
             sub2.set_ylim([-1, 1])
@@ -926,8 +951,7 @@ class PhaseSpace:
             plt.savefig(f"{figname}_eig_spectrum.png")
 
     def polarspectrum(self, ax=None):
-        """
-        Plot spectrum on polar coordinates.
+        """Plot spectrum on polar coordinates.
 
         Parameters
         ----------
@@ -960,7 +984,7 @@ class PhaseSpace:
         else:
             return f"{e0:.8f}"
 
-    def getfundamental(self, lambdas=None):
+    def getfundamental(self):
         """
         Get fundamental eigenpair.
 
@@ -986,26 +1010,25 @@ class PhaseSpace:
         if self.problem in ["kappa", "gamma"]:
             for i in range(self.nev):
                 # get total flux
-                v = self.get(moment=0, nEv=i)
-                # fix almost zero points to avoid sign issues
-                v[np.abs(v) < np.finfo(float).eps] = 0
-                ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
-                if ispos:
+                # v = self.get(moment=0, nEv=i)
+                # # fix almost zero points to avoid sign issues
+                # v[np.abs(v/max(abs(v))) < np.finfo(float).eps] = 0
+                # ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
+                if self._has_uniform_sign(i):
                     idx = i
                     break
         elif self.problem in ["zeta"]:
             idxpos = []
             for i in range(self.nev):
                 # get total flux
-                v = self.get(moment=0, nEv=i)
-                # fix almost zero points to avoid sign issues
-                v[np.abs(v) < np.finfo(float).eps] = 0
-                ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
-                if ispos and self.eigvals[i] != 0:
+                # v = self.get(moment=0, nEv=i)
+                # # fix almost zero points to avoid sign issues
+                # v[np.abs(v/max(abs(v))) < np.finfo(float).eps] = 0
+                # ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
+                if self._has_uniform_sign(i) and self.eigvals[i] != 0:
                     idxpos.append(i)
             if len(idxpos) > 0:
                 idx = idxpos
-
         elif self.problem in ["alpha", "delta", "theta"]:
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
@@ -1015,24 +1038,25 @@ class PhaseSpace:
                 for i in range(len(reals)):
                     # get total flux
                     ind = np.argwhere(self.eigvals == reals[i])[0][0]
-                    v = self.get(moment=0, nEv=ind)
-                    # fix almost zero points to avoid sign issues
-                    v[np.abs(v) < np.finfo(float).eps] = 0
-                    ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
-                    if ispos:
+                    # v = self.get(moment=0, nEv=ind)
+                    # # fix almost zero points to avoid sign issues
+                    # v[np.abs(v/max(abs(v))) < np.finfo(float).eps] = 0
+                    # ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
+                    if self._has_uniform_sign(ind):
                         idx = np.argwhere(self.eigvals == reals[i])[0][0]
                         break
-
         elif self.problem == 'omega':
             reals = self.eigvals[self.eigvals.imag == 0]
+            reals[~np.isfinite(reals)] = 0
+            reals = reals[reals != 0]
             if reals.size != 0:
                 fund = max(reals)
                 idx = np.where(self.eigvals == fund)[0][0]
-                v = self.get(moment=0, nEv=idx)
-                # fix almost zero points to avoid sign issues
-                v[np.abs(v) < np.finfo(float).eps] = 0
-                ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
-                if ~ispos:
+                # v = self.get(moment=0, nEv=idx)
+                # # fix almost zero points to avoid sign issues
+                # v[np.abs(v/max(abs(v))) < 1E-5] = 0 # np.finfo(float).ep
+                # ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
+                if not self._has_uniform_sign(idx):
                     idx = None
 
         if idx is None:
@@ -1051,8 +1075,134 @@ class PhaseSpace:
                     eigenvalue = eigenvalue.real
                 return eigenvalue, eigenvector
 
+    def getprompt(self):
+        """Get prompt mode from omega spectrum.
+
+        Parameters
+        ----------
+        lambdas : _type_, optional
+            _description_, by default None
+
+        Raises
+        ------
+        PhaseSpaceError
+            _description_
+        """
+        if self.problem != 'omega':
+            raise PhaseSpaceError(f"Cannot parse prompt spectrum in {self.problem}. "
+                                   "This method works only for omega!")
+        idx = None
+        eps = 1E-12 # np.finfo(float).eps
+        lambdas = self.geometry.regions[self.geometry.regionmap[0]].__dict__['lambda']
+        # --- clean eigenvalues
+        reals = self.eigvals[self.eigvals.imag == 0]
+        reals[~np.isfinite(reals)] = 0
+        reals = reals[reals != 0]
+        reals = reals[(reals+eps < -lambdas.max()) | (reals-eps > -lambdas.min())]
+        reals[::-1].sort()
+        maybeprompt = []
+        if reals.size != 0:
+            for e in reals:
+                idx = np.where(self.eigvals == e)[0][0]
+                if self._has_uniform_sign(idx):
+                    maybeprompt.append(e)
+                else:
+                    idx = None
+            if len(maybeprompt) > 1:
+                maybeprompt = np.asarray(maybeprompt)
+                fund = maybeprompt[np.argmax(abs(maybeprompt))]
+            else:
+                fund = maybeprompt
+            idx = np.where(self.eigvals == fund)[0][0]
+
+        if idx is None:
+            raise OSError("No fundamental prompt eigenvalue detected!")
+        else:
+            if isinstance(idx, list):
+                if len(idx) == 1:
+                    idx = idx[0]
+                eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
+                if eigenvalue.imag.any() == 0:
+                    eigenvalue = eigenvalue.real
+                return eigenvalue, eigenvector
+            else:
+                eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
+                if eigenvalue.imag == 0:
+                    eigenvalue = eigenvalue.real
+                return eigenvalue, eigenvector
+
+    def getdelayed(self):
+        """Get prompt mode from omega spectrum.
+
+        Parameters
+        ----------
+        lambdas : _type_, optional
+            _description_, by default None
+
+        Raises
+        ------
+        PhaseSpaceError
+            _description_
+        """
+        if self.problem != 'omega':
+            raise PhaseSpaceError(f"Cannot parse prompt spectrum in {self.problem}. "
+                                   "This method works only for omega!")
+        idx = None
+        eps = 1E-8
+        lambdas = self.geometry.regions[self.geometry.regionmap[0]].__dict__['lambda']
+        # --- clean eigenvalues
+        reals = self.eigvals[self.eigvals.imag == 0]
+        reals[~np.isfinite(reals)] = 0
+        reals = reals[reals != 0]
+        reals = reals[(reals+eps >= -lambdas.max())]
+        reals[::-1].sort()
+        delayed = []
+        if reals.size != 0:
+            # --- divide delayed eigenvalues in families to improve detection efficiency
+            for p in range(self.nF):
+                maybedelayed = []
+                if p == 0:
+                    condition = reals >= -lambdas[p]
+                else:
+                    condition = (reals >= -lambdas[p]) & (reals+1E-8 <= -lambdas[p-1])
+                tmp = reals[condition]
+                for e in tmp:
+                    idx = np.where(self.eigvals == e)[0][0]
+                    if self._has_uniform_sign(idx):
+                        maybedelayed.append(e)
+                    else:
+                        idx = None
+                if len(maybedelayed) > 1:
+                    maybedelayed = np.asarray(maybedelayed)
+                    # to avoid taking prompt supercritical mode
+                    fund = maybedelayed[np.argmin(abs(maybedelayed))]
+                else:
+                    fund = maybedelayed
+
+                idx = np.where(self.eigvals == fund)[0][0]
+                delayed.append(idx)
+
+        if len(delayed) < self.nF:
+            raise OSError(f"Only {len(idx)} delayed eigenvalues detected!")
+        else:
+            if isinstance(delayed, list):
+                if len(delayed) == 1:
+                    idx = delayed[0]
+                else:
+                    idx = delayed
+                eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
+                if eigenvalue.imag.any() == 0:
+                    eigenvalue = eigenvalue.real
+                return eigenvalue, eigenvector
+            else:
+                eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
+                if eigenvalue.imag == 0:
+                    eigenvalue = eigenvalue.real
+                return eigenvalue, eigenvector
+
     def get(self, group=None, angle=None, moment=0, mode=0, family=0,
-            nEv=None, normalisation=False, precursors=False, ):
+            nEv=None, normalisation=False, precursors=False, interp=False,
+            **kwargs):
         """
         Get spatial flux distribution for group, angle/moment and spatial mode.
 
@@ -1073,6 +1223,9 @@ class PhaseSpace:
             Precursors family number. Default is 0.
         precursors : bool, optional
             Flag for precursor concentration. Default is ``False``.
+        interp: bool, optional
+            If ``True``, the odd order moments computed by PN are interpolated
+            on the same mesh of the even orderd moments.
 
         Returns
         -------
@@ -1084,14 +1237,14 @@ class PhaseSpace:
         """
         if self.problem == "static":
             normalisation = False
-        if normalisation is not False:
-            which = "phasespace" if normalisation else normalisation
-            self.normalisation(which=which)
+        if normalisation:
+            which = "phasespace" if not normalisation else normalisation
+            self.normalisation(which=which, mode=mode, **kwargs)
 
         if self.model == "PN" or self.model == "Diffusion":
             y = self._getPN(group=group, angle=angle, moment=moment,
                             mode=mode, family=family, precursors=precursors,
-                            nEv=nEv, )
+                            nEv=nEv, interp=interp)
         elif self.model == "SN":
             y = self._getSN(group=group, angle=angle, moment=moment,
                             mode=mode, family=family, precursors=precursors,
@@ -1099,7 +1252,7 @@ class PhaseSpace:
         return y
 
     def _getPN(self, group=None, angle=None, moment=0, mode=0, family=1,
-               nEv=None, precursors=False, ):
+               nEv=None, precursors=False, interp=False):
         """
         Get spatial flux distribution for group, angle and spatial mode.
 
@@ -1128,7 +1281,12 @@ class PhaseSpace:
             if group > self.nE:
                 msg = "Cannot get group {} for {}-group" " data!".format(
                     group, self.nE)
-                raise OSError(msg)
+                raise PhaseSpaceError(msg)
+
+        if nA == 0 and moment > 1:
+            raise PhaseSpaceError("Cannot provide angular moments higher than 1 for diffusion!")
+        elif nA == 0 and moment == 1:
+            D = self.geometry.getxs('Diffcoef')
 
         if self.problem in ["static", "delayed", "prompt"]:  # source problem
             vect = self.flux
@@ -1137,11 +1295,7 @@ class PhaseSpace:
                 vect = self.eigvect[:, nEv]
             else:
                 if mode == 0:
-                    if self.problem == "omega":
-                        lambdas = self.geometry.getxs("lambda")
-                    else:
-                        lambdas = None
-                    _, vect = self.getfundamental(lambdas)
+                    _, vect = self.getfundamental()
                 else:
                     vect = self.eigvect[:, mode]
 
@@ -1150,20 +1304,23 @@ class PhaseSpace:
                 moment = 0
                 nF = self.nF
                 if family < 1:
-                    raise OSError(f"Family number must be >0, not {family}")
+                    raise PhaseSpaceError(f"Family number must be >0, not {family}")
                 family = family - 1
                 iF = nS * family
             else:
                 iF = 0
 
-            if nA is None:
+            if nA == 0:
                 No = 0
                 Ne = 1
             else:
                 No = (nA+1)//2 if nA % 2 != 0 else nA // 2
                 Ne = nA+1-No
+            if moment % 2 == 0 or nA == 0 or interp:
+                dim = nS
+            else:
+                dim = nS-1
 
-            dim = nS if moment % 2 == 0 else nS-1
             # preallocation for group-wise moments
             gro = [group] if group else np.arange(1, self.geometry.nE+1)
             if len(vect.shape) > 1:
@@ -1178,7 +1335,7 @@ class PhaseSpace:
                         nE + (g - 1) * nF + iF + nS
                 else:
                     # compute No and Ne for the requested moment/angle
-                    if nA is None:
+                    if nA == 0:
                         NO = 0
                         NE = 1
                         skip = nS*(g-1)
@@ -1196,9 +1353,26 @@ class PhaseSpace:
                 # store slices
                 if len(vect.shape) > 1:
                     for nE in range(vect.shape[1]):
-                        y[ig * dim: dim * (ig + 1), nE] = vect[iS:iE, nE]
+                        if interp and moment % 2 != 0 and nA != 0:
+                            x = self.geometry.mesh
+                            xp = self.geometry.ghostmesh
+                            yg = np.interp(x, xp, vect[iS:iE, nE])
+                        else:
+                            yg = vect[iS:iE, nE]
+                        y[ig * dim: dim * (ig + 1), nE] = yg
                 else:
-                    y[ig * dim: dim * (ig + 1)] = vect[iS:iE]
+                    if interp and moment % 2 != 0 and nA != 0:
+                        x = self.geometry.mesh
+                        xp = self.geometry.ghostmesh
+                        yg = np.interp(x, xp, vect[iS:iE])
+                    else:
+                        yg = vect[iS:iE]
+                    y[ig * dim: dim * (ig + 1)] = yg
+
+                if nA == 0 and moment == 1:
+                    # compute current via finite difference
+                    y[ig * dim: dim * (ig + 1)] = np.gradient(vect[iS:iE], self.geometry.mesh)
+                    y[ig * dim: dim * (ig + 1)] = -D[ig, :]*y[ig * dim: dim * (ig + 1)]
         else:
             # build angular flux and evaluate in angle
             if isinstance(angle, int):
@@ -1269,11 +1443,7 @@ class PhaseSpace:
                 vect = self.eigvect[:, nEv]
             else:
                 if mode == 0:
-                    if self.problem == "omega":
-                        lambdas = self.geometry.getxs("lambda")
-                    else:
-                        lambdas = None
-                    _, vect = self.getfundamental(lambdas)
+                    _, vect = self.getfundamental()
                 else:
                     vect = self.eigvect[:, mode]
 
@@ -1331,6 +1501,45 @@ class PhaseSpace:
 
         return y
 
+    def _has_uniform_sign(self, idx):
+        """Check if mode n. idx has uniform sign (i.e. is fundamental)
+
+        Parameters
+        ----------
+        idx : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        ispos : TYPE
+            DESCRIPTION.
+
+        """
+        flux = self.get(moment=0, nEv=idx)
+        curr = self.get(moment=1, nEv=idx, interp=True)
+        # --- mask boundaries to avoid spurious values
+        mask = np.full(flux.shape, False)
+        idb = np.concatenate([np.arange(0, len(flux), self.nS),
+                              np.arange(self.nS-1, len(flux), self.nS),])
+        for i in idb:
+            mask[i] = True
+        # --- check flux sign
+        fluxnb = np.ma.MaskedArray(flux, mask=mask)
+        if fluxnb[1] >= 0:
+            is_sign_unif = np.all(fluxnb >= 0)
+            ispos = True
+        else:
+            is_sign_unif = np.all(fluxnb < 0)
+            ispos = False
+        # --- check current sign
+        if ispos:
+            is_curr_neg = np.all(curr[np.arange(0, len(flux), self.nS)] < 0)
+        else:
+            # if flux is all negative, this condition is the opposite
+            is_curr_neg = np.all(curr[np.arange(0, len(flux), self.nS)] > 0)
+
+        return is_sign_unif and is_curr_neg
+
     def to_hdf5(self, h5name=None):
         """Save phase space object to HDF5 file."""
         if h5name is None:
@@ -1349,3 +1558,6 @@ class PhaseSpace:
                 # if type(v) is bytes:
                 #     v = v.decode()
                 self.__dict__[k] = v
+
+class PhaseSpaceError(Exception):
+    pass
