@@ -6,8 +6,12 @@ File: NeutronPrecursorsEquation.py
 Description: Class that defines numerically approximated neutron precursors
              operators.
 """
+from TEST.methods.space import FD, FV
 from TEST.methods.energy import multigroup as MG
-from TEST.methods.BCs import DiffusionBCs, PNBCs, SNBCs
+from TEST.methods.angle import Diffusion
+from TEST.methods.angle.discreteordinates import SN
+from TEST.methods.angle.sphericalharmonics import PN
+from scipy.sparse import block_diag
 from matplotlib.pyplot import spy
 
 
@@ -27,20 +31,66 @@ class NPE():
         self.geometry = ge.geometry
         self.spatial_scheme = ge.spatial_scheme
         # assign operators
-        self.D = MG.decay(ge, self.model, fmt=fmt)
         self.E = MG.emission(ge, self.model, fmt=fmt)
-        self.T = MG.ptime(ge, self.model, fmt=fmt)
+        self.D = self.decay(ge, self.model, fmt)
+        self.T = self.ptime(ge, self.model, fmt)
 
-        # if BC is True or 'zero' in ge.BC:
-        #     self.BC = ge.BC
-        #     if model == 'Diffusion':
-        #         self = DiffusionBCs.setBCs(self, ge)
-        #     elif model == 'PN':
-        #         self = PNBCs.setBCs(self, ge)
-        #     elif model == 'SN':
-        #         self = SNBCs.setBCs(self, ge)
-        # else:
-        #     self.BC = False
+    @staticmethod
+    def ptime(ge, model, fmt):
+        """
+        Define precursors balance time operator.
+
+        Parameters
+        ----------
+        ge : object
+            Geometry object.
+
+        Returns
+        -------
+        None.
+
+        """
+        if model == 'PN':
+            M = PN.ptime(ge, fmt=fmt)
+        elif model == 'SN':
+            M = SN.ptime(ge, fmt=fmt)
+        elif model == 'Diffusion':
+            M = PN.ptime(ge, fmt=fmt)
+        else:
+            raise OSError('%s model not available!' % model)
+
+        # move along rows
+        APF = [block_diag((M), format=fmt)]
+        APF = block_diag((APF), format=fmt)
+        return APF
+
+    @staticmethod
+    def decay(ge, model, fmt):
+        """
+        Define time decay operator for precursors balance.
+
+        Parameters
+        ----------
+        ge : object
+            Geometry object.
+
+        Returns
+        -------
+        None.
+
+        """
+        if model == 'PN':
+            M = PN.decay(ge, fmt=fmt)
+        elif model == 'SN':
+            M = SN.decay(ge, fmt=fmt)
+        elif model == 'Diffusion':
+            M = PN.decay(ge, fmt=fmt)
+        else:
+            raise OSError('%s model not available!' % model)
+        # move along rows
+        APF = [block_diag((M), format=fmt)]
+        APF = block_diag((APF), format=fmt)
+        return APF
 
     def spy(self, what, markersize=2):
         spy(self.__dict__[what], markersize=markersize)
