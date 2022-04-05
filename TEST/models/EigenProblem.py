@@ -54,10 +54,8 @@ class eigenproblem():
         try:
             evp = getattr(self, which)
             if which in ['alpha', 'omega']:
-                # if self.model != 'Diffusion':
-                #     generalisedTime = generalisedTime
-                # else:
-                #     generalisedTime = True
+                # to reduce cond. number
+                generalisedTime = True
                 evp(generalised=generalisedTime)
             else:
                 evp()
@@ -269,7 +267,7 @@ class eigenproblem():
         with open('tmp.txt', append_write) as f:
             np.savetxt(f, arr)
 
-    def alpha(self, generalised=False):
+    def alpha(self, generalised=True):
         """
         Cast operators into the prompt time eigenvalue problem "alpha".
 
@@ -392,7 +390,7 @@ class eigenproblem():
         self.whichspectrum = 'LR'
         self.sigma = None
 
-    def omega(self, generalised=False):
+    def omega(self, generalised=True):
         """
         Cast operators into the delayed time eigenvalue problem "omega".
 
@@ -424,7 +422,7 @@ class eigenproblem():
         else:
             self.B = None
             invT = inv(T)
-            if self.model == 'Diffusion':
+            if self.model == 'Diffusion':  # whatever BCs
                 for gro in range(self.operators.nE):
                     skip = gro*self.nS
                     # set to 1 in order to not affect A, which has BCs imposed
