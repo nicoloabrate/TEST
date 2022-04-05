@@ -613,7 +613,8 @@ class Material():
                               f' in {self.UniName} not consistent! '
                               'Forcing consistency acting on chi-prompt...')
                     else:
-                        self.Chip = (self.Chit-np.dot(self.beta, self.Chid))/(1-self.beta.sum())
+                        # self.Chip = (self.Chit-np.dot(self.beta, self.Chid))/(1-self.beta.sum())
+                        self.Chip /= self.Chip.sum()
                         for g in range(0, self.nE):
                             chit = (1-self.beta.sum())*self.Chip[g] + \
                                     np.dot(self.beta, self.Chid[:, g])
@@ -823,7 +824,7 @@ class Material():
                         if g == 0:
                             collapsed[key] = np.zeros((G, ))
 
-                        if 'Chi' in key:
+                        if key in ['Chit', 'Chip']:
                             collapsed[key][g] = v[iS:iE].sum()
                         else:
                             collapsed[key][g] = fissrate.dot(v[iS:iE])/FRC

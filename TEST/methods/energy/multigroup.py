@@ -6,7 +6,7 @@ File: multigroup.py
 Description: Class for multi-energy group operators.
 """
 from numpy import newaxis, asarray, ones
-from scipy.sparse import block_diag, bmat, hstack
+from scipy.sparse import block_diag, bmat, hstack, vstack
 from TEST.methods.angle import Diffusion
 from TEST.methods.angle.discreteordinates import SN
 from TEST.methods.angle.sphericalharmonics import PN
@@ -410,69 +410,22 @@ def delfiss(ge, model, fmt='csc'):
     """
     fxs = ge.getxs('Fiss')
     nub = ge.getxs('Nubar')
-    chi = ge.getxs('Chid')
     beta = ge.getxs('beta')
 
-    MG = []
-    MGapp = MG.append
+    M = []
+    Mapp = M.append
 
-    for emi_gro in range(ge.nE):  # emission
-
-        M = []
-        Mapp = M.append
-
-        for dep_gro in range(ge.nE):  # departure
-            chinusf = chi[emi_gro, :]*nub[dep_gro, :]*fxs[dep_gro, :]
-            if model == 'PN':
-                Mapp(PN.delfission(ge, beta, chinusf, fmt=fmt))
-            elif model == 'SN':
-                Mapp(SN.delfission(ge, beta, chinusf, fmt=fmt))
-            elif model == 'Diffusion':
-                Mapp(PN.delfission(ge, beta, chinusf, fmt=fmt))
-            else:
-                raise OSError('%s model not available!' % model)
-
-        # move along rows
-        MGapp(M)
-
-    MG = bmat((MG), format=fmt)
-
-    return MG
-
-
-def ptime(ge, model, fmt):
-    """
-    Define precursors balance time operator.
-
-    Parameters
-    ----------
-    ge : object
-        Geometry object.
-
-    Returns
-    -------
-    None.
-
-    """
-    APF = []
-    APFapp = APF.append
-
-    for g in range(ge.nE):  # emission group
-
-        if model == 'PN':
-            M = PN.ptime(ge, fmt=fmt)
+    for dep_gro in range(ge.nE):  # departure
+        chinusf = nub[dep_gro, :]*fxs[dep_gro, :]
+        if model == 'PN' or model == 'Diffusion':
+            Mapp(PN.delfission(ge, beta, chinusf, fmt=fmt))
         elif model == 'SN':
-            M = SN.ptime(ge, fmt=fmt)
-        elif model == 'Diffusion':
-            M = PN.ptime(ge, fmt=fmt)
+            Mapp(SN.delfission(ge, beta, chinusf, fmt=fmt))
         else:
             raise OSError('%s model not available!' % model)
 
-        # move along rows
-        APFapp(block_diag((M), format=fmt))
-
-    APF = block_diag((APF), format=fmt)
-    return APF
+    MG = hstack((M), format=fmt)
+    return MG
 
 
 def emission(ge, model, fmt):
@@ -491,52 +444,18 @@ def emission(ge, model, fmt):
     """
     APF = []
     APFapp = APF.append
-
+    chid = ge.getxs('Chid')
     for g in range(ge.nE):  # emission group
 
-        if model == 'PN':
-            M = PN.emission(ge, fmt=fmt)
+        if model == 'PN' or model == 'Diffusion':
+            M = PN.emission(ge, chid[g, :], fmt=fmt)
         elif model == 'SN':
-            M = SN.emission(ge, fmt=fmt)
-        elif model == 'Diffusion':
-            M = PN.emission(ge, fmt=fmt)
+            M = SN.emission(ge, chid[g, :], fmt=fmt)
         else:
             raise OSError('%s model not available!' % model)
 
         # move along rows
         APFapp(hstack((M), format=fmt))
 
-    APF = block_diag((APF), format=fmt)
-    return APF
-
-
-def decay(ge, model, fmt):
-    """
-    Define precursors balance time decay operator.
-
-    Parameters
-    ----------
-    ge : object
-        Geometry object.
-
-    Returns
-    -------
-    None.
-
-    """
-    APF = []
-    APFapp = APF.append
-    for g in range(ge.nE):  # emission group
-        if model == 'PN':
-            M = PN.decay(ge, fmt=fmt)
-        elif model == 'SN':
-            M = SN.decay(ge, fmt=fmt)
-        elif model == 'Diffusion':
-            M = PN.decay(ge, fmt=fmt)
-        else:
-            raise OSError('%s model not available!' % model)
-        # move along rows
-        APFapp(block_diag((M), format=fmt))
-
-    APF = block_diag((APF), format=fmt)
+    APF = vstack((APF), format=fmt)
     return APF

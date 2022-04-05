@@ -96,7 +96,7 @@ def couple2NPE(nteOper, npeOper, nF, model):
         # get dimensions
         nS, nE, nA = nteOper.nS, nteOper.nE, nteOper.nA
         n = nteOper.Fp.shape[0]
-        m = nE*nF*nS
+        m = nF*nS
 
         # define matrices to fill blocks
         A1 = csr_matrix((n, m))

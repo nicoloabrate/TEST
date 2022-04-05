@@ -308,9 +308,9 @@ def delfission(ge, beta, xs, fmt='csc'):
         meshtype = 'edges'
 
         if model == 'FD':
-            f = FD.zero(ge, beta[family, :]*xs[family, :], meshtype)
+            f = FD.zero(ge, beta[family, :]*xs, meshtype)
         elif model == 'FV':
-            f = FV.zero(ge, beta[family, :]*xs[family, :], meshtype)
+            f = FV.zero(ge, beta[family, :]*xs, meshtype)
         else:
             raise OSError('%s model not available for spatial variable!' % model)
 
@@ -351,7 +351,7 @@ def ptime(ge, fmt='csc'):
     return M
 
 
-def emission(ge, fmt='csc'):
+def emission(ge, chid, fmt='csc'):
     """
     Assemble precursors emission operator.
 
@@ -369,7 +369,7 @@ def emission(ge, fmt='csc'):
     Mapp = M.append
     lambdas = ge.getxs('lambda')
     for family in range(ge.NPF):  # precursor family
-        e = FD.zero(ge, lambdas[family, :], 'edges')
+        e = FD.zero(ge, chid[family, :]*lambdas[family, :], 'edges')
         if family == 0:
             m = e.shape[1]
             n = m
