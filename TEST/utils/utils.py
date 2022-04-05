@@ -12,7 +12,6 @@ from pathlib import Path
 
 def get_energy_grid(grid_name):
     pwd = Path(__file__).parent.parent
-    pwd = pwd.joinpath('material')
     egridpath = pwd.joinpath('datalib', 'group_structures',
                              '{}.txt'.format(grid_name))
     energygrid = np.loadtxt(egridpath)
