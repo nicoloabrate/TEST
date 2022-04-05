@@ -445,8 +445,9 @@ class PhaseSpace:
                    "not available as " "normalisation mode")
             print(msg)
 
-    def xplot(self, group, angle=None, mode=0, moment=0, family=0, ax=None,
-              precursors=False, title=None, imag=False, normalisation="peaktotalflux", power=None,
+    def xplot(self, group, angle=None, mode=0, nEv=None, moment=0, family=0,
+              precursors=False, title=None, imag=False, ax=None,
+              normalisation="peaktotalflux", power=None,
               figname=None, **kwargs):
         """
         Plot solution along space for a certain portion of the phase space.
@@ -482,7 +483,7 @@ class PhaseSpace:
 
         """
         y = self.get(group, angle=angle, mode=mode, family=family,
-                     precursors=precursors, moment=moment,
+                     precursors=precursors, moment=moment, nEv=nEv,
                      normalisation=normalisation, power=power)
         yr, yi = y.real, y.imag
         if len(yr) == self.geometry.nS:
@@ -518,7 +519,7 @@ class PhaseSpace:
             plt.savefig(f"{figname}.pdf")
 
     def eplot(self, eflx=None, x=None, angle=None, mode=0, moment=0, family=0, ax=None,
-              precursors=False, title=None, figname=None, imag=False,
+              precursors=False, title=None, figname=None, imag=False, nEv=None, 
               lethargynorm=True, logx=True, logy=True, **kwargs, ):
         """
         Plot solution along energy for a certain portion of the phase space.
@@ -564,7 +565,7 @@ class PhaseSpace:
                 eflx = np.zeros((self.nE, ))
                 for g in range(self.nE):
                     y = self.get(g+1, angle=angle, mode=mode, family=family,
-                                precursors=precursors, moment=moment,
+                                precursors=precursors, moment=moment, nEv=nEv, 
                                 **kwargs,)
                     mesh = self.geometry.mesh
                     eflx[g] = y[np.argmin(abs(mesh-x))]
@@ -572,7 +573,7 @@ class PhaseSpace:
                 eflx = np.zeros((self.nE,))
                 for g in range(self.nE):
                     y = self.get(g+1, angle=angle, mode=mode, family=family,
-                                precursors=precursors, moment=moment,
+                                precursors=precursors, moment=moment, nEv=nEv, 
                                 **kwargs,)
                     eflx[g] = self.braket(y, dims='nS',
                                         phasespacevolume={'g': None})
@@ -1009,22 +1010,12 @@ class PhaseSpace:
         idx = None
         if self.problem in ["kappa", "gamma"]:
             for i in range(self.nev):
-                # get total flux
-                # v = self.get(moment=0, nEv=i)
-                # # fix almost zero points to avoid sign issues
-                # v[np.abs(v/max(abs(v))) < np.finfo(float).eps] = 0
-                # ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
                 if self._has_uniform_sign(i):
                     idx = i
                     break
         elif self.problem in ["zeta"]:
             idxpos = []
             for i in range(self.nev):
-                # get total flux
-                # v = self.get(moment=0, nEv=i)
-                # # fix almost zero points to avoid sign issues
-                # v[np.abs(v/max(abs(v))) < np.finfo(float).eps] = 0
-                # ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
                 if self._has_uniform_sign(i) and self.eigvals[i] != 0:
                     idxpos.append(i)
             if len(idxpos) > 0:
@@ -1038,26 +1029,22 @@ class PhaseSpace:
                 for i in range(len(reals)):
                     # get total flux
                     ind = np.argwhere(self.eigvals == reals[i])[0][0]
-                    # v = self.get(moment=0, nEv=ind)
-                    # # fix almost zero points to avoid sign issues
-                    # v[np.abs(v/max(abs(v))) < np.finfo(float).eps] = 0
-                    # ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
                     if self._has_uniform_sign(ind):
                         idx = np.argwhere(self.eigvals == reals[i])[0][0]
                         break
         elif self.problem == 'omega':
-            reals = self.eigvals[self.eigvals.imag == 0]
-            reals[~np.isfinite(reals)] = 0
-            reals = reals[reals != 0]
-            if reals.size != 0:
-                fund = max(reals)
-                idx = np.where(self.eigvals == fund)[0][0]
-                # v = self.get(moment=0, nEv=idx)
-                # # fix almost zero points to avoid sign issues
-                # v[np.abs(v/max(abs(v))) < 1E-5] = 0 # np.finfo(float).ep
-                # ispos = np.all(v >= 0) if v[0] >= 0 else np.all(v < 0)
-                if not self._has_uniform_sign(idx):
-                    idx = None
+            prompt, _ = self.getprompt()
+            delayd, _ = self.getdelayed()
+            evals = np.concatenate([[prompt], delayd])
+            tot_prec = np.zeros((self.nF+1, ))
+            for i, e in enumerate(evals):
+                # check precursors sign: only fundamental has all C with unif. sign
+                idx = np.argwhere(self.eigvals == e)[0][0]
+                for p in range(self.nF):
+                    prec = self.get(precursors=True, family=p+1, nEv=idx)
+                    tot_prec[i] += np.trapz(prec, x=self.geometry.mesh)
+            imx = np.argmax(tot_prec)
+            idx = np.argwhere(self.eigvals == evals[imx])[0][0]
 
         if idx is None:
             raise OSError("No fundamental eigenvalue detected!")
@@ -1302,7 +1289,6 @@ class PhaseSpace:
         if angle is None:
             if precursors and self.problem == "omega":
                 moment = 0
-                nF = self.nF
                 if family < 1:
                     raise PhaseSpaceError(f"Family number must be >0, not {family}")
                 family = family - 1
@@ -1322,7 +1308,10 @@ class PhaseSpace:
                 dim = nS-1
 
             # preallocation for group-wise moments
-            gro = [group] if group else np.arange(1, self.geometry.nE+1)
+            if precursors:
+                gro = [0] # no energy dependence for precursors conc.
+            else:
+                gro = [group] if group else np.arange(1, self.geometry.nE+1)
             if len(vect.shape) > 1:
                 y = np.zeros((dim*len(gro), vect.shape[1]))
             else:
@@ -1330,9 +1319,8 @@ class PhaseSpace:
 
             for ig, g in enumerate(gro):
                 if precursors:
-                    iS = (Ne * nS + No * (nS - 1)) * nE + (g - 1) * nF + iF
-                    iE = (Ne * nS + No * (nS - 1)) * \
-                        nE + (g - 1) * nF + iF + nS
+                    iS = (Ne*nS+No*(nS-1))*nE+iF
+                    iE = (Ne*nS+No*(nS-1))*nE+iF+nS
                 else:
                     # compute No and Ne for the requested moment/angle
                     if nA == 0:
