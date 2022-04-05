@@ -72,7 +72,6 @@ class Slab:
                 self.energygrid = energygrid
             elif isinstance(energygrid, str):
                 pwd = Path(__file__).parent.parent
-                pwd = pwd.joinpath('material')
                 egridpath = pwd.joinpath('datalib', 'group_structures',
                                          '{}.txt'.format(energygrid))
                 self.egridname = str(energygrid)
@@ -85,7 +84,6 @@ class Slab:
                     self.egridname = '1G'
                 else:
                     pwd = Path(__file__).parent.parent
-                    pwd = pwd.joinpath('material')
                     egridpath = pwd.joinpath('datalib', 'group_structures',
                                              '{}G.txt'.format(energygrid))
                     self.energygrid = np.loadtxt(egridpath)
@@ -422,19 +420,42 @@ class Slab:
 
         return vals
 
-    def perturb(self, perturbation, sanitycheck=True):
+    def perturb(self, perturbation, sanitycheck=True, keepUnpert=True):
+        """_summary_
 
+        Parameters
+        ----------
+        perturbation : _type_
+            _description_
+        sanitycheck : bool, optional
+            _description_, by default True
+        keepUnpert : bool, optional
+            Keep unperturbed material when whole regions are perturbed, by default True
+
+        Raises
+        ------
+        OSError
+            _description_
+        OSError
+            _description_
+        OSError
+            _description_
+        OSError
+            _description_
+        """
+
+        # TODO: add gamma/theta/delta/k custom perturbations
         # parse file content
         if isinstance(perturbation, str):
             if '.json' not in perturbation:
                 perturbation = '%s.json' % perturbation
             with open(perturbation) as f:
                 perturbation = json.load(f)
-
         iP = 0  # perturbation counter
         for p in list(self.regions.keys()):
             if 'Perturbation' in p:
                 iP += 1
+
         regs = list(self.regionmap.values())
         for k, v in perturbation.items():
             # check perturbation consistency
@@ -480,7 +501,8 @@ class Slab:
                         elif (x1, x2) == (r, l):
                             idx = self.layers.index(r)
                             oldreg = regs[idx]
-                            regs[idx] =  'Perturbation%d' % iP
+                            if keepUnpert:
+                                regs[idx] =  'Perturbation%d' % iP
                         elif x2 == l:  # on the left
                             oldreg = regs[idx]
                             regs.insert(idx+1, 'Perturbation%d' % iP)
@@ -488,8 +510,11 @@ class Slab:
                             regs.insert(idx, regs[idx])
                             oldreg = regs[idx]
                             regs.insert(idx+1, 'Perturbation%d' % iP)
-                        mystr = 'Perturbation{}'.format(iP)
-                        self.regions[mystr] = cp(self.regions[oldreg])
+                        if keepUnpert:
+                            mystr = 'Perturbation{}'.format(iP)
+                            self.regions[mystr] = cp(self.regions[oldreg])
+                        else:
+                            mystr = oldreg
                         self.regions[mystr].perturb(k, hw, dg, sanitycheck=sanitycheck)
                     # perturbation between two or more regions
                     elif x1 < l and x2 > l:
