@@ -54,6 +54,10 @@ class eigenproblem():
         try:
             evp = getattr(self, which)
             if which in ['alpha', 'omega']:
+                # if self.model != 'Diffusion':
+                #     generalisedTime = generalisedTime
+                # else:
+                #     generalisedTime = True
                 evp(generalised=generalisedTime)
             else:
                 evp()
@@ -62,7 +66,7 @@ class eigenproblem():
             raise OSError('{} eigenproblem not available!'.format(which))
 
     def _slepc(self, verbose=False, tol=1E-8, monitor=True, sigma=None,
-               normalisation='totalflux'):
+               normalisation='totalflux', **kwargs):
 
         start = t.time()
         if sigma:
@@ -190,7 +194,7 @@ class eigenproblem():
                          'eigenvectors' : eigvect,
                          'problem': self.which}
             self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
-                                       normalisation=None)
+                                       normalisation=None, **kwargs)
 
             if self.fundamentalconverged():
                 nofund = False
@@ -205,7 +209,7 @@ class eigenproblem():
                 E.setDimensions(nev=self.nev)
                 E.solve()
 
-        self.solution.normalisation(which=normalisation)
+        self.solution.normalisation(which=normalisation, **kwargs)
         end = t.time()
 
         if verbose:
@@ -412,10 +416,20 @@ class eigenproblem():
             self.A = S+Fp+Fd+E-C-F0-S0-D-L
 
         if generalised:
+            if self.model == 'Diffusion':
+                for gro in range(self.operators.nE):
+                    skip = gro*self.nS
+                    self.operators.T[[skip, skip+self.nS-1], :] = 0
             self.B = T
         else:
             self.B = None
             invT = inv(T)
+            if self.model == 'Diffusion':
+                for gro in range(self.operators.nE):
+                    skip = gro*self.nS
+                    # set to 1 in order to not affect A, which has BCs imposed
+                    invT[[skip, skip+self.nS-1], [skip, skip+self.nS-1]] = 1
+            # impose BCs if Diffusion (done here to avoid singularities)
             self.A = invT.dot(self.A)
 
         self.which = 'omega'
@@ -423,7 +437,7 @@ class eigenproblem():
         self.sigma = 0
 
     def solve(self, algo='SLEPc', verbose=False,tol=1E-14, monitor=False,
-              normalisation='totalflux', shift=None, which=None):
+              normalisation='totalflux', shift=None, which=None, **kwargs):
 
         A = self.A
         B = self.B
@@ -439,7 +453,7 @@ class eigenproblem():
             try:
                 start = t.time()
                 res = self._slepc(tol=tol, monitor=monitor, sigma=shift,
-                                  normalisation=normalisation)
+                                  normalisation=normalisation, **kwargs)
                 end = t.time()
             except NameError:
                 print('SLEPc/SLEPc packages not installed. \
@@ -479,7 +493,7 @@ class eigenproblem():
                          'problem': self.which}
             self.solution = PhaseSpace(self.geometry, myeigpair,
                                        self.operators, normalisation=True,
-                                       whichnorm=normalisation)
+                                       whichnorm=normalisation, **kwargs)
 
         elif algo == 'eig':
 
@@ -507,7 +521,8 @@ class eigenproblem():
                          'eigenvectors' : eigvect,
                          'problem': self.which}
             self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
-                                       normalisation=True, whichnorm=normalisation)
+                                       normalisation=True, whichnorm=normalisation,
+                                       **kwargs)
 
         else:
             if algo != 'SLEPc':
