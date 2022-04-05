@@ -61,8 +61,7 @@ class Material():
     """Create material regions with multi-group constants."""
 
     def __init__(self, uniName=None, energygrid=None, datapath=None,
-                 egridname=None, h5file=None,
-                 reader='json'):
+                 egridname=None, h5file=None):
         """
         Initialise object.
 
@@ -101,45 +100,65 @@ class Material():
                 msg = f"h5file must be dict or str, not {type(h5file)}"
                 raise TypeError(msg)
         else:
+            filetypes = ["json", "_res.m", "txt"]
             nE = len(energygrid)-1
             egridname = egridname if egridname else f"{nE}G"
-            pwd = Path(__file__).parent
+            pwd = Path(__file__).parent.parent
 
+            isabspath = False
+            reader = 'json'
             if datapath is None:
-                pwd = Path(__file__).parent
+                pwd = Path(__file__).parent.parent
                 datapath = pwd.joinpath('datalib', f'{egridname}')
                 filename = uniName
+            elif path.isfile(datapath):
+                isabspath = True
+                fname = datapath
+                filename = datapath
+                missing_ext = True
+                for fmt in filetypes:
+                    ending = f".{fmt}" if fmt != "_res.m" else fmt
+                    if ending in fname:
+                        missing_ext = False
+                        reader = "serpent" if ending == "_res.m" else fmt
+                if missing_ext:
+                    raise OSError(f'Cannot read file {datapath}! Only .json, _res.m and .txt can be parsed!')
+                else:
+                    pass
             elif path.isdir(datapath) is False:
-                pwd = Path(__file__).parent
+                pwd = Path(__file__).parent.parent
                 filename = copy(datapath)
                 datapath = pwd.joinpath('datalib', f'{egridname}')
             else:
                 raise OSError(f'{datapath} path not valid!')
 
             if reader == 'json':
-                if '.json' not in str(filename):
-                    fname = path.join(datapath, "json", filename)
-                    fname = f'{str(fname)}.{reader}'
-                else:
-                    fname = filename
-                if path.exists(fname):
+                if not isabspath:
+                    if '.json' not in str(filename):
+                        fname = path.join(datapath, "json", filename)
+                        fname = f'{str(fname)}.{reader}'
+                    else:
+                        fname = filename
+                if path.isfile(fname):
                     self._readjson(fname)
                 else:
                     reader = 'serpent'
-
             if reader == 'serpent':
-                fname = path.join(datapath, "serpent", filename)
-                fname = f'{str(fname)}_res.m'
+                if not isabspath:
+                    fname = path.join(datapath, "serpent", filename)
+                    if '_res.m':
+                        fname = f'{str(fname)}_res.m'
 
-                if path.exists(fname):
+                if path.isfile(fname):
                     self._readserpentres(fname, uniName, nE, egridname)
                 else:
                     reader = 'txt'
 
             if reader == 'txt':
-                fname = path.join(datapath, "txt", filename)
-                fname = f'{str(fname)}.{reader}'
-                if path.exists(fname):
+                if not isabspath:
+                    fname = path.join(datapath, "txt", filename)
+                    fname = f'{str(fname)}.{reader}'
+                if path.isfile(fname):
                     self._readtxt(fname, nE)
                 else:
                     raise OSError(f'{fname} not found!')
@@ -412,8 +431,10 @@ class Material():
 
         """
         if what == 'density':
-            densdata = ['Capt', 'Fiss', *list(map(lambda z: "S"+str(z), range(0, 8))),
-                        *list(map(lambda z: "Sp"+str(z), range(0, 8)))]
+            densdata = ['Capt', 'Fiss', *list(map(lambda z: "S"+str(z), range(self.L))),
+                        *list(map(lambda z: "Sp"+str(z), range(self.L)))]
+            if howmuch < 0:
+                raise OSError('Cannot apply negative density perturbations!')
             for xs in densdata:
                 self.__dict__[xs][:] = self.__dict__[xs][:]*howmuch
         else:
@@ -470,7 +491,7 @@ class Material():
 
         if sanitycheck:
             # force normalisation
-            if abs(self.Chit.sum() - 1) > 1E-5:
+            if abs(self.Chit.sum() - 1) > 1E-4:
                 if np.any(self.Chit == 0) :
                     pass
                 else:
@@ -493,7 +514,7 @@ class Material():
         # check basic reactions existence
         for s in basicdata:
             if s not in datavail:
-                raise OSError('%s is missing in %s data!' % (s, self.UniName))
+                raise OSError(f'{s} is missing in {self.UniName} data!')
         # --- compute in-group scattering
         InScatt = np.diag(self.S0)
         sTOT = self.S0.sum(axis=0) if len(self.S0.shape) > 1 else self.S0
@@ -510,6 +531,8 @@ class Material():
 
         self.Remxs = self.Abs+sTOT-InScatt
         self.Tot = self.Remxs+InScatt
+        # ensure non-zero total XS
+        self.Tot[self.Tot <= 0] = 1E-8
         if 'Invv' not in datavail:
             avgE = 1/2*(E[:-1]+E[1:])*1.602176634E-13  # J
             v = np.sqrt(2*avgE/1.674927351e-27)
@@ -519,77 +542,35 @@ class Material():
 
         # --- compute secondaries per collision
         self.secpercoll = (sTOT+self.Nsf)/(self.Tot)
-        # --- compute mean of scattering cosine
         if 'S1' in datavail:
-            sTOT1 = self.S1.sum(axis=0) if len(self.S1.shape) > 1 else self.S1
-            self.mu0 = 0*self.Tot if np.isnan((sTOT1/sTOT).sum()) \
-                else sTOT1/sTOT
-        elif 'Transpxs' in datavail:
-             self.mu0 = (self.Tot- self.Transpxs)/sTOT
+            # --- compute transport xs (derivation from P1)
+            self.Transpxs = self.Tot-self.S1.sum(axis=0)
+            self.Diffcoef = 1/(3*self.Transpxs)
+        # --- compute diffusion coefficient and transport xs
         elif 'Diffcoef' in datavail:
-            tmp = 1/(3*self.Diffcoef)
-            self.mu0 = (self.Tot-tmp)/sTOT
-            for imu, mu in enumerate(self.mu0):
-                if mu > 1 or mu < -1:
-                    self.mu0[imu] = 0
+            self.Transpxs = 1/(3*self.Diffcoef)
+            self.Transpxs[self.Transpxs <= 0] = 1E-8
+        elif 'Transpxs' in datavail:
+            self.Transpxs[self.Transpxs <= 0] = 1E-8
+            self.Diffcoef = 1/(3*self.Transpxs)
         else:
-            self.mu0 = np.zeros((self.nE, ))
-        # check consistency
-        if abs(self.mu0).max() > 1:
-            raise OSError(f'Average cosine larger than 1! Check \
-                          {self.UniName} data!')
-        # --- compute transport xs
-        self.Transpxs = self.Tot-self.mu0*sTOT
-        # --- compute diffusion coefficient
-        self.Diffcoef = 1/(3*self.Transpxs)
+            self.Transpxs = self.Tot
+            self.Diffcoef = 1/(3*self.Transpxs)
         # --- compute diffusion length
+        self.Remxs[self.Remxs <= 0] = 1E-8 # avoid huge diff. coeff. and length
         self.DiffLength = np.sqrt(self.Diffcoef/self.Remxs)
         # --- compute mean free path
         self.MeanFreePath = 1/self.Tot
         # --- ensure consistency kinetic parameters (if fissile medium)
-        if self.Fiss.max() > 0:
-            if abs(self.Chit.sum() - 1) > 1E-5:
-                print(f'Total fission spectra in {self.UniName} not \
-                      normalised!')
-
-            # ensure pdf normalisation
-            self.Chit /= self.Chit.sum()
-            for s in kinetics:
-                if s in datavail:
-                    kincons = True
-                else:
-                    kincons = False
-
-            if kincons is True:
-                try:
-                    if len(self.Chid.shape) == 1:
-                        # each family has same emission spectrum
-                        self.Chid = np.asarray([self.Chid]*self.NPF)
-                    elif self.Chid.shape != (self.NPF, self.nE):
-                        raise OSError(f'Delayed fiss. spectrum should be \
-                                      ({self.NPF}, {self.nE})')
-
-                    for g in range(0, self.nE):
-                        chit = (1-self.beta.sum())*self.Chip[g] + \
-                                np.dot(self.beta, self.Chid[:, g])
-                        if abs(self.Chit[g]-chit) > 1E-3:
-                            raise OSError(f'Fission spectra or delayed \
-                                          fractions in {self.UniName} not \
-                                          consistent!')
-
-                except AttributeError as err:
-                    if "'Material' object has no attribute 'Chid'" in str(err):
-                        self.Chid = np.asarray([self.Chit]*self.NPF)
-                        self.Chip = self.Chit
-                    else:
-                        print(err)
-
-        # --- ensure consistency kinetic parameters (if fissile medium)
+        self.Fiss[self.Fiss <= 5E-7] = 0
         isFiss = self.Fiss.max() > 0
         if isFiss:
-            if abs(self.Chit.sum() - 1) > 1E-5:
-                print(f'Total fission spectra in {self.UniName} not \
-                      normalised!')
+            # FIXME FIXME check Serpent RSD and do correction action
+            self.Chit[self.Chit <= 1E-4] = 0
+            if abs(self.Chit.sum() - 1) > 1E-4:
+                print(f'Total fission spectra in {self.UniName} not normalised!'
+                      'Forcing normalisation...')
+
             # ensure pdf normalisation
             self.Chit /= self.Chit.sum()
             if "Kappa" not in self.__dict__.keys():
@@ -606,22 +587,45 @@ class Material():
         if kincons:
             try:
                 self.beta_tot = self.beta.sum()
-                if len(self.Chid.shape) == 1:
-                    # each family has same emission spectrum
-                    self.Chid = np.asarray([self.Chid]*self.NPF)
-                elif self.Chid.shape != (self.NPF, self.nE):
-                    raise OSError(f'Delayed fiss. spectrum should be \
-                                    ({self.NPF}, {self.nE})')
 
-                for g in range(0, self.nE):
-                    chit = (1-self.beta.sum())*self.Chip[g] + \
-                            np.dot(self.beta, self.Chid[:, g])
-                    if abs(self.Chit[g]-chit) > 1E-3:
-                        raise OSError(f'Fission spectra or delayed \
-                                        fractions in {self.UniName} not \
-                                        consistent!')
+                if isFiss:
+                    if len(self.Chid.shape) == 1:
+                        # each family has same emission spectrum
+                        # FIXME FIXME check Serpent RSD and do correction action
+                        self.Chid[self.Chid <= 1E-4] = 0
+                        self.Chid /= self.Chid.sum()
+                        self.Chid = np.asarray([self.Chid]*self.NPF)
+                    elif self.Chid.shape != (self.NPF, self.nE):
+                        raise MaterialError(f'Delayed fiss. spectrum should be \
+                                             ({self.NPF}, {self.nE})')
+
+                    # FIXME FIXME check Serpent RSD and do correction action
+                    self.Chip[self.Chip <= 1E-4] = 0
+
+                    try:
+                        for g in range(0, self.nE):
+                            chit = (1-self.beta.sum())*self.Chip[g] + \
+                                    np.dot(self.beta, self.Chid[:, g])
+                            if abs(self.Chit[g]-chit) < 1E-4:
+                                raise MaterialError()
+                    except MaterialError:
+                        print(f'Fission spectra or delayed fractions'
+                              f' in {self.UniName} not consistent! '
+                              'Forcing consistency acting on chi-prompt...')
+                    else:
+                        self.Chip = (self.Chit-np.dot(self.beta, self.Chid))/(1-self.beta.sum())
+                        for g in range(0, self.nE):
+                            chit = (1-self.beta.sum())*self.Chip[g] + \
+                                    np.dot(self.beta, self.Chid[:, g])
+                            if abs(self.Chit[g]-chit) > 1E-4:
+                                raise MaterialError("Normalisation failed!")
+                else:
+                    self.Chit = np.zeros((self.nE, ))
+                    self.Chip = np.zeros((self.nE, ))
+                    self.Chid = np.zeros((self.NPF, self.nE))
+
             except AttributeError as err:
-                if "'Material' object has no attribute 'Chid'" in str(err) or 'Chip' in str(err):
+                if 'Chid' in str(err) or 'Chip' in str(err):
                     self.Chid = np.asarray([self.Chit]*self.NPF)
                     self.Chip = self.Chit
                 else:
@@ -633,8 +637,13 @@ class Material():
                 for p in range(self.NPF):
                     self.Chid[p, :] /= self.Chid[p, :].sum()
         else:
-            self.Chip = self.Chit
-            self.Chid = self.Chit
+            if isFiss:
+                self.Chip = self.Chit
+                self.Chid = self.Chit
+            else:
+                self.Chit = np.zeros((self.nE, ))
+                self.Chip = np.zeros((self.nE, ))
+                self.Chid = np.zeros((self.NPF, self.nE))
 
     def void(self, keepXS=None, sanitycheck=True):
         """
@@ -756,6 +765,9 @@ class Material():
             raise OSError('Collapsing failed: few-group structure  \
                           boundaries do not match with multi-group \
                           one')
+        for ig, g in enumerate(fewgrp):
+            if g not in multigrp:
+                raise OSError(f'Group boundary n.{ig}, {g} MeV not present in fine grid!')
 
         iS = 0
         collapsed = {}
@@ -818,6 +830,8 @@ class Material():
                 else:
                     continue
             iS = iE
+
+        collapsed['Diffcoef'] = 1/(3*collapsed['Transpxs'])
         # overwrite data
         self.energygrid = fewgrp
         self.nE = G
@@ -966,3 +980,6 @@ class Mix(Material):
         S = sum('S' in s for s in datastr)//2
         self.L = S if S > L else L  # get maximum scattering order
         self.datacheck()
+
+class MaterialError(Exception):
+    pass
