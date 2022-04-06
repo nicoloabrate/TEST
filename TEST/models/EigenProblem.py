@@ -18,7 +18,7 @@ import time as t
 import numpy as np
 from scipy.linalg import eig
 from scipy.sparse.linalg import eigs, inv
-from TEST.geometry.phasespace import PhaseSpace
+from TEST.geometry.phasespace import PhaseSpace, PhaseSpaceError
 from TEST.models.NeutronPrecursorsEquation import NPE as npe
 from TEST.models.NeutronTransportEquation import couple2NPE
 from matplotlib.pyplot import spy
@@ -123,7 +123,7 @@ class eigenproblem():
                 E.setTarget(self.sigma)
 
         # set spectral transformation
-        if self.which in ['alpha', 'omega', 'delta', 'zeta', 'theta']:
+        if self.which in ['delta', 'zeta', 'theta']:
             st.setType('sinvert')
 
         end = t.time()
@@ -219,7 +219,7 @@ class eigenproblem():
         try:
             eig, ev = self.solution.getfundamental()
             ans = True
-        except OSError as ierr:
+        except PhaseSpaceError as ierr:
             ans = False
             if 'No fundamental eigenvalue detected!' not in str(ierr):
                 print(ierr)
@@ -294,7 +294,7 @@ class eigenproblem():
         self.A = B
         self.B = T
         self.which = 'alpha'
-        self.whichspectrum = 'TR'
+        self.whichspectrum = 'LR'
         self.sigma = 0
 
     def gamma(self):
@@ -431,7 +431,8 @@ class eigenproblem():
             self.A = invT.dot(self.A)
 
         self.which = 'omega'
-        self.whichspectrum = 'TR'
+        # TODO FIXME add possibility to run a k calculation to tune automatically the eigensolver
+        self.whichspectrum = 'LR'
         self.sigma = 0
 
     def solve(self, algo='SLEPc', verbose=False,tol=1E-14, monitor=False,
