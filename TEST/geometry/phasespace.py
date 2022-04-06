@@ -116,17 +116,14 @@ class PhaseSpace:
                                 self.eigvect[:, offset] = tmp
                                 self.eigvals[offset] = tmpe
 
-                                # self.eigvect[:,[offset, ipos]] = self.eigvect[:,[ipos, offset]]
-                                # self.eigvals[[offset, ipos]] = self.eigvals[[ipos, offset]]
                                 offset += 1
-                        # else:
-                        #     eig0, ev0 = self.getfundamental()
-                        #     idx = np.argwhere(eigvals == eig0)[0][0]
-                        #     if idx != 0:
-                        #         self.eigvect[:,[0, idx]] = self.eigvect[:,[idx, 0]]
-                        #         self.eigvals[[0, idx]] = self.eigvals[[idx, 0]]
-                    except OSError:
-                        pass
+
+                    except PhaseSpaceError as err:
+                        if "No fundamental eigenvalue detected!" in str(err):
+                            pass
+                            print(str(err))
+                        else:
+                            raise PhaseSpaceError(err)
 
                     if normalisation:
                         self.normalisation(which=whichnorm, **kwargs)
@@ -519,7 +516,7 @@ class PhaseSpace:
             plt.savefig(f"{figname}.pdf")
 
     def eplot(self, eflx=None, x=None, angle=None, mode=0, moment=0, family=0, ax=None,
-              precursors=False, title=None, figname=None, imag=False, nEv=None, 
+              precursors=False, title=None, figname=None, imag=False, nEv=None,
               lethargynorm=True, logx=True, logy=True, **kwargs, ):
         """
         Plot solution along energy for a certain portion of the phase space.
@@ -565,7 +562,7 @@ class PhaseSpace:
                 eflx = np.zeros((self.nE, ))
                 for g in range(self.nE):
                     y = self.get(g+1, angle=angle, mode=mode, family=family,
-                                precursors=precursors, moment=moment, nEv=nEv, 
+                                precursors=precursors, moment=moment, nEv=nEv,
                                 **kwargs,)
                     mesh = self.geometry.mesh
                     eflx[g] = y[np.argmin(abs(mesh-x))]
@@ -573,7 +570,7 @@ class PhaseSpace:
                 eflx = np.zeros((self.nE,))
                 for g in range(self.nE):
                     y = self.get(g+1, angle=angle, mode=mode, family=family,
-                                precursors=precursors, moment=moment, nEv=nEv, 
+                                precursors=precursors, moment=moment, nEv=nEv,
                                 **kwargs,)
                     eflx[g] = self.braket(y, dims='nS',
                                         phasespacevolume={'g': None})
@@ -1035,19 +1032,37 @@ class PhaseSpace:
         elif self.problem == 'omega':
             prompt, _ = self.getprompt()
             delayd, _ = self.getdelayed()
-            evals = np.concatenate([[prompt], delayd])
-            tot_prec = np.zeros((self.nF+1, ))
-            for i, e in enumerate(evals):
-                # check precursors sign: only fundamental has all C with unif. sign
-                idx = np.argwhere(self.eigvals == e)[0][0]
-                for p in range(self.nF):
-                    prec = self.get(precursors=True, family=p+1, nEv=idx)
-                    tot_prec[i] += np.trapz(prec, x=self.geometry.mesh)
-            imx = np.argmax(tot_prec)
-            idx = np.argwhere(self.eigvals == evals[imx])[0][0]
+            evals = None
+            if prompt is not None:
+                if prompt.size == 1:
+                    prompt = np.asarray([prompt])
+            else:
+                prompt = []
+
+            if delayd is not None:
+                if delayd.size == 1:
+                    delayd = np.asarray([delayd])
+            else:
+                delayd = []
+            if len(delayd) >= 1 or len(prompt) >= 1:
+                evals = np.asarray(list(delayd)+list(prompt))
+                evals = np.unique(evals)
+
+            if evals is not None:
+                tot_prec = np.zeros((len(evals), ))
+                for i, e in enumerate(evals):
+                    # check precursors sign: only fundamental has all C with unif. sign
+                    idx = np.argwhere(self.eigvals == e)[0][0]
+                    for p in range(self.nF):
+                        prec = self.get(precursors=True, family=p+1, nEv=idx)
+                        tot_prec[i] += np.trapz(prec, x=self.geometry.mesh)
+                imx = np.argmax(tot_prec)
+                idx = np.argwhere(self.eigvals == evals[imx])[0][0]
+            else:
+                idx = None
 
         if idx is None:
-            raise OSError("No fundamental eigenvalue detected!")
+            raise PhaseSpaceError("No fundamental eigenvalue detected!")
         else:
             if isinstance(idx, list):
                 if len(idx) == 1:
@@ -1100,10 +1115,14 @@ class PhaseSpace:
                 fund = maybeprompt[np.argmax(abs(maybeprompt))]
             else:
                 fund = maybeprompt
-            idx = np.where(self.eigvals == fund)[0][0]
+            try:
+                idx = np.where(self.eigvals == fund)[0][0]
+            except IndexError:
+                idx = None
 
         if idx is None:
-            raise OSError("No fundamental prompt eigenvalue detected!")
+            print("No fundamental prompt eigenvalue detected!")
+            return None, None
         else:
             if isinstance(idx, list):
                 if len(idx) == 1:
@@ -1165,27 +1184,34 @@ class PhaseSpace:
                     fund = maybedelayed[np.argmin(abs(maybedelayed))]
                 else:
                     fund = maybedelayed
-
-                idx = np.where(self.eigvals == fund)[0][0]
-                delayed.append(idx)
+                try:
+                    idx = np.where(self.eigvals == fund)[0][0]
+                    delayed.append(idx)
+                except IndexError:
+                    pass
 
         if len(delayed) < self.nF:
-            raise OSError(f"Only {len(idx)} delayed eigenvalues detected!")
-        else:
-            if isinstance(delayed, list):
-                if len(delayed) == 1:
-                    idx = delayed[0]
-                else:
-                    idx = delayed
-                eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
-                if eigenvalue.imag.any() == 0:
-                    eigenvalue = eigenvalue.real
-                return eigenvalue, eigenvector
+            if idx is not None:
+                indlen = len(idx) if idx.size > 1 else 1
+                print(f"Only {indlen} delayed eigenvalues detected!")
             else:
-                eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
-                if eigenvalue.imag == 0:
-                    eigenvalue = eigenvalue.real
-                return eigenvalue, eigenvector
+                print("No delayed eigenvalues detected!")
+                return None, None
+
+        if isinstance(delayed, list):
+            if len(delayed) == 1:
+                idx = delayed[0]
+            else:
+                idx = delayed
+            eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
+            if eigenvalue.imag.any() == 0:
+                eigenvalue = eigenvalue.real
+            return eigenvalue, eigenvector
+        else:
+            eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
+            if eigenvalue.imag == 0:
+                eigenvalue = eigenvalue.real
+            return eigenvalue, eigenvector
 
     def get(self, group=None, angle=None, moment=0, mode=0, family=0,
             nEv=None, normalisation=False, precursors=False, interp=False,
