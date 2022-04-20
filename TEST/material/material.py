@@ -14,6 +14,7 @@ from serpentTools import read
 from serpentTools.settings import rc as rcst
 from copy import deepcopy as copy
 from matplotlib import rc, checkdep_usetex
+from TEST.utils import get_energy_grid
 
 usetex = checkdep_usetex(True)
 rc("font", **{"family": "sans-serif", "sans-serif": ["Helvetica"]})
@@ -24,8 +25,8 @@ rcst['xs.getB1XS'] = False
 rcst['xs.variableGroups'] = ['kinetics', 'xs', 'xs-prod', 'gc-meta']
 
 # it depends on Serpent 2 highest Legendre polynomial expansion order
-scatt_keys = [*list(map(lambda z: "infS"+str(z), range(0, 8))),
-              *list(map(lambda z: "infSp"+str(z), range(0, 8)))]
+scatt_keys = [*list(map(lambda z: "infS"+str(z), range(0, 2))),
+              *list(map(lambda z: "infSp"+str(z), range(0, 2))), 'infScatt1']
 xsdf_keys = ['infTot', 'infAbs', 'infDiffcoef', 'infTranspxs', 'infCapt',
              'infRemxs', 'infFiss', 'infNsf']
 ene_keys = ['infNubar', 'infInvv', 'infKappa', 'infInvv',  'infChit',
@@ -39,9 +40,13 @@ basicdata = ['Fiss', 'Nubar', 'S0', 'Chit']
 kinetics = ['lambda', 'beta']
 alldata = list(set([*sumxs, *indepdata, *basicdata, *kinetics]))
 
-collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(0, 8))),
-               *list(map(lambda z: "Sp"+str(z), range(0, 8))), 'Invv', 'Transpxs']
+collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(0, 1))),
+               *list(map(lambda z: "Sp"+str(z), range(0, 1))), 'Invv', 'Diffcoef']
 collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'Kappa']
+
+mix_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(0, 2))),
+          *list(map(lambda z: "Sp"+str(z), range(0, 2)))]
+mix_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'Kappa']
 
 units = {'Chid': '-', 'Chit': '-', 'Chip': '-', 'Tot': 'cm^{-1}',
          'Capt': 'cm^{-1}', 'Abs': 'cm^{-1}', 'Fiss': 'cm^{-1}',
@@ -101,8 +106,16 @@ class Material():
                 raise TypeError(msg)
         else:
             filetypes = ["json", "_res.m", "txt"]
-            nE = len(energygrid)-1
-            egridname = egridname if egridname else f"{nE}G"
+            if isinstance(energygrid, str):
+                egridname = energygrid
+                energygrid = get_energy_grid(energygrid)
+                energygrid = energygrid[np.argsort(-energygrid)]
+                nE = len(energygrid)-1
+            else:
+                nE = len(energygrid)-1
+                if egridname is None:
+                    egridname = f"{nE}G"
+
             pwd = Path(__file__).parent.parent
 
             isabspath = False
@@ -222,7 +235,9 @@ class Material():
         selfdic = self.__dict__
         for my_key in serp_keys:
 
-            if my_key.startswith('infS') or my_key.startswith('infSp'):
+            if my_key.startswith('infScatt') or my_key.startswith('infSscattp'):
+                vals = data.infExp[my_key]
+            elif my_key.startswith('infS') or my_key.startswith('infSp'):
                 vals = np.reshape(data.infExp[my_key], (nE, nE), order='F')
             else:
                 vals = data.infExp[my_key]
@@ -435,6 +450,11 @@ class Material():
                         *list(map(lambda z: "Sp"+str(z), range(self.L)))]
             if howmuch < 0:
                 raise OSError('Cannot apply negative density perturbations!')
+            if sanitycheck:
+                # ensure later consistency check
+                del self.Diffcoef
+                del self.Transpxs
+                del self.DiffLength
             for xs in densdata:
                 self.__dict__[xs][:] = self.__dict__[xs][:]*howmuch
         else:
@@ -542,20 +562,27 @@ class Material():
 
         # --- compute secondaries per collision
         self.secpercoll = (sTOT+self.Nsf)/(self.Tot)
-        if 'S1' in datavail:
-            # --- compute transport xs (derivation from P1)
-            self.Transpxs = self.Tot-self.S1.sum(axis=0)
-            self.Diffcoef = 1/(3*self.Transpxs)
         # --- compute diffusion coefficient and transport xs
-        elif 'Diffcoef' in datavail:
+        if 'Diffcoef' in datavail:
             self.Transpxs = 1/(3*self.Diffcoef)
             self.Transpxs[self.Transpxs <= 0] = 1E-8
+            self.Diffcoef = 1/(3*self.Transpxs)
+            mubar = np.divide(self.Tot-self.Transpxs, self.S0.sum(axis=0), where=self.S0.sum(axis=0)!=0)
+            self.S1 = mubar*self.S0
         elif 'Transpxs' in datavail:
             self.Transpxs[self.Transpxs <= 0] = 1E-8
+            self.Diffcoef = 1/(3*self.Transpxs)
+            mubar = np.divide(self.Tot-self.Transpxs, self.S0.sum(axis=0), where=self.S0.sum(axis=0)!=0)
+            self.S1 = mubar*self.S0
+        elif 'S1' in datavail:
+            self.Transpxs = self.Tot-self.S1.sum(axis=0)
             self.Diffcoef = 1/(3*self.Transpxs)
         else:
             self.Transpxs = self.Tot
             self.Diffcoef = 1/(3*self.Transpxs)
+            mubar = np.divide(self.Tot-self.Transpxs, self.S0.sum(axis=0), where=self.S0.sum(axis=0)!=0)
+            self.S1 = mubar*self.S0
+
         # --- compute diffusion length
         self.Remxs[self.Remxs <= 0] = 1E-8 # avoid huge diff. coeff. and length
         self.DiffLength = np.sqrt(self.Diffcoef/self.Remxs)
@@ -603,23 +630,21 @@ class Material():
                     self.Chip[self.Chip <= 1E-4] = 0
 
                     try:
-                        for g in range(0, self.nE):
+                        for g in range(self.nE):
                             chit = (1-self.beta.sum())*self.Chip[g] + \
                                     np.dot(self.beta, self.Chid[:, g])
-                            if abs(self.Chit[g]-chit) < 1E-4:
+                            if abs(self.Chit[g]-chit) > 1E-4:
                                 raise MaterialError()
                     except MaterialError:
                         print(f'Fission spectra or delayed fractions'
                               f' in {self.UniName} not consistent! '
                               'Forcing consistency acting on chi-prompt...')
-                    else:
                         # self.Chip = (self.Chit-np.dot(self.beta, self.Chid))/(1-self.beta.sum())
                         self.Chip /= self.Chip.sum()
-                        for g in range(0, self.nE):
-                            chit = (1-self.beta.sum())*self.Chip[g] + \
-                                    np.dot(self.beta, self.Chid[:, g])
-                            if abs(self.Chit[g]-chit) > 1E-4:
-                                raise MaterialError("Normalisation failed!")
+                        for g in range(self.nE):
+                            self.Chit[g] = (1-self.beta_tot)*self.Chip[g] + np.dot(self.beta, self.Chid[:, g])
+                        if abs(self.Chit.sum()-1) > 1E-6:
+                            raise MaterialError("Normalisation failed!")
                 else:
                     self.Chit = np.zeros((self.nE, ))
                     self.Chip = np.zeros((self.nE, ))
@@ -763,9 +788,9 @@ class Material():
             raise OSError(f'Collapsing failed: few-group structure should \
                           have less than {H} group')
         if multigrp[0] != fewgrp[0] or multigrp[0] != fewgrp[0]:
-            raise OSError('Collapsing failed: few-group structure  \
-                          boundaries do not match with multi-group \
-                          one')
+            raise OSError('Collapsing failed: few-group structure'
+                          'boundaries do not match with multi-group'
+                          'one')
         for ig, g in enumerate(fewgrp):
             if g not in multigrp:
                 raise OSError(f'Group boundary n.{ig}, {g} MeV not present in fine grid!')
@@ -791,7 +816,10 @@ class Material():
                         collapsed[key] = np.zeros(dims)
 
                     if len(dims) == 1:
-                        collapsed[key][g] = flx[iS:iE].dot(v[iS:iE])/NC
+                        if key == 'Diffcoef':
+                            v = self.Tot-self.S1.sum(axis=0)
+                            v = 1/3/v
+                        collapsed[key][g] = np.divide(flx[iS:iE].dot(v[iS:iE]), NC, where=NC!=0)
                     else:
                         # --- scattering
                         iS2 = 0
@@ -803,7 +831,7 @@ class Material():
                             iE2 = iE2[-1][0]+iS2
                             s = v[iS:iE, iS2:iE2].sum(axis=0)
                             NCS = flx[iS2:iE2].sum()
-                            collapsed[key][g][g2] = flx[iS2:iE2].dot(s)/NCS
+                            collapsed[key][g][g2] = np.divide(flx[iS2:iE2].dot(s), NCS, where=NCS!=0)
                             iS2 = iE2
                 # --- fission-related data
                 elif key in collapse_xsf:
@@ -827,12 +855,12 @@ class Material():
                         if key in ['Chit', 'Chip']:
                             collapsed[key][g] = v[iS:iE].sum()
                         else:
-                            collapsed[key][g] = fissrate.dot(v[iS:iE])/FRC
+                            collapsed[key][g] = np.divide(fissrate.dot(v[iS:iE]), FRC, where=FRC!=0)
                 else:
                     continue
             iS = iE
 
-        collapsed['Diffcoef'] = 1/(3*collapsed['Transpxs'])
+        collapsed['Transpxs'] = 1/(3*collapsed['Diffcoef'])
         # overwrite data
         self.energygrid = fewgrp
         self.nE = G
@@ -848,7 +876,7 @@ class Mix(Material):
     """Create regions mixing other materials."""
 
     def __init__(self, *, universes, densities=None, energygrid, datapath=None,
-                 egridname=None, reader='json', mixname=None):
+                 egridname=None, mixname=None):
         """
         Initialise object.
 
@@ -885,80 +913,58 @@ class Mix(Material):
             densities = np.ones(len(universes))
 
         idx = 0
-        nMat = len(universes)
         materials = dict(zip(universes, densities))
-        xsf = {}
-        fissionprod = np.zeros((nE, nMat))
-        totfissxs = np.zeros((nE, ))
-        betatot = np.zeros((nMat, ))
-        beta = []
+        fissprod = np.zeros((nE, ))
+        totfiss = np.zeros((nE, ))
+        matobj = {}
         for k, v in materials.items():
-            xsf[k] = {}
             if datapath is not None:
                 kpath = datapath[k]
             else:
                 kpath = None
 
             mat = Material(uniName=k, energygrid=energygrid, datapath=kpath,
-                           egridname=egridname, reader=reader)
+                           egridname=egridname)
+            matobj[k] = mat
             # density multiplication and summation
             for s in mat.__dict__.keys():
-                if s in collapse_xs:
+                if s in mix_xs:
                     if idx == 0:
                         self.__dict__[s] = densities[idx]*mat.__dict__[s]
                     else:
                         self.__dict__[s] += densities[idx]*mat.__dict__[s]
+                elif s in mix_xsf:
+                    if s in ['Nubar', 'Kappa']:
+                        if idx == 0:
+                            self.__dict__[s] = mat.__dict__[s]*mat.Fiss*densities[idx]
+                        else:
+                            self.__dict__[s] += mat.__dict__[s]*mat.Fiss*densities[idx]
+                    else:   # Chip and Chit
+                        if idx == 0:
+                            self.__dict__[s] = mat.__dict__[s]*mat.Nubar*mat.Fiss*densities[idx]
+                        else:
+                            self.__dict__[s] += mat.__dict__[s]*mat.Nubar*mat.Fiss*densities[idx]
 
-            fissionprod[:, idx] = mat.Nubar*mat.Fiss
-            totfissxs += mat.Fiss
-            xsf[k]['Fiss'] = mat.Fiss
-            for s in collapse_xsf:
-                xsf[k][s] = mat.__dict__[s]
-                self.__dict__[s] = np.zeros(mat.__dict__[s].shape)
+            fissprod += mat.Nubar*mat.Fiss*densities[idx]
+            totfiss += mat.Fiss*densities[idx]
 
             if 'beta' in mat.__dict__.keys():
-                NPF = mat.NPF
-                self.beta = np.zeros((NPF, ))
-                self.Chid = np.zeros((NPF, nE))
-                beta.append(mat.beta)
+                if idx == 0:
+                    self.beta = mat.__dict__['beta']
             if 'lambda' in mat.__dict__.keys():
-                self.__dict__['lambda'] = np.zeros((mat.NPF, ))
-                xsf[k]['lambda'] = mat.__dict__['lambda']
+                if idx == 0:
+                    self.__dict__['lambda'] = mat.__dict__['lambda']
 
             idx += 1
 
-        beta = np.asarray(beta)
-        if self.Fiss.max() > 0:
-            for i, k in enumerate(materials.keys()):
-                fiss = xsf[k]['Fiss']
-                nuba = xsf[k]['Nubar']
-                # mix Nubar
-                self.Nubar += fiss*nuba
-                # mix emission spectra
-                self.Chit += xsf[k]['Chit']*np.sum(fiss*nuba)
-                if beta.max() > 0:
-                    self.beta += beta[i, :]*np.sum(fiss*nuba)
-                    betatot[i] = beta[i, :].sum()
-                    self.Chip += xsf[k]['Chip']*np.sum(fiss*nuba*(1-betatot[i]))
-                    for f in range(NPF):
-                        self.Chid[f, :] += xsf[k]['Chid'][f, :]*np.sum(fiss*nuba*beta[i, f])
-                if 'lambda' in xsf[k].keys():
-                    self.__dict__['lambda'] = xsf[k]['lambda']
-                # mix fission heat
-
-            self.Nubar = self.Nubar/totfissxs
-            self.beta = self.beta/fissionprod.sum()
-            self.Chit = self.Chit/fissionprod.sum()
-            self.Chip = self.Chip/(fissionprod*(1-betatot)).sum()
-            # FIXME Fission energy is missing!
-            for f in range(NPF):
-                self.Chid[f, :] = self.Chid[f, :]/(fissionprod*beta[:, f]).sum()
-
-        # # TODO FIXME
-        # if self.Fiss.max() > 0:
-        #     for s in collapse_xsf:
-        #         nu = mat.__dict__['Nubar'] if 'Chi' in s else 1
-        #         self.__dict__[s] = self.__dict__[s]/np.sum(mat.__dict__['Fiss']*nu)
+        for key in mix_xsf:
+            # normalise group constants
+            if key in ['Nubar', 'Kappa']:
+                tmp = np.divide(self.__dict__[key], totfiss, where=totfiss!=0)
+                self.__dict__[key] = tmp
+            if key in ['Chit', 'Chip', 'Chid']:
+                tmp = np.divide(self.__dict__[key], fissprod, where=fissprod!=0)
+                self.__dict__[key] = tmp
 
         if mixname is None:
             mixname = '_'.join(universes)
