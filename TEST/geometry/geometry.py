@@ -282,12 +282,18 @@ class Slab:
         ax.set_xlabel(xlabel)
         ax.set_xticks(self.layers)
 
-    def displaygeom(self, ax=None, xlabel=None, labels=None, ncols=None):
+    def displaygeom(self, ax=None, xlabel=None, labels=None, ncols=None, cols=None):
         """Plot regions."""
         ax = ax or gca()
-        c = ['royalblue', 'firebrick',
-             'forestgreen', 'gold', 'darkorange',
-             'darkviolet']+rcParams['axes.prop_cycle'].by_key()['color']
+        if cols is None:
+            c = ['royalblue', 'firebrick',
+                'forestgreen', 'gold', 'darkorange',
+                'darkviolet']+rcParams['axes.prop_cycle'].by_key()['color']
+        else:
+            nReg = len(self.regions.keys())
+            if len(cols) < nReg:
+                raise GeometryError(f"Number of input colors, {len(cols)}, should match number of regions, {nReg}!")
+            c = cols
 
         c = dict(zip(self.regions.keys(), c))
         if labels is not None:
@@ -466,7 +472,7 @@ class Slab:
             if 'depgro' not in v.keys():
                 v['depgro'] = None
 
-            x = v['where']
+            wh = v['where']
             hw = v['howmuch']
             dg = v['depgro']
             if k != 'density':
@@ -474,13 +480,12 @@ class Slab:
                     raise OSError('The perturbation intensities required \
                                   should be {}'.format(self.nE))
 
-            if isinstance(x, list):
-                x = tuple(x)
-            if isinstance(x, tuple):
-                x = [x]
+            if not isinstance(wh, list):
+                raise GeometryError(f"Input coordinates must be a list of tuples, not {type(wh)}!")
 
-            nlayers_old = len(self.layers)-1+0
-            for x1, x2 in x:  # loop over perturbation coordinates
+            for x in wh:  # loop over perturbation coordinates
+                nlayers_old = len(self.layers)-1
+                x1, x2 = x
                 coo = zip(self.layers[:-1], self.layers[1:])
                 iP = iP + 1
                 # FIXME: right and left are swapped!
@@ -520,35 +525,35 @@ class Slab:
                     elif x1 < l and x2 > l:
                         raise OSError('Perturbations can be applied one region at a time!')
 
-            self.nLayers = len(self.layers)-1
-            self.regionwhere = OrderedDict(zip(range(self.nLayers),
-                                               zip(self.layers[:-1],
-                                                   self.layers[1:])))
-            self.regionmap = OrderedDict(zip(range(self.nLayers), regs))
-            # update mesh to take into account new layers
-            tmp = self._split if isinstance(self._split, list) else \
-                self._split.tolist()
+                self.nLayers = len(self.layers)-1
+                self.regionwhere = OrderedDict(zip(range(self.nLayers),
+                                                zip(self.layers[:-1],
+                                                    self.layers[1:])))
+                self.regionmap = OrderedDict(zip(range(self.nLayers), regs))
+                # update mesh to take into account new layers
+                tmp = self._split if isinstance(self._split, list) else \
+                    self._split.tolist()
 
-            if list(set(tmp)) == tmp:
-                self._split = self._split*np.ones((self.nLayers),
-                                                  dtype=type(self._split))
+                if list(set(tmp)) == tmp:
+                    self._split = self._split*np.ones((self.nLayers),
+                                                    dtype=type(self._split))
 
-            if max(tmp) < 0 and nlayers_old != self.nLayers:  # user def points
-                idy = np.argmax(tmp)
-                scaling_fact = (x2-x1)/(self.layers[idy+1]-self.layers[idy])
-                minmfp = self._split.insert(idx, int(scaling_fact*max(tmp)))
-                self.mesher(minmfp, spatial_scheme=self.spatial_scheme)
-            else:
-                minmfp = np.zeros((self.nLayers, ))
+                if max(tmp) < 0 and nlayers_old != self.nLayers:  # user def points
+                    idy = np.argmax(tmp)
+                    scaling_fact = (x2-x1)/(self.layers[idy+1]-self.layers[idy])
+                    minmfp = self._split.insert(idx, int(scaling_fact*max(tmp)))
+                    self.mesher(minmfp, spatial_scheme=self.spatial_scheme)
+                else:
+                    minmfp = np.zeros((self.nLayers, ))
 
-                for iLay in range(0, self.nLayers):
-                    uniName = self.regionmap[iLay]
-                    if self.nA > 0:
-                        minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
-                    else:
-                        minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
+                    for iLay in range(0, self.nLayers):
+                        uniName = self.regionmap[iLay]
+                        if self.nA > 0:
+                            minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
+                        else:
+                            minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
 
-                self.mesher(minmfp, spatial_scheme=self.spatial_scheme)
+                    self.mesher(minmfp, spatial_scheme=self.spatial_scheme)
 
     def replace(self, replacement):
         # TODO: finish the implementation and test it
@@ -590,6 +595,7 @@ class Slab:
         path = None if 'path' not in replacement.keys() else replacement['path']
         self.regions[new_mat] = Material(uniName=new_mat,
                                          energygrid=self.energygrid,
+                                         egridname=self.egridname,
                                          datapath=path)
 
     def computeQW(self):
@@ -619,3 +625,7 @@ class Slab:
     def updateN(self, N):
         """Update the angle order."""
         self.nA = N
+
+
+class GeometryError(Exception):
+    pass
