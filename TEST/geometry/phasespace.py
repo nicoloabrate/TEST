@@ -26,7 +26,7 @@ class PhaseSpace:
 
     def __init__(self, geometry=None, solution=None, operators=None,
                  h5name=None, energygrid=None, source=False, normalisation=False,
-                 whichnorm="phasespace", **kwargs):
+                 whichnorm="peaktotalflux", **kwargs):
         """
         Initialise phase space object.
 
@@ -102,6 +102,7 @@ class PhaseSpace:
                         idx = []
                         for e0 in eig0:
                             idx.append(np.argwhere(eigvals == e0)[0][0])
+
                         offset = 0
                         for ipos in idx:
                             if ipos != 0:
@@ -117,6 +118,7 @@ class PhaseSpace:
                                 self.eigvals[offset] = tmpe
 
                                 offset += 1
+
 
                     except PhaseSpaceError as err:
                         if "No fundamental eigenvalue detected!" in str(err):
@@ -298,7 +300,7 @@ class PhaseSpace:
 
         return y
 
-    def normalisation(self, which="phasespace", mode=None, adjoint=None,
+    def normalisation(self, which="phasespace", nEv=None, adjoint=None,
                       power=None, A=None):
         """
         normalisation eigenvectors according to a user-defined criterion.
@@ -318,7 +320,7 @@ class PhaseSpace:
         """
         # FIXME TODO reduce lines, only one loop over eigenfunctions
         nS, nE = self.geometry.nS, self.geometry.nE
-        modes = range(len(self.eigvals)) if mode is None else [mode]
+        modes = range(len(self.eigvals)) if nEv is None else [nEv]
         if which in ["phasespace", "totalflux"]:
             skip = None
             for iv in modes:
@@ -331,13 +333,13 @@ class PhaseSpace:
                 v = self.eigvect[:, iv]
 
                 if len(y.shape) > 1:
-                    skip = []
-                    # normalisation all positive eigenf
+                    # skip = []
+                    # normalise all positive eigenf
                     for ic, col in enumerate(y.T):
                         ivpos = np.argwhere(self.eigvals == eig[ic])[0][0]
-                        skip.append(ivpos)
+                        # skip.append(ivpos)
                         if which == 'totalflux':
-                            # normalisation total flux
+                            # total flux normalisation
                             self.eigvect[:, ivpos] /= self.braket(col)
                         elif which == 'phasespace':
                             # normalisation on the inner product over the phase space
@@ -443,7 +445,7 @@ class PhaseSpace:
             print(msg)
 
     def xplot(self, group, angle=None, mode=0, nEv=None, moment=0, family=0,
-              precursors=False, title=None, imag=False, ax=None,
+              precursors=False, title=None, imag=False, ax=None, NZ=None,
               normalisation="peaktotalflux", power=None,
               figname=None, **kwargs):
         """
@@ -481,7 +483,7 @@ class PhaseSpace:
         """
         y = self.get(group, angle=angle, mode=mode, family=family,
                      precursors=precursors, moment=moment, nEv=nEv,
-                     normalisation=normalisation, power=power)
+                     NZ=NZ, normalisation=normalisation, power=power)
         yr, yi = y.real, y.imag
         if len(yr) == self.geometry.nS:
             x = self.geometry.mesh
@@ -491,13 +493,8 @@ class PhaseSpace:
 
         y = yr if imag is False else yi
         if len(y.shape) > 1:
-            # TODO add method to plot first eigenfunctions
-            # cc = cycler(mcolors.TABLEAU_COLORS.values())
-            # cl = cycler('linestyle',['-','--',':','-.'])
-            # linestyle_cycler = cc*cl
-            # plt.rc('lines.linestyle', prop_cycle=linestyle_cycler)
+            myls = ['-','--',':','-.']
             for ic, col in enumerate(y.T):
-                myls = ['-','--',':','-.']
                 plt.plot(x, col, ls=myls[ic], **kwargs)
         else:
             plt.plot(x, y, **kwargs)
@@ -806,8 +803,17 @@ class PhaseSpace:
             mineig = min(evals.real)
             maxeig = max(evals.real)
             if plotfund:
-                mineig = val if mineig > val else mineig
-                maxeig = val if maxeig < val else maxeig
+                if np.any(mineig > val):
+                    if val.size > 1:
+                        mineig = min(val)
+                    else:
+                        mineig = val
+                if np.any(maxeig < val):
+                    if val.size > 1:
+                        maxeig = max(val)
+                    else:
+                        maxeig = val
+
             xlo = np.sign(mineig)*np.ceil(abs(mineig))
             xup = np.sign(maxeig)*np.ceil(abs(maxeig))
             if loglog:
@@ -982,6 +988,53 @@ class PhaseSpace:
         else:
             return f"{e0:.8f}"
 
+    def _geteig(self, nEv=0, NZ=None):
+        """Return eigenvalues. If clusters are found,
+        no sorting is operated, to avoid conflicts
+        with self.get() method.
+
+        Parameters
+        ----------
+        nEv : int, optional
+            _description_, by default 0
+        NZ : _type_, optional
+            _description_, by default None
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+
+        if NZ is not None:
+            nEv = self.getzero(NZ)
+
+        e = self.eigvals[nEv]
+        return e
+
+    def geteig(self, nEv=0, NZ=None):
+        """Return eigenvalues. If clusters are found,
+        the eigenvalues are sorted in descending order.
+
+        Parameters
+        ----------
+        nEv : int, optional
+            _description_, by default 0
+        NZ : _type_, optional
+            _description_, by default None
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        if NZ is not None:
+            nEv = self.getzero(NZ)
+
+        e = self.eigvals[nEv]
+        idx = np.argsort(e)[::-1]
+        return e[idx]
+
     def getfundamental(self):
         """
         Get fundamental eigenpair.
@@ -1010,14 +1063,14 @@ class PhaseSpace:
                 if self._has_uniform_sign(i):
                     idx = i
                     break
-        elif self.problem in ["zeta"]:
+        elif self.problem in ["zeta", "delta", "theta"]:
             idxpos = []
             for i in range(self.nev):
                 if self._has_uniform_sign(i) and self.eigvals[i] != 0:
                     idxpos.append(i)
             if len(idxpos) > 0:
                 idx = idxpos
-        elif self.problem in ["alpha", "delta", "theta"]:
+        elif self.problem in ["alpha", ]:
             # select real eigenvalues
             reals = self.eigvals[self.eigvals.imag == 0]
             # reals = reals[reals != 0]
@@ -1070,7 +1123,11 @@ class PhaseSpace:
                 eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
                 if eigenvalue.imag.any() == 0:
                     eigenvalue = eigenvalue.real
-                return eigenvalue, eigenvector
+                if eigenvalue.size > 1:
+                    ind = np.argsort(eigenvalue)[::-1]
+                    return eigenvalue[ind], eigenvector[:, ind]
+                else:
+                    return eigenvalue, eigenvector
             else:
                 eigenvalue, eigenvector = self.eigvals[idx], self.eigvect[:, idx]
                 if eigenvalue.imag == 0:
@@ -1213,9 +1270,53 @@ class PhaseSpace:
                 eigenvalue = eigenvalue.real
             return eigenvalue, eigenvector
 
+    def getzero(self, NZ):
+        """Eigenfunctions are ordered if number of zeros smaller than
+        zeroscutoff.
+
+        Parameters
+        ----------
+        zeroscutoff : TYPE, optional
+            DESCRIPTION. The default is 30.
+
+        Returns
+        -------
+        None.
+
+        """
+        idx = None
+        # --- get only "acceptable" eigenvalues
+        reals = self.eigvals[self.eigvals.imag == 0]
+        reals[~np.isfinite(reals)] = 0
+        reals = reals[abs(reals) > np.finfo(float).eps]
+        if self.problem not in ['alpha', 'omega']:
+            reals = reals[reals > np.finfo(float).eps]
+
+        nzeros = np.zeros((reals.size,), dtype=int)
+        for i, e in enumerate(reals):
+            idx = np.argwhere(self.eigvals == e)[0][0]
+            nzeros[i] = self._countzeros(idx)
+
+        # --- build list of index for real and other discarded eigenvalues
+        idx = np.zeros((self.eigvals.size, ), dtype=int)
+
+        sortind = np.argsort(nzeros)
+        nzeros.sort()
+        idx = []
+        # sort, if needed
+        for i, s in enumerate(sortind):
+            if nzeros[i] == NZ:
+                idx.append(np.argwhere(self.eigvals == reals[s])[0][0])
+
+        return idx
+
+    def _splitspectrum(self):
+        if self.problem != 'zeta':
+            raise PhaseSpaceError("This method works only for zeta!")
+
     def get(self, group=None, angle=None, moment=0, mode=0, family=0,
-            nEv=None, normalisation=False, precursors=False, interp=False,
-            **kwargs):
+            nEv=None, NZ=None, normalisation=False, precursors=False,
+            interp=False, eig=False, **kwargs):
         """
         Get spatial flux distribution for group, angle/moment and spatial mode.
 
@@ -1248,11 +1349,21 @@ class PhaseSpace:
             Imaginary part of the flux mode.
 
         """
+        if NZ is not None:
+            nEv = self.getzero(NZ)
+            mode = None
+        elif nEv is not None:
+            mode = None
+            NZ = None
+        else:
+            nEv = mode
+
         if self.problem == "static":
             normalisation = False
         if normalisation:
             which = "phasespace" if not normalisation else normalisation
-            self.normalisation(which=which, mode=mode, **kwargs)
+            # FIXME
+            self.normalisation(which=which, nEv=nEv, **kwargs)
 
         if self.model == "PN" or self.model == "Diffusion":
             y = self._getPN(group=group, angle=angle, moment=moment,
@@ -1262,7 +1373,20 @@ class PhaseSpace:
             y = self._getSN(group=group, angle=angle, moment=moment,
                             mode=mode, family=family, precursors=precursors,
                             nEv=nEv, )
-        return y
+
+        e = self._geteig(nEv)
+        if e.size == 1:
+            if eig:
+                return e, y
+            else:
+                return y
+        else:
+            # sort eigvect according to eigvals
+            idx = np.argsort(e)[::-1]
+            if eig:
+                return e[idx], y[:, idx]
+            else:
+                return y[:, idx]
 
     def _getPN(self, group=None, angle=None, moment=0, mode=0, family=1,
                nEv=None, precursors=False, interp=False):
@@ -1514,6 +1638,20 @@ class PhaseSpace:
                 y = y+w[n]*eval_legendre(moment, mu[n])*phi
 
         return y
+
+    def _countzeros(self, idx):
+        # check only first group->its harmonic behaviour is the same for any group
+        flux = self.get(moment=0, group=1, nEv=idx)
+        # --- mask boundaries to avoid spurious values
+        mask = np.full(flux.shape, False)
+        idb = [0, self.nS-1]
+        for i in idb:
+            mask[i] = True
+        # --- check flux sign
+        fluxnb = np.ma.MaskedArray(flux, mask=mask)
+        flxsign = np.sign(fluxnb)
+        nzeros = ((np.roll(flxsign, 1)-flxsign) != 0).astype(int).sum()
+        return nzeros
 
     def _has_uniform_sign(self, idx):
         """Check if mode n. idx has uniform sign (i.e. is fundamental)
