@@ -119,6 +119,7 @@ class read():
             Item converted in Python type (str, int, float, numpy.array, dict,
             list).
         """
+        tmp = None
         if pytype is None:
             try:
                 pytype = item.dtype.name
@@ -133,7 +134,7 @@ class read():
                 tmp = re.findall("<class '(.*?)'>", pytype)[0]
                 try:
                     pytype = eval(tmp)
-                except  NameError:
+                except NameError:
                     pytype = None
         # if type(item).__name__ in read._str2type:
         if pytype in read._str2type.values():
@@ -188,6 +189,8 @@ class read():
                 val = item.value.decode(enc)
             else:
                 raise TypeError(f'Cannot read data {item} with type {type(item)}!')
+        elif pytype is None and tmp == 'NoneType':
+            val = None
         elif type(item).__name__ == 'Group':
             val = read._h52dict(item, keytype=keytype)
         elif pytype is str or pytype == 'str':
