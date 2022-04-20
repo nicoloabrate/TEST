@@ -40,33 +40,57 @@ class GET(eigenproblem):
         # --- define new operators
         self.LHS = deepcopy(nte)
         if setPhaseSpace is not None:
+            if "void" in ge.regions.keys():
+                raise GETError("'void' cannot be used as name for a region!")
+            if 'which' not in setPhaseSpace.keys():
+                if 'where' not in setPhaseSpace.keys():
+                    raise GETError("'which' key missing in setPhaseSpace dict!")
+                else:
+                    tmp = None
+                    for i, reg in ge.regionmap.items():
+                        x1x2 = ge.regionwhere[i]
+                        if x1x2 not in setPhaseSpace["where"]:
+                            if tmp is None:
+                                tmp = reg
+                            if tmp != reg:
+                                raise GETError("'where' key must refer to regions filled with the same material!")
+            else:
+                if not isinstance(setPhaseSpace["which"], str):
+                    raise GETError("'which' key can contain only one region!")
+                    where = []
+                    for i, reg in ge.regionmap.items():
+                        if reg == setPhaseSpace["which"]:
+                            where.append(ge.regionwhere[i])
+                    setPhaseSpace["where"] = where
+            # copy geometry object
             voidgeom = deepcopy(ge)
             isnewmaterial = True
-            for reg in ge.regions.keys():
-                if reg not in setPhaseSpace['which']:  # set region to void
-                    voidgeom.regions[reg].void()
+
+            for i, reg in ge.regionmap.items():
+                x1x2 = ge.regionwhere[i]
+                not_in_coord = x1x2 not in setPhaseSpace["where"]
+                not_in_mater = reg != setPhaseSpace['which']
+                if not_in_coord or not_in_mater:
+                    voidgeom.regionmap[i] = "void"
+                    if "void" not in voidgeom.regions.keys():
+                        voidgeom.regions["void"] = deepcopy(voidgeom.regions[reg])
+                        voidgeom.regions["void"].void()
                 else:  # set to void except in specified region/channel/group
                     isnewmaterial = False
+                    if reg != setPhaseSpace["which"]:
+                        raise GETError(f"{reg} coordinates {x1x2} cannot be included in"
+                                       " setPhaseSpace object!")
                     voidgeom.regions[reg].void(keepXS=setPhaseSpace)
                     if which == 'theta':
                         self.eigposition = setPhaseSpace['reaction']
 
             if isnewmaterial:  # replace newmaterial to void
                 if 'datapath' not in setPhaseSpace.keys():
-                    if isinstance(setPhaseSpace['where'], list):
-                        setPhaseSpace['datapath'] = [None]*len(setPhaseSpace['where'])
-                    else:
-                        setPhaseSpace['datapath'] = None
-                else:
-                    if isinstance(setPhaseSpace['where'], list):
-                        if isinstance(setPhaseSpace['datapath'], list) is False:
-                            setPhaseSpace['datapath'] = [setPhaseSpace['datapath']]*len(setPhaseSpace['where'])
+                    setPhaseSpace['datapath'] = None
                 if isinstance(setPhaseSpace['where'], list):
-                    if isinstance(setPhaseSpace['which'], list):
-                        for where, whichmat, path in zip(setPhaseSpace['where'], setPhaseSpace['which'], setPhaseSpace['datapath']):
-                            voidgeom.replace({'where': tuple([where]), 'which': whichmat, 'path': path})
-                    else:
-                        raise OSError('setPhaseSpace: both where and which field should be of type list!')
+                    voidgeom.replace({'where': tuple(setPhaseSpace['where']),
+                                        'which': setPhaseSpace['which'],
+                                        'path': setPhaseSpace['datapath']})
                 else:
                     voidgeom.replace({'where': setPhaseSpace['where'],
                                       'which': setPhaseSpace['which'],
@@ -80,7 +104,7 @@ class GET(eigenproblem):
                 raise OSError('Diffusion not available for GET!')
 
             self.voidgeom = voidgeom
-            if isnewmaterial is False:
+            if not isnewmaterial:
                 # subtract new operators to keep balance
                 self.LHS.F = nte.F-self.RHS.F
                 self.LHS.S = nte.S-self.RHS.S
@@ -113,7 +137,7 @@ class GET(eigenproblem):
         self.A = LHS.L-LHS.F-LHS.S+LHS.F0+LHS.S0+LHS.C  # leakage operator
         self.B = RHS.F+RHS.S-RHS.F0-RHS.S0-RHS.C  # material operator
         self.which = 'zeta'
-        self.whichspectrum = 'TR'
+        self.whichspectrum = 'LR'
         self.sigma = 1
 
     def delta(self):
@@ -168,3 +192,6 @@ class GET(eigenproblem):
         self.which = 'theta'
         self.whichspectrum = 'TR'
         self.sigma = 1
+
+class GETError(Exception):
+    pass
