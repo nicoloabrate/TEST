@@ -123,7 +123,7 @@ class eigenproblem():
                 E.setTarget(self.sigma)
 
         # set spectral transformation
-        if self.which in ['delta', 'zeta', 'theta']:
+        if self.which in ['delta', 'theta']: # 'zeta',
             st.setType('sinvert')
 
         end = t.time()
@@ -436,7 +436,7 @@ class eigenproblem():
         self.sigma = 0
 
     def solve(self, algo='SLEPc', verbose=False,tol=1E-14, monitor=False,
-              normalisation='totalflux', shift=None, which=None, **kwargs):
+              normalisation='peaktotalflux', shift=None, which=None, **kwargs):
 
         A = self.A
         B = self.B
