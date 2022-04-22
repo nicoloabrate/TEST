@@ -399,7 +399,7 @@ class write():
             #     typekey = str(type(key).__name__)
 
             # convert items
-            if isinstance(item, (int64, float64, bytes, int, float)):
+            if isinstance(item, (int64, float64, complex128, bytes, int, float)):
                 fh5g.create_dataset(str(key), data=item)
             elif isinstance(item, str):
                 dt_str = h5py.special_dtype(vlen=str)
