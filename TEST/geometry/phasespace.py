@@ -1710,6 +1710,13 @@ class PhaseSpace:
                 # if type(v) is bytes:
                 #     v = v.decode()
                 self.__dict__[k] = v
+        if self.eigvals.ndim == 1:
+            self.eigvals = self.eigvals[:, np.newaxis]
+        elif np.isscalar(self.eigvals):
+            self.eigvals = np.array([self.eigvals], )
+        if self.eigvect.ndim == 1:
+            self.eigvect = self.eigvect[:, np.newaxis]
+
 
 class PhaseSpaceError(Exception):
     pass
