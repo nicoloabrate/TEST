@@ -5,6 +5,7 @@ File: material.py
 
 Description: Class to handle different material regions.
 """
+import re
 import json
 import numpy as np
 import matplotlib.pyplot as plt
@@ -191,8 +192,11 @@ class Material():
             L = 0
             datastr = list(self.__dict__.keys())
             # //2 since there are 'S' and 'Sp'
-            S = sum('S' in s for s in datastr)//2
-            self.L = S if S > L else L  # get maximum scattering order
+            l = -1
+            for i, s in enumerate(datastr):
+                if re.match(r'S\d', s):
+                    l += 1
+            self.L = l if l > L else L  # get maximum scattering order
             self.datacheck()
 
     def _readjson(self, path):
@@ -817,7 +821,7 @@ class Material():
 
                     if len(dims) == 1:
                         if key == 'Diffcoef':
-                            v = self.Tot-self.S1.sum(axis=0)
+                            v = self.Transpxs
                             v = 1/3/v
                         collapsed[key][g] = np.divide(flx[iS:iE].dot(v[iS:iE]), NC, where=NC!=0)
                     else:
