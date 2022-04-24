@@ -51,13 +51,13 @@ mix_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'Kappa']
 
 units = {'Chid': '-', 'Chit': '-', 'Chip': '-', 'Tot': 'cm^{-1}',
          'Capt': 'cm^{-1}', 'Abs': 'cm^{-1}', 'Fiss': 'cm^{-1}',
-         'NuSf': 'cm^{-1}', 'Remxs': 'cm^{-1}', 'Transpxs': 'cm^{-1}',
+         'Nsf': 'cm^{-1}', 'Remxs': 'cm^{-1}', 'Transpxs': 'cm^{-1}',
          'Kappa': 'MeV', 'S': 'cm^{-1}', 'Nubar': '-', 'Invv': 's/cm',
          'Difflenght': 'cm^2', 'Diffcoef': 'cm', 'Flx': 'a.u.'}
 xslabels = {'Chid': 'delayed fiss. emission spectrum', 'Chit': 'total fiss. emission spectrum',
             'Chip': 'prompt fiss. emission spectrum', 'Tot': 'Total xs',
             'Capt': 'Capture xs', 'Abs': 'Absorption xs', 'Fiss': 'Fission xs',
-            'NuSf': 'Fiss. production xs', 'Remxs': 'Removal xs', 'Transpxs': 'Transport xs',
+            'Nsf': 'Fiss. production xs', 'Remxs': 'Removal xs', 'Transpxs': 'Transport xs',
             'Kappa': 'Fiss. energy', 'S': 'Scattering xs', 'Nubar': 'neutrons by fission',
             'Invv': 'Inverse velocity', 'Difflenght': 'Diff. length', 'Diffcoef': 'Diff. coeff.',
             'Flx': 'Flux spectrum'}
