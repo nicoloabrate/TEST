@@ -513,7 +513,7 @@ class PhaseSpace:
             plt.savefig(f"{figname}.pdf")
 
     def eplot(self, eflx=None, x=None, angle=None, mode=0, moment=0, family=0, ax=None,
-              precursors=False, title=None, figname=None, imag=False, nEv=None,
+              precursors=False, title=None, figname=None, imag=False, nEv=None, egrid=False,
               lethargynorm=True, logx=True, logy=True, **kwargs, ):
         """
         Plot solution along energy for a certain portion of the phase space.
@@ -586,20 +586,24 @@ class PhaseSpace:
             yi = np.zeros((len(eflx.imag)+1,))
             yi[0] = eflx.imag[0]
             yi[1:] = eflx.imag
-            plt.step(E, yr, where='mid', **kwargs)
+            plt.step(E, yr, where='pre', **kwargs)
             if "label" in kwargs.keys():
                 kwargs["label"] = "{} real".format(kwargs["label"])
 
             if "label" in kwargs.keys():
                 kwargs["label"] = "{} imag".format(kwargs["label"])
-            plt.step(E, yi, where='mid', **kwargs)
+            plt.step(E, yi, where='pre', **kwargs)
         else:
-            plt.step(E, yr, where='mid', **kwargs)
+            plt.step(E, yr, where='pre', **kwargs)
 
         if loglog or logx:
             ax.set_xscale('log')
         if loglog or logy:
             ax.set_yscale('log')
+
+        if egrid:
+            for e in E:
+                ax.axvline(e, c='k', lw=0.5, ls=':')
 
         plt.grid(which='both', alpha=0.2)
         ax.set_xlabel('E [MeV]')
@@ -1710,9 +1714,7 @@ class PhaseSpace:
                 # if type(v) is bytes:
                 #     v = v.decode()
                 self.__dict__[k] = v
-        if self.eigvals.ndim == 1:
-            self.eigvals = self.eigvals[:, np.newaxis]
-        elif np.isscalar(self.eigvals):
+        if np.isscalar(self.eigvals):
             self.eigvals = np.array([self.eigvals], )
         if self.eigvect.ndim == 1:
             self.eigvect = self.eigvect[:, np.newaxis]
