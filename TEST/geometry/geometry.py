@@ -616,7 +616,8 @@ class Slab:
         mu[::-1].sort()
 
         PL = np.zeros((L, self.nA))
-        for order in range(0, L):
+        # TODO FIXME check that this is correct
+        for order in range(L+1):
             PL[order, :] = eval_legendre(order, mu)
         C = (2*np.arange(0, self.nA)+1)/2
         QW = {'L': L, 'mu': mu, 'w': w, 'PL': PL, 'C': C}

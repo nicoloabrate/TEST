@@ -450,8 +450,8 @@ class Material():
 
         """
         if what == 'density':
-            densdata = ['Capt', 'Fiss', *list(map(lambda z: "S"+str(z), range(self.L))),
-                        *list(map(lambda z: "Sp"+str(z), range(self.L)))]
+            densdata = ['Capt', 'Fiss', *list(map(lambda z: "S"+str(z), range(self.L+1))),
+                        *list(map(lambda z: "Sp"+str(z), range(self.L+1)))]
             if howmuch < 0:
                 raise OSError('Cannot apply negative density perturbations!')
             if sanitycheck:
@@ -495,7 +495,7 @@ class Material():
                         delta = 1/(3*mydic[what][g])-self.Transpxs[g]
                     elif what == 'S0':
                         # change higher moments, if any
-                        for ll in range(self.L):
+                        for ll in range(self.L+1):
                             R = (mydic[what][g]/mydic[what][g]-delta)
                             key = 'S%d' % ll
                             mydic[key][depgro][g] = mydic[key][depgro][g]*R
@@ -696,7 +696,7 @@ class Material():
 
         """
         # add anisotropic XS
-        for ll in range(self.L):
+        for ll in range(self.L+1):
             new = f'S{ll}'
             newP = f'Sp{ll}'
             if new not in alldata:
@@ -988,8 +988,11 @@ class Mix(Material):
         L = 0
         datastr = list(self.__dict__.keys())
         # //2 since there are 'S' and 'Sp'
-        S = sum('S' in s for s in datastr)//2
-        self.L = S if S > L else L  # get maximum scattering order
+        l = -1
+        for i, s in enumerate(datastr):
+            if re.match(r'S\d', s):
+                l += 1
+        self.L = l if l > L else L  # get maximum scattering order
         self.datacheck()
 
 class MaterialError(Exception):
