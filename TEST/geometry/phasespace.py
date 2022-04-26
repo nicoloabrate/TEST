@@ -74,7 +74,7 @@ class PhaseSpace:
                     eigvals = solution["eigenvalues"]
                     eigvect = solution["eigenvectors"]
                     self.problem = solution["problem"]
-                    self.nev = len(eigvals)
+                    self.nEv = len(eigvals)
 
                     # --- manipulate eigenpairs
                     # sort eigenvalues
@@ -87,10 +87,10 @@ class PhaseSpace:
                     eigvect = np.conj(signs)*eigvect
 
                     # convert to np.float64 if imaginary part is null
-                    if np.iscomplex(eigvect[:, 0:self.nev]).sum() == 0:
-                        ev = eigvect[:, 0:self.nev].real
+                    if np.iscomplex(eigvect[:, 0:self.nEv]).sum() == 0:
+                        ev = eigvect[:, 0:self.nEv].real
                     else:
-                        ev = eigvect[:, 0:self.nev]
+                        ev = eigvect[:, 0:self.nEv]
 
                     self.eigvals = eigvals
                     self.eigvect = ev
@@ -992,6 +992,10 @@ class PhaseSpace:
         else:
             return f"{e0:.8f}"
 
+    @property
+    def nEv(self):
+        return len(self.eigvals)
+
     def _geteig(self, nEv=0, NZ=None):
         """Return eigenvalues. If clusters are found,
         no sorting is operated, to avoid conflicts
@@ -1063,13 +1067,13 @@ class PhaseSpace:
         """
         idx = None
         if self.problem in ["kappa", "gamma"]:
-            for i in range(self.nev):
+            for i in range(self.nEv):
                 if self._has_uniform_sign(i):
                     idx = i
                     break
         elif self.problem in ["zeta", "delta", "theta"]:
             idxpos = []
-            for i in range(self.nev):
+            for i in range(self.nEv):
                 if self._has_uniform_sign(i) and self.eigvals[i] != 0:
                     idxpos.append(i)
             if len(idxpos) > 0:
