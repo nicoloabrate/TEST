@@ -74,7 +74,6 @@ class PhaseSpace:
                     eigvals = solution["eigenvalues"]
                     eigvect = solution["eigenvectors"]
                     self.problem = solution["problem"]
-                    self.nEv = len(eigvals)
 
                     # --- manipulate eigenpairs
                     # sort eigenvalues
