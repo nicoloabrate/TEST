@@ -90,7 +90,7 @@ class PhaseSpace:
                     if np.iscomplex(eigvect[:, 0:nev]).sum() == 0:
                         ev = eigvect[:, 0:nev].real
                     else:
-                        ev = eigvect[:, 0:nEv]
+                        ev = eigvect[:, 0:nev]
 
                     self.eigvals = eigvals
                     self.eigvect = ev
