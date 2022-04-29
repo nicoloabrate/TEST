@@ -73,6 +73,7 @@ class PhaseSpace:
                 else:
                     eigvals = solution["eigenvalues"]
                     eigvect = solution["eigenvectors"]
+                    nev = len(eigvals)
                     self.problem = solution["problem"]
 
                     # --- manipulate eigenpairs
@@ -86,10 +87,10 @@ class PhaseSpace:
                     eigvect = np.conj(signs)*eigvect
 
                     # convert to np.float64 if imaginary part is null
-                    if np.iscomplex(eigvect[:, 0:self.nEv]).sum() == 0:
-                        ev = eigvect[:, 0:self.nEv].real
+                    if np.iscomplex(eigvect[:, 0:nev]).sum() == 0:
+                        ev = eigvect[:, 0:nev].real
                     else:
-                        ev = eigvect[:, 0:self.nEv]
+                        ev = eigvect[:, 0:nEv]
 
                     self.eigvals = eigvals
                     self.eigvect = ev
