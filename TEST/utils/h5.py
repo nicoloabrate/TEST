@@ -68,6 +68,7 @@ class read():
             # get sub-groups and datasets
             try:
                 dic = {}
+                # -------- loop over sub-groups
                 for k, v in fh5[gro].items():
                     try:
                         pytype = v.attrs['pytype']
@@ -141,7 +142,8 @@ class read():
             if isinstance(item, h5py._hl.dataset.Dataset):
                 if pytype is str:
                     if item.shape == ():
-                        val = array(item)[()] # .decode()
+                        val = array(item)[()] # item.asstr() # 
+                        val = val.decode()
                     else:
                         val = []
                         for i in item:
@@ -157,6 +159,7 @@ class read():
                         else:
                             val = zeros(item.shape, dtype=dt)
                             item.read_direct(val)
+                            read._bytes2str_in_iter(val)
                     else:
                         raise TypeError(f'Cannot read data {item} with type {type(item)}!')
             elif pytype in read._scalar_types:
@@ -172,6 +175,8 @@ class read():
                         val = val.to_list()
                     elif pytype == tuple:
                         val = tuple(map(tuple, val))
+                read._bytes2str_in_iter(val)
+
             elif pytype is str:
                 val = item
             elif pytype is bytes:
@@ -195,7 +200,8 @@ class read():
             val = read._h52dict(item, keytype=keytype)
         elif pytype is str or pytype == 'str':
             if item.shape == ():
-                val = array(item)[()] # .decode()
+                val = array(item)[()]
+                val = val.decode()
             else:
                 val = []
                 for i in item:
@@ -203,6 +209,7 @@ class read():
                 val = asarray(val)
         else:
             raise TypeError(f'Cannot read data {item} with type {type(item)}!')
+
         return val
 
     def _h52dict(path, keytype=None):
@@ -256,6 +263,27 @@ class read():
 
         return dic
 
+    def _bytes2str_in_iter(iterable):
+        if type(iterable) not in read._iter_types:
+            raise TESTH5Error(f"{type(iterable)} is not in iterable types!")
+        i = 0
+        for el in iterable:
+            if type(el) in read._iter_types:
+                if type(el) == ndarray:
+                    if isinstance(el.dtype, (object, str)):
+                        read._bytes2str_in_iter(el)
+                elif isinstance(el.dtype, (dict, OrderedDict)):
+                    for k, v in el.items():
+                        read._bytes2str_in_iter(v)
+                else:
+                    read._bytes2str_in_iter(el)
+            elif type(el) == bytes:
+                iterable[i] = el.decode()
+            i += 1
+
+
+class TESTH5Error(Exception):
+    pass
 
 class write():
 
