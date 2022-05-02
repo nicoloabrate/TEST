@@ -415,9 +415,10 @@ class eigenproblem():
 
         if generalised:
             if self.model == 'Diffusion':
+                T = T.tocsr()
                 for gro in range(self.operators.nE):
                     skip = gro*self.nS
-                    self.operators.T[[skip, skip+self.nS-1], :] = 0
+                    T[[skip, skip+self.nS-1], :] = 0
             self.B = T
         else:
             self.B = None
