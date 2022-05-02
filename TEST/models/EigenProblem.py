@@ -414,20 +414,10 @@ class eigenproblem():
             self.A = S+Fp+Fd+E-C-F0-S0-D-L
 
         if generalised:
-            if self.model == 'Diffusion':
-                T = T.tocsr()
-                for gro in range(self.operators.nE):
-                    skip = gro*self.nS
-                    T[[skip, skip+self.nS-1], :] = 0
             self.B = T
         else:
             self.B = None
             invT = inv(T)
-            if self.model == 'Diffusion':  # whatever BCs
-                for gro in range(self.operators.nE):
-                    skip = gro*self.nS
-                    # set to 1 in order to not affect A, which has BCs imposed
-                    invT[[skip, skip+self.nS-1], [skip, skip+self.nS-1]] = 1
             # impose BCs if Diffusion (done here to avoid singularities)
             self.A = invT.dot(self.A)
 

@@ -151,10 +151,6 @@ def couple2NPE(nteOper, npeOper, nF, model):
             for gro in range(nE):
                 skip = (No*(nS-1)+Ne*nS)*gro
                 tmp[skip:nS+skip, :] = npeOper.E[nS*gro:nS*(gro+1), :]
-                # FIXME TODO: define class for operator handling allowing to impose BCs
-                # impose BCs in Diffusion case
-                if model == "Diffusion":
-                    tmp[[skip, skip+nS-1], :] = 0
         E = bmat([[A4, tmp.copy()], [A3, A2]])
         # decay
         D = block_diag(([A4, npeOper.D]))

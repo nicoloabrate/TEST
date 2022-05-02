@@ -72,26 +72,13 @@ def setBCs(op, geometry):
                 skip = gro*op.nS
                 # left boundary
                 L[skip, :] = 0
-                L[skip, skip+1] = -D_left[gro]/dx[0]*sqrt(3)
-                L[skip, skip] = 1+D_left[gro]/dx[0]*sqrt(3)
+                L[skip, skip+1] = -2*D_left[gro]/dx[0]**2
+                L[skip, skip] = 2/sqrt(3)/dx[0]+2*D_left[gro]/dx[0]**2
                 # right boundary
                 L[skip+op.nS-1, :] = 0
-                L[skip+op.nS-1, skip+op.nS-1] = 1+D_right[gro]/dx[-1]*sqrt(3)
-                L[skip+op.nS-1, skip+op.nS-2] = -D_right[gro]/dx[-1]*sqrt(3)
-                if hasattr(op, 'Fp'):
-                    op.Fp[[skip, skip+op.nS-1], :] = 0
-                else:
-                    op.F[[skip, skip+op.nS-1], :] = 0
-                # FIXME
-                # inefficient, set to zero only non-zero entry!
-                op.S[[skip, skip+op.nS-1], :] = 0
-                op.S0[[skip, skip+op.nS-1], :] = 0
-                op.F0[[skip, skip+op.nS-1], :] = 0
-                op.C[[skip, skip+op.nS-1], :] = 0
-                # FIXME commented to build compact EVP for alpha and omega
-                # so BCs imposed after inversion
-                # if hasattr(op, 'T'):
-                #     op.T[[skip, skip+op.nS-1], :] = 0
+                L[skip+op.nS-1, skip+op.nS-1] = 2/sqrt(3)/dx[-1]+2*D_right[gro]/dx[-1]**2
+                L[skip+op.nS-1, skip+op.nS-2] = -2*D_right[gro]/dx[-1]**2
+
         elif bc in ['marshak', 'Marshak']:
             # diffusion
             left_reg = geometry.regionmap[0]
@@ -102,26 +89,11 @@ def setBCs(op, geometry):
             for gro in range(op.nE):
                 skip = gro*op.nS
                 # left boundary
-                L[skip, :] = 0
-                L[skip, skip+1] = -D_left[gro]/dx[0]*2
-                L[skip, skip] = 1+D_left[gro]/dx[0]*2
+                L[skip, skip+1] = -2*D_left[gro]/dx[0]**2
+                L[skip, skip] = 1/dx[0]+2*D_left[gro]/dx[0]**2
                 # right boundary
-                L[skip+op.nS-1, :] = 0
-                L[skip+op.nS-1, skip+op.nS-1] = 1+D_right[gro]/dx[-1]*2
-                L[skip+op.nS-1, skip+op.nS-2] = -D_right[gro]/dx[-1]*2
-                if hasattr(op, 'Fp'):
-                    op.Fp[[skip, skip+op.nS-1], :] = 0
-                else:
-                    op.F[[skip, skip+op.nS-1], :] = 0
-                # FIXME
-                # inefficient, set to zero only non-zero entry!
-                op.S[[skip, skip+op.nS-1], :] = 0
-                op.S0[[skip, skip+op.nS-1], :] = 0
-                op.F0[[skip, skip+op.nS-1], :] = 0
-                op.C[[skip, skip+op.nS-1], :] = 0
-                # FIXME commented to build compact EVP for alpha and omega
-                # so BCs imposed after inversion
-                # if hasattr(op, 'T'):
-                #     op.T[[skip, skip+op.nS-1], :] = 0
+                L[skip+op.nS-1, skip+op.nS-1] = 1/dx[-1]+2*D_right[gro]/dx[-1]**2
+                L[skip+op.nS-1, skip+op.nS-2] = -2*D_right[gro]/dx[-1]**2
+
     op.L = L
     return op
