@@ -383,7 +383,7 @@ class Material():
         return vals
 
     def plot(self, what, dep_group=None, family=1, ax=None, figname=None,
-             normalise=True, **kwargs):
+             normalise=True, logx=True, **kwargs):
 
         E = self.energygrid
         ax = ax or plt.gca()
@@ -401,10 +401,9 @@ class Material():
             if normalise:
                 u = np.log(self.energygrid/self.energygrid[0])
                 xs = xs/np.diff(-u)
-
-
-        if 'Chi' in what:
-            xs = xs/xs.dot(-np.diff(E))
+        if normalise:
+            if 'Chi' in what:
+                xs = xs/xs.dot(-np.diff(E))
 
         if 'S' in what:
             uom = units['S']
@@ -423,7 +422,8 @@ class Material():
         plt.stairs(xs, edges=E, baseline=None, **kwargs)
         ax.set_xlabel('E [MeV]')
         ax.set_ylabel(f'{whatlabel} [{uom}]')
-        ax.set_xscale('log')
+        if logx:
+            ax.set_xscale('log')
         if what not in ['Nubar', 'Chid', 'Chip', 'Chit']:
             ax.set_yscale('log')
 
