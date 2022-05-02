@@ -1172,7 +1172,8 @@ class PhaseSpace:
             for e in reals:
                 idx = np.where(self.eigvals == e)[0][0]
                 if self._has_uniform_sign(idx):
-                    maybeprompt.append(e)
+                    if e < 0:
+                        maybeprompt.append(e)
                 else:
                     idx = None
             if len(maybeprompt) > 1:
