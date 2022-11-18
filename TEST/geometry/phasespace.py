@@ -444,6 +444,60 @@ class PhaseSpace:
                    "not available as " "normalisation mode")
             print(msg)
 
+    def collapse(self, spectrum, fewgrp, moment=0):
+        """
+        Collapse in energy the multi-group data.
+
+        Parameters
+        ----------
+        fewgrp : iterable
+            Few-group structure to perform the collapsing.
+
+        Raises
+        ------
+        OSError
+            Collapsing failed: weighting flux missing in {}.
+
+        Returns
+        -------
+        None.
+
+        """
+        flx = spectrum
+
+        multigrp = self.geometry.energygrid
+        if isinstance(fewgrp, list):
+            fewgrp = np.asarray(fewgrp)
+        # ensure descending order
+        fewgrp = fewgrp[np.argsort(-fewgrp)]
+        H = len(multigrp)-1
+        G = len(fewgrp)-1
+        # sanity check
+        if G > H:
+            raise OSError(f'Collapsing failed: few-group structure should \
+                          have less than {H} group')
+        if multigrp[0] != fewgrp[0] or multigrp[0] != fewgrp[0]:
+            raise OSError('Collapsing failed: few-group structure'
+                          'boundaries do not match with multi-group'
+                          'one')
+        for ig, g in enumerate(fewgrp):
+            if g not in multigrp:
+                raise OSError(f'Group boundary n.{ig}, {g} MeV not present in fine grid!')
+
+        iS = 0
+        collapsed = {}
+        collapsed = np.zeros((G, ))
+        for g in range(G):
+            # select fine groups in g
+            G1, G2 = fewgrp[g], fewgrp[g+1]
+            iE = np.argwhere(np.logical_and(multigrp[iS:] < G1,
+                                            multigrp[iS:] >= G2))[-1][0]+iS
+            # compute flux in g
+            collapsed[g] = flx[iS:iE].sum()
+            iS = iE
+        return collapsed
+
+
     def xplot(self, group, angle=None, mode=0, nEv=None, moment=0, family=0,
               precursors=False, title=None, imag=False, ax=None, NZ=None,
               normalisation="peaktotalflux", power=None,
