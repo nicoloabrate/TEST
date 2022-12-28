@@ -16,6 +16,7 @@ from serpentTools.settings import rc as rcst
 from copy import deepcopy as copy
 from matplotlib import rc, checkdep_usetex
 from TEST.utils import get_energy_grid
+import logging
 
 usetex = checkdep_usetex(True)
 rc("font", **{"family": "sans-serif", "sans-serif": ["Helvetica"]})
@@ -599,8 +600,8 @@ class Material():
             # FIXME FIXME check Serpent RSD and do correction action
             self.Chit[self.Chit <= 1E-4] = 0
             if abs(self.Chit.sum() - 1) > 1E-4:
-                print(f'Total fission spectra in {self.UniName} not normalised!'
-                      'Forcing normalisation...')
+                logging.debug(f'Total fission spectra in {self.UniName} not normalised!'
+                                 'Forcing normalisation...')
 
             # ensure pdf normalisation
             self.Chit /= self.Chit.sum()
@@ -640,9 +641,9 @@ class Material():
                             if abs(self.Chit[g]-chit) > 1E-4:
                                 raise MaterialError()
                     except MaterialError:
-                        print(f'Fission spectra or delayed fractions'
-                              f' in {self.UniName} not consistent! '
-                              'Forcing consistency acting on chi-prompt...')
+                        logging.debug(f'Fission spectra or delayed fractions'
+                                      f' in {self.UniName} not consistent! '
+                                      'Forcing consistency acting on chi-prompt...')
                         # self.Chip = (self.Chit-np.dot(self.beta, self.Chid))/(1-self.beta.sum())
                         self.Chip /= self.Chip.sum()
                         for g in range(self.nE):
