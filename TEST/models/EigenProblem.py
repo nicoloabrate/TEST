@@ -18,6 +18,7 @@ import time as t
 import numpy as np
 from scipy.linalg import eig
 from scipy.sparse.linalg import eigs, inv
+from scipy.sparse import block_diag
 from TEST.geometry.phasespace import PhaseSpace, PhaseSpaceError
 from TEST.models.NeutronPrecursorsEquation import NPE as npe
 from TEST.models.NeutronTransportEquation import couple2NPE
@@ -32,7 +33,7 @@ _targetdict = {'SM': 'SMALLEST_MAGNITUDE', 'SR': 'SMALLEST_REAL',
 class eigenproblem():
 
     def __init__(self, *, nte, which, ge, nev=1,
-                 generalisedTime=False):
+                 generalisedTime=False, diffusion=False):
 
         # --- problem settings
         self.nS = nte.nS
@@ -58,7 +59,10 @@ class eigenproblem():
                 generalisedTime = True
                 evp(generalised=generalisedTime)
             else:
-                evp()
+                if which in ['gamma']:
+                    evp(diffusion=diffusion)
+                else:
+                    evp()
         except AttributeError as ierr:
             print(ierr)
             raise OSError('{} eigenproblem not available!'.format(which))
@@ -297,7 +301,7 @@ class eigenproblem():
         self.whichspectrum = 'LR'
         self.sigma = 0
 
-    def gamma(self):
+    def gamma(self, diffusion=False):
         """
         Cast operators into the collision eigenvalue problem "gamma".
 
@@ -313,9 +317,23 @@ class eigenproblem():
             else:
                 self.A = op.R  # no leakage, infinite medium
         else:
-            self.A = op.L+op.C+op.S0+op.F0  # destruction operator
+            if self.model != 'Diffusion':
+                self.A = op.L+op.C+op.S0+op.F0  # destruction operator
+            else:
+                if diffusion:
+                    diagS = block_diag((op.S.diagonal()))
+                    self.A = op.L+op.C+op.S0+op.F0-diagS  # destruction operator
+                else:
+                    self.A = op.L+op.C+op.S0+op.F0  # destruction operator
 
-        self.B = op.F+op.S  # multiplication operator
+        if self.model != 'Diffusion':
+            self.B = op.F+op.S  # multiplication operator
+        else:
+            if diffusion:
+                self.B = op.F+op.S-diagS  # multiplication operator
+            else:
+                self.B = op.F+op.S  # multiplication operator
+
         self.which = 'gamma'
         self.whichspectrum = 'LR'
         self.sigma = None

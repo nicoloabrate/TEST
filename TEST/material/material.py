@@ -27,8 +27,8 @@ rcst['xs.getB1XS'] = False
 rcst['xs.variableGroups'] = ['kinetics', 'xs', 'xs-prod', 'gc-meta']
 
 # it depends on Serpent 2 highest Legendre polynomial expansion order
-scatt_keys = [*list(map(lambda z: "infS"+str(z), range(0, 2))),
-              *list(map(lambda z: "infSp"+str(z), range(0, 2))), 'infScatt1']
+scatt_keys = [*list(map(lambda z: "infS"+str(z), range(0, 3))),
+              *list(map(lambda z: "infSp"+str(z), range(0, 3))), 'infScatt1']
 xsdf_keys = ['infTot', 'infAbs', 'infDiffcoef', 'infTranspxs', 'infCapt',
              'infRemxs', 'infFiss', 'infNsf']
 ene_keys = ['infNubar', 'infInvv', 'infKappa', 'infInvv',  'infChit',

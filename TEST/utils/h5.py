@@ -478,6 +478,14 @@ class write():
                 fh5[grp].attrs.create('pytype', type(iterable))
                 for i, obj in enumerate(iterable):
                     write.dict2h5(fh5[grp], i, obj.__dict__)
+                # try:
+                #     fh5[grp].attrs.create('pytype', type(iterable))
+                #     for i, obj in enumerate(iterable):
+                #         write.dict2h5(fh5[grp], i, obj.__dict__)
+                # except TypeError:
+                #     fh5[dataname].attrs.create('pytype', type(iterable))
+                #     for i, obj in enumerate(iterable):
+                #         write.dict2h5(fh5[dataname], i, obj.__dict__)
             elif ittype in [*read._int_types, *read._float_types]:
                 fh5.create_dataset(dataname, data=iterable, chunks=True,
                                    compression="gzip", compression_opts=4)

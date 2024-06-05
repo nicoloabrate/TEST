@@ -398,7 +398,7 @@ class GET():
         signs = np.sign(eigvect[1, :])  # sign of 2nd row to avoid BCs
         eigvect = np.conj(signs)*eigvect
 
-        # convert to np.float64 if imaginary part is null
+        # convert to float64 if imaginary part is null
         if np.iscomplex(eigvect[:, 0:self.nev]).sum() == 0:
             ev = eigvect[:, 0:self.nev].real
         else:

@@ -32,7 +32,7 @@ def zero(ge, f, meshtype='edges'):
     fx = np.zeros((1, N))
     q = 0
     NL = ge.nLayers
-    if isinstance(f, (int, float, np.float)):
+    if isinstance(f, (int, float, float)):
         f = [f]*NL
     for i in range(0, NL):
         pts = dicob[meshtype][q::]

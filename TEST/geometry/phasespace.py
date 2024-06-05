@@ -86,7 +86,7 @@ class PhaseSpace:
                     signs = np.sign(eigvect[1, :])  # 2nd row sign to avoid BCs
                     eigvect = np.conj(signs)*eigvect
 
-                    # convert to np.float64 if imaginary part is null
+                    # convert to float64 if imaginary part is null
                     if np.iscomplex(eigvect[:, 0:nev]).sum() == 0:
                         ev = eigvect[:, 0:nev].real
                     else:
@@ -1573,7 +1573,8 @@ class PhaseSpace:
                 if nA == 0 and moment == 1:
                     # compute current via finite difference
                     y[ig * dim: dim * (ig + 1)] = np.gradient(vect[iS:iE], self.geometry.mesh)
-                    y[ig * dim: dim * (ig + 1)] = -D[ig, :]*y[ig * dim: dim * (ig + 1)]
+                    diffcoef_g = FD.zero(self.geometry, D[ig, :])
+                    y[ig * dim: dim * (ig + 1)] = -diffcoef_g*y[ig * dim: dim * (ig + 1)]
         else:
             # build angular flux and evaluate in angle
             if isinstance(angle, int):
@@ -1747,13 +1748,17 @@ class PhaseSpace:
             is_sign_unif = np.all(fluxnb < 0)
             ispos = False
         # --- check current sign
-        if ispos:
-            is_curr_neg = np.all(curr[np.arange(0, len(flux), self.nS)] < 0)
+        # if ispos:
+        if curr[1] > 0: # skip boundary element
+            is_curr_sign_nonuni = ~np.all(curr > 0)
         else:
-            # if flux is all negative, this condition is the opposite
-            is_curr_neg = np.all(curr[np.arange(0, len(flux), self.nS)] > 0)
+            is_curr_sign_nonuni = ~np.all(curr < 0)
+        
+        # else:
+        #     # if flux is all negative, this condition is the opposite
+        #     is_curr_neg = np.all(curr[np.arange(0, len(flux), self.nS)] > 0)
 
-        return is_sign_unif and is_curr_neg
+        return is_sign_unif and is_curr_sign_nonuni
 
     def to_hdf5(self, h5name=None):
         """Save phase space object to HDF5 file."""

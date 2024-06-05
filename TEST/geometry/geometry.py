@@ -537,6 +537,7 @@ class Slab:
                 if list(set(tmp)) == tmp:
                     self._split = self._split*np.ones((self.nLayers),
                                                     dtype=type(self._split))
+                    self._split = self._split.tolist()
 
                 if max(tmp) < 0 and nlayers_old != self.nLayers:  # user def points
                     idy = np.argmax(tmp)
@@ -617,7 +618,7 @@ class Slab:
 
         PL = np.zeros((L, self.nA))
         # TODO FIXME check that this is correct
-        for order in range(L+1):
+        for order in range(L):
             PL[order, :] = eval_legendre(order, mu)
         C = (2*np.arange(0, self.nA)+1)/2
         QW = {'L': L, 'mu': mu, 'w': w, 'PL': PL, 'C': C}
