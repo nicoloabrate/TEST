@@ -130,8 +130,8 @@ class sourceproblem():
                             else:
                                 mysource = lambda mu, E: sourceproblem.mysrc(source, xv, mu, E)*eval_legendre(moment, mu)
                                 # integrate on energy and angle
-                                # FIXME: this has to be tested
-                                f[iS], err = dblquad(mysource, -1, 1, E[0], E[1])
+                                src_val = mysource(0, E)
+                                f[iS], err = dblquad(mysource, E[1], E[0], -1, 1)
                                 f[iS] = f[iS]*coeff
                                 if err > 1E-5:
                                     print('Source projection failed! Integration error={}'.format(err))
@@ -163,7 +163,7 @@ class sourceproblem():
                                 f[iS] = sourceproblem.mysrc(source, xv, mu, 0)*coeff*np.diff(E)
                             else:
                                 mysource = lambda E: sourceproblem.mysrc(source, xv, mu, E)
-                                f[iS], err = quad(mysource, E[0], E[1])
+                                f[iS], err = quad(mysource, E[1], E[0])
                                 f[iS] = f[iS]*coeff
                                 if err > 1E-5:
                                     print('Source projection failed! Integration error={}'.format(err))
@@ -248,10 +248,12 @@ class sourceproblem():
             if self.model != 'Diffusion':
                 self.A = op.Linf+op.R-op.S-op.F  # no leakage, infinite medium
             else:
-                self.A = op.R-op.S-op.F  # no leakage, infinite medium
+                R = op.F0 + op.C + op.S0
+                self.A = R-op.S-op.F  # no leakage, infinite medium
             self.nev = 1
         else:
-            self.A = op.L+op.R-op.S-op.F  # destruction operator
+            R = op.F0 + op.C + op.S0
+            self.A = op.L+R-op.S-op.F  # destruction operator
 
         self.which = 'static'
 
@@ -353,12 +355,16 @@ class sourceproblem():
         None.
 
         """
-        if sourceproblem.nonsingular(self.A):
-            phi = spsolve(self.A, self.source[:, np.newaxis])
-            self.solution = PhaseSpace(self.geometry, {'solution': phi, 'problem':self.problem},
-                                       self.operators, source=True)
-        else:
-            print('The transport operator is singular!')
+        # if sourceproblem.nonsingular(self.A):
+        phi = spsolve(self.A, self.source[:, np.newaxis])
+        self.solution = PhaseSpace(self.geometry, {'solution': phi, 'problem': self.problem},
+                                    self.operators, source=True)
+        # else:
+        #     print('The transport operator is singular!')
+
+    def integrate_source(self):
+        Q = self.source
+        # TODO: compute integral of the source to normalise it automatically, if needed
 
     def spy(self, what, markersize=2):
         spy(self.__dict__[what], markersize=markersize)
