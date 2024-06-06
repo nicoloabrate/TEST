@@ -1437,8 +1437,12 @@ class PhaseSpace:
                             mode=mode, family=family, precursors=precursors,
                             nEv=nEv, )
 
-        e = self._geteig(nEv)
-        if e.size == 1:
+        if self.problem != "static":
+            e = self._geteig(nEv)
+
+        if self.problem == "static":
+            return y
+        elif e.size == 1:
             if eig:
                 return e, y
             else:
