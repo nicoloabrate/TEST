@@ -18,12 +18,13 @@ import time as t
 import numpy as np
 from scipy.linalg import eig
 from scipy.sparse.linalg import eigs, inv
-from scipy.sparse import block_diag
+from scipy.sparse import block_diag, diags
 from TEST.geometry.phasespace import PhaseSpace, PhaseSpaceError
+from TEST.models.SourceProblem import sourceproblem
 from TEST.models.NeutronPrecursorsEquation import NPE as npe
 from TEST.models.NeutronTransportEquation import couple2NPE
 from matplotlib.pyplot import spy
-
+from copy import deepcopy as copy
 
 _targetdict = {'SM': 'SMALLEST_MAGNITUDE', 'SR': 'SMALLEST_REAL',
                'LM': 'LARGEST_MAGNITUDE', 'LR': 'LARGEST_REAL',
@@ -218,6 +219,65 @@ class eigenproblem():
             print("ELAPSED TIME (SLEPc solution): %f [s]" % (end-start))
 
         return res
+
+    def power_iteration(self, guess=None, tol=1E-12, history=True,
+                        sigma=None, normalisation=None):
+
+        if guess is None:
+            n = self.operators.F.shape[0]
+            S0 = np.ones((n,))
+            Q = self.operators.F*S0
+            # mysrc = lambda x: S0 # , E: S0*(E>0.0625)+S0/2*(E<=0.0625) # *(x>=-H and x<=H)
+        else:
+            Q = guess
+
+        err_vect = 1
+        err_eigv = 1
+        eig_old = 1
+        if history:
+            his_eig = [eig_old]
+
+        # build source problems
+        F = copy(self.operators.F) # FIXME
+        self.operators.F = diags([0], [0], F.shape, format=F.format)
+        src_new = sourceproblem(self.operators, 'static', self.geometry, Q)
+        src_old = sourceproblem(self.operators, 'static', self.geometry, Q) # FIXME
+        src_old.solve()
+        src_old.solution.flux = src_old.source
+
+        n_iter = 0
+
+        while err_vect > tol or err_eigv > tol*1E2:
+            # solve the source-driven problem
+            src_new.solve()
+            phi = copy(src_new.solution.flux) # FIXME
+            src_new.solution.flux = F*phi
+            # update eigenvalue
+            Q_new = src_new.solution.get(moment=0)
+            Q_new_braket = src_new.solution.braket(Q_new)
+
+            Q_old = src_old.solution.get(moment=0)
+            Q_old_braket = src_old.solution.braket(Q_old)
+
+            eig_new = eig_old * Q_new_braket / Q_old_braket
+
+            if history:
+                his_eig.append(eig_new)
+            # update error
+            err_eigv = 1E5*(eig_new - eig_old)
+            # FIXME FIXME
+            err_vect = np.linalg.norm(Q_new - Q_old) / np.linalg.norm(Q_new)
+            # update source and eigenvalue
+            src_old.solution.flux = src_new.solution.flux
+            src_new.source = src_new.solution.flux/eig_new
+            eig_old = eig_new
+            n_iter += 1
+
+        self.operators.F = F
+        if history:
+            return phi[:, np.newaxis], np.array([eig_new]), err_eigv, err_vect, his_eig
+        else:
+            return phi[:, np.newaxis], np.array([eig_new]), err_eigv, err_vect
 
     def fundamentalconverged(self):
         try:
@@ -445,7 +505,8 @@ class eigenproblem():
         self.sigma = 0
 
     def solve(self, algo='SLEPc', verbose=False,tol=1E-14, monitor=False,
-              normalisation='peaktotalflux', shift=None, which=None, **kwargs):
+              normalisation='peaktotalflux', shift=None, which=None, history=False,
+              guess=None, **kwargs):
 
         A = self.A
         B = self.B
@@ -532,6 +593,33 @@ class eigenproblem():
                                        normalisation=True, whichnorm=normalisation,
                                        **kwargs)
 
+        elif algo == 'power':
+
+            if self.which in ['alpha', 'delta', 'zeta', 'omega', 'theta']:
+                # TODO FIXME
+                raise OSError(f'{algo} algorithm not implemented for {self.which} eigenvalue problem!')
+                # FIXME TODO 
+                # M1, M2 = A, B
+
+            start = t.time()
+            if history:
+                eigvect, eigvals, err_eigv, err_vect, his_eig = self.power_iteration(guess=guess, history=history)
+                self.history = np.asarray(his_eig)
+                self.n_iter = self.history.size
+            else:
+                eigvect, eigvals, err_eigv, err_vect = self.power_iteration(guess=guess, history=history)
+
+            end = t.time()
+            self.nev = len(eigvals)
+
+            # create native phase space
+            myeigpair = {'eigenvalues': eigvals,
+                         'eigenvectors': eigvect,
+                         'problem': self.which}
+            self.solution = PhaseSpace(self.geometry, myeigpair,
+                                       self.operators, normalisation=True,
+                                       whichnorm=normalisation, **kwargs)
+            
         else:
             if algo != 'SLEPc':
                 raise OSError('%s algorithm is unavailable!' % algo)
