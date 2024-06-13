@@ -63,9 +63,13 @@ def setBCs(op, geometry):
 
         A = _getcoeffs(A)
         m, n = A.shape
+        
+        # FIXME (debugging)
+        # L = L.todense()
 
-        A[0:m//2, :] = -2/geometry.dx[0]*A[0:m//2, :]
-        A[m//2:m, :] = 2/geometry.dx[-1]*A[m//2:m, :]
+        # FIXME
+        A[0:m//2, :] *= -2/geometry.dx[0]
+        A[m//2:m, :] *= 2/geometry.dx[-1]
 
         for gro in range(0, op.nE):
 
@@ -82,15 +86,15 @@ def setBCs(op, geometry):
 
                 if moment >= 1:  # *2 for one-side f.d.
                     # right boundary, lower diag
-                    L[ip+idg, ip-(M-1)+idg] = 2*L[ip+idg, ip-(M-1)+idg]
+                    L[ip+idg, ip-(M-1)+idg] *= 2
                     # left boundary, lower diag
-                    L[ip+M-1+idg, ip-1+idg] = 2*L[ip+M-1+idg, ip-1+idg]
+                    L[ip+M-1+idg, ip-1+idg] *= 2
 
                 if moment < n-1 or N % 2 != 0:  # no last and odd eq.
                     # right boundary, upper diag
-                    L[ip+idg, ip+M+idg] = 2*L[ip+idg, ip+M+idg]
+                    L[ip+idg, ip+M+idg] *= 2
                     # left boundary, upper diag
-                    L[ip+M-1+idg, ip+M-1+M-1+idg] = 2*L[ip+M-1+idg, ip+M-1+M-1+idg]
+                    L[ip+M-1+idg, ip+M-1+M-1+idg] *= 2
 
                 # set non-diagonal entries (even moments)
                 jj = np.arange(0, n)

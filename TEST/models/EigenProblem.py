@@ -34,7 +34,7 @@ _targetdict = {'SM': 'SMALLEST_MAGNITUDE', 'SR': 'SMALLEST_REAL',
 class eigenproblem():
 
     def __init__(self, *, nte, which, ge, nev=1,
-                 generalisedTime=False, diffusion=False):
+                 generalisedTime=False, adjoint=False, diffusion=False):
 
         # --- problem settings
         self.nS = nte.nS
@@ -58,12 +58,12 @@ class eigenproblem():
             if which in ['alpha', 'omega']:
                 # to reduce cond. number
                 generalisedTime = True
-                evp(generalised=generalisedTime)
+                evp(generalised=generalisedTime, adjoint=adjoint)
             else:
                 if which in ['gamma']:
-                    evp(diffusion=diffusion)
+                    evp(diffusion=diffusion, adjoint=adjoint)
                 else:
-                    evp()
+                    evp(adjoint=adjoint)
         except AttributeError as ierr:
             print(ierr)
             raise OSError('{} eigenproblem not available!'.format(which))
@@ -221,7 +221,7 @@ class eigenproblem():
         return res
 
     def power_iteration(self, guess=None, tol=1E-12, history=True,
-                        sigma=None, normalisation=None):
+                        sigma=None, n_iter_max=1000, normalisation=None):
 
         if guess is None:
             n = self.operators.F.shape[0]
@@ -247,7 +247,7 @@ class eigenproblem():
 
         n_iter = 0
 
-        while err_vect > tol or err_eigv > tol*1E2:
+        while n_iter <= n_iter_max and (err_vect > tol or err_eigv > tol*1E2):
             # solve the source-driven problem
             src_new.solve()
             phi = copy(src_new.solution.flux) # FIXME
@@ -331,7 +331,7 @@ class eigenproblem():
         with open('tmp.txt', append_write) as f:
             np.savetxt(f, arr)
 
-    def alpha(self, generalised=True):
+    def alpha(self, generalised=True, adjoint=False):
         """
         Cast operators into the prompt time eigenvalue problem "alpha".
 
@@ -355,13 +355,18 @@ class eigenproblem():
             invT = inv(op.T)
             B = invT.dot(B)
 
-        self.A = B
-        self.B = T
+        if adjoint:
+            self.A = B.T
+            self.B = T.T
+        else:
+            self.A = B
+            self.B = T
+
         self.which = 'alpha'
         self.whichspectrum = 'LR'
         self.sigma = 0
 
-    def gamma(self, diffusion=False):
+    def gamma(self, adjoint=False, diffusion=False):
         """
         Cast operators into the collision eigenvalue problem "gamma".
 
@@ -394,11 +399,15 @@ class eigenproblem():
             else:
                 self.B = op.F+op.S  # multiplication operator
 
+        if adjoint:
+            self.A = self.A.T
+            self.B = self.B.T
+
         self.which = 'gamma'
         self.whichspectrum = 'LR'
         self.sigma = None
 
-    def delta(self):
+    def delta(self, adjoint=False):
         """
         Cast operators into the streaming/density eigenvalue problem "delta".
 
@@ -410,11 +419,15 @@ class eigenproblem():
         op = self.operators
         self.A = op.L  # leakage operator
         self.B = op.F+op.S-op.F0-op.S0-op.C  # material operator
+        if adjoint:
+            self.A = self.A.T
+            self.B = self.B.T
+
         self.which = 'delta'
         self.whichspectrum = 'TR'
         self.sigma = 1
 
-    def theta(self):
+    def theta(self, adjoint=False):
         """
         Cast operators into the capture eigenvalue problem "theta".
 
@@ -439,11 +452,15 @@ class eigenproblem():
             raise OSError("Theta eigenvalue cannot be solved since"
                           " the capture cross section is apparently zero!")
 
+        if adjoint:
+            self.A = self.A.T
+            self.B = self.B.T
+
         self.which = 'theta'
         self.whichspectrum = 'TR'
         self.sigma = 1
 
-    def kappa(self):
+    def kappa(self, adjoint=False):
         """
         Cast operators into the criticality eigenvalue problem "kappa".
 
@@ -464,6 +481,11 @@ class eigenproblem():
             self.A = op.L+op.C+op.S0+op.F0-op.S  # destruction operator
 
         self.B = op.F  # multiplication operator
+        
+        if adjoint:
+            self.A = self.A.T
+            self.B = self.B.T
+        
         self.which = 'kappa'
         self.whichspectrum = 'LR'
         self.sigma = None
@@ -506,7 +528,7 @@ class eigenproblem():
 
     def solve(self, algo='SLEPc', verbose=False,tol=1E-14, monitor=False,
               normalisation='peaktotalflux', shift=None, which=None, history=False,
-              guess=None, **kwargs):
+              guess=None, n_iter_max=1000, **kwargs):
 
         A = self.A
         B = self.B
@@ -603,7 +625,8 @@ class eigenproblem():
 
             start = t.time()
             if history:
-                eigvect, eigvals, err_eigv, err_vect, his_eig = self.power_iteration(guess=guess, history=history)
+                eigvect, eigvals, err_eigv, err_vect, his_eig = self.power_iteration(guess=guess, history=history, 
+                                                                                     n_iter_max=n_iter_max)
                 self.history = np.asarray(his_eig)
                 self.n_iter = self.history.size
             else:

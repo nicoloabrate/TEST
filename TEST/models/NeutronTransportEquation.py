@@ -16,7 +16,7 @@ from matplotlib.pyplot import spy
 class NTE():
 
     def __init__(self, ge, model, steady, N=None, prod=None, BC=True,
-                 fmt='csr', prompt=False, allope=False):
+                 fmt='csr', prompt=False, allope=False, adjoint=False):
         self.model = model
         if model == 'Diffusion':
             N = 0
@@ -45,16 +45,24 @@ class NTE():
         self.F0 = MG.fission(ge, self.model, fmt=fmt)
         self.C = MG.capture(ge, self.model, fmt=fmt)
         self.S = MG.scattering(ge, self.model, prod=prod, fmt=fmt)
+        if adjoint:
+            self.S = self.S.T
 
         if allope:
             self.Fp = MG.promptfiss(ge, self.model, fmt=fmt)
             self.Fd = MG.delfiss(ge, self.model, fmt=fmt)
             self.F = MG.fissionprod(ge, self.model, fmt=fmt)
             self.T = MG.time(ge, self.model, fmt=fmt)
+            if adjoint:
+                self.Fp = self.Fp.T
+                self.Fd = self.Fd.T
+                self.F = self.F.T
 
         else:
             if steady:
                 self.F = MG.fissionprod(ge, self.model, fmt=fmt)
+                if adjoint:
+                    self.F = self.F.T
                 self.state = 'steady'
 
             else:
@@ -62,25 +70,45 @@ class NTE():
 
                 if prompt:
                     self.F = MG.fissionprod(ge, self.model, fmt=fmt)
+                    if adjoint:
+                        self.F = self.F.T
                 else:
                     self.Fd = MG.delfiss(ge, self.model, fmt=fmt)
                     self.Fp = MG.promptfiss(ge, self.model, fmt=fmt)
+                    if adjoint:
+                        self.Fp = self.Fp.T
+                        self.Fd = self.Fd.T
 
                 self.state = 'transient'
 
         if BC or 'zero' in ge.BC:
             self.BC = ge.BC
             self.Linf = MG.leakage(ge, self.model, fmt=fmt)
+
+            # transpose and then impose BCs
+            if adjoint == "continuous":
+                self.Linf = self.Linf.T
+
             if model == 'Diffusion':
                 self = DiffusionBCs.setBCs(self, ge)
             elif 'P' in model:
                 self = PNBCs.setBCs(self, ge)
             elif 'S' in model:
                 self = SNBCs.setBCs(self, ge)
+                
+            self.Linf = MG.leakage(ge, self.model, fmt=fmt)
+            if adjoint:
+                self.Linf = self.Linf.T
+
         else:
             # leakage operator without boundary conditions (imposed later)
             self.Linf = MG.leakage(ge, self.model, fmt=fmt)
+            # if adjoint:
+            #     self.Linf = self.Linf.T
             self.BC = False
+
+        if adjoint == "discrete":
+            self.L = self.L.T
 
     def spy(self, what, markersize=2):
         spy(self.__dict__[what], markersize=markersize)
