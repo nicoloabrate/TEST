@@ -51,6 +51,7 @@ class NTE():
         if allope:
             self.Fp = MG.promptfiss(ge, self.model, fmt=fmt)
             self.Fd = MG.delfiss(ge, self.model, fmt=fmt)
+            self.Fd_prod = MG.delfissprod(ge, self.model, fmt=fmt)
             self.F = MG.fissionprod(ge, self.model, fmt=fmt)
             self.T = MG.time(ge, self.model, fmt=fmt)
             if adjoint:

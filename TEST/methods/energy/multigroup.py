@@ -427,6 +427,64 @@ def delfiss(ge, model, fmt='csc'):
     MG = hstack((M), format=fmt)
     return MG
 
+def delfissprod(ge, model, fmt='csc', adjoint=False):
+    """
+    Assemble multi-group delayed fission emission operator sub-matrix.
+    WATCH OUT: this operator is given as a list of operators
+
+    Parameters
+    ----------
+    ge : object
+        Geometry object.
+    meshtype : string, optional
+        Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
+        mesh. The default is 'mesh'.
+
+    Returns
+    -------
+    None.
+
+    """
+    FMG = []
+    FMGapp = FMG.append
+
+    fxs = ge.getxs('Fiss')
+    chid = ge.getxs('Chid')
+    nub = ge.getxs('Nubar')
+    beta = ge.getxs('beta')
+
+    NPF = beta.shape[0]
+
+    for i in range(NPF):
+
+        MG = []
+        MGapp = MG.append
+
+        for emi_gro in range(ge.nE):  # emission
+
+            M = []
+            Mapp = M.append
+
+            for dep_gro in range(ge.nE):  # departure
+                coeff = chid[emi_gro, i]*beta[i]*nub[dep_gro, :]*fxs[dep_gro, :]
+                if model == 'PN' or model == 'Diffusion':
+                    Mapp(PN.fission(ge, coeff, fmt=fmt))
+                elif model == 'SN':
+                    Mapp(SN.fission(ge, coeff, fmt=fmt))
+                else:
+                    raise OSError('%s model not available!' % model)
+
+            # move along rows
+            MGapp(M)
+
+        if adjoint is True:
+            MG = asarray(MG)
+            MG = MG.T
+
+        FMGapp(bmat((MG), format=fmt))
+
+    return FMG
+
 
 def emission(ge, model, fmt):
     """

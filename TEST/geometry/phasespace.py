@@ -8,7 +8,7 @@ Description: Class to handle phase space operations.
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
-from matplotlib import rc, rcParams, checkdep_usetex, ticker
+from matplotlib import rc, rcParams, ticker
 from matplotlib.ticker import FormatStrFormatter, MultipleLocator
 from matplotlib import ticker as tkr
 from matplotlib.patches import ConnectionPatch
@@ -181,7 +181,8 @@ class PhaseSpace:
         if v2 is not None:
             if v1.shape != v2.shape:
                 raise OSError("phasespace.braket: v1 and v2 shape mismatch!")
-            v1 = np.multiply(v1, v2)
+            else:
+                v1 = np.multiply(v1, v2)
 
         # initialisation
         G = self.geometry.nE
