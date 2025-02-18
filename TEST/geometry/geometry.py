@@ -8,14 +8,15 @@ Description: Class for simplified 1D geometries.
 import json
 import numpy as np
 from matplotlib.pyplot import gca
-from matplotlib import rc, rcParams, checkdep_usetex
+from matplotlib import rc, rcParams
 from TEST.material import Material
 from collections import OrderedDict
 from pathlib import Path
 from copy import deepcopy as cp
 from scipy.special import roots_legendre, eval_legendre
+import shutil 
 
-usetex = checkdep_usetex(True)
+usetex = True if shutil.which('latex') else False
 rc('text', usetex=usetex)
 rc('font', **{'family' : "sans-serif"})
 if usetex:
@@ -426,6 +427,13 @@ class Slab:
 
         return vals
 
+    def be_critical(self, perturbation):
+        # TODO: enforce criticality also with gamma/theta/delta/k/zeta
+        if "keff" in perturbation.keys():
+            for reg in self.regions.values():
+                if reg.Fiss.max() > 0:
+                    reg.Nubar /= perturbation["keff"]
+
     def perturb(self, perturbation, sanitycheck=True, keepUnpert=True):
         """_summary_
 
@@ -450,7 +458,6 @@ class Slab:
             _description_
         """
 
-        # TODO: add gamma/theta/delta/k custom perturbations
         # parse file content
         if isinstance(perturbation, str):
             if '.json' not in perturbation:
