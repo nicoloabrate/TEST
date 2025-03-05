@@ -57,7 +57,7 @@ class NPE():
         elif model == 'Diffusion':
             M = PN.ptime(ge, fmt=fmt)
         else:
-            raise OSError('%s model not available!' % model)
+            raise OSError(f'{model} model not available!')
 
         # move along rows
         APF = [block_diag((M), format=fmt)]
@@ -86,7 +86,7 @@ class NPE():
         elif model == 'Diffusion':
             M = PN.decay(ge, fmt=fmt)
         else:
-            raise OSError('%s model not available!' % model)
+            raise OSError(f'{model} model not available!')
         # move along rows
         APF = [block_diag((M), format=fmt)]
         APF = block_diag((APF), format=fmt)

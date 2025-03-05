@@ -43,7 +43,6 @@ def setBCs(op, geometry):
     op.BC = BCs
 
     # copy leakage operator to new variable
-    L = op.Linf
     for bc in BCs:
 
         # FIXME: actually only the same bc can be handled on two boundaries
@@ -63,13 +62,10 @@ def setBCs(op, geometry):
 
         A = _getcoeffs(A)
         m, n = A.shape
-        
-        # FIXME (debugging)
-        # L = L.todense()
 
         # FIXME
-        A[0:m//2, :] *= -2/geometry.dx[0]
-        A[m//2:m, :] *= 2/geometry.dx[-1]
+        A[0:m//2, :] *= -2 # /geometry.dx[0]
+        A[m//2:m, :] *= 2 # /geometry.dx[-1]
 
         for gro in range(0, op.nE):
 
@@ -86,15 +82,15 @@ def setBCs(op, geometry):
 
                 if moment >= 1:  # *2 for one-side f.d.
                     # right boundary, lower diag
-                    L[ip+idg, ip-(M-1)+idg] *= 2
+                    op.L[ip+idg, ip-(M-1)+idg] *= 2
                     # left boundary, lower diag
-                    L[ip+M-1+idg, ip-1+idg] *= 2
+                    op.L[ip+M-1+idg, ip-1+idg] *= 2
 
                 if moment < n-1 or N % 2 != 0:  # no last and odd eq.
                     # right boundary, upper diag
-                    L[ip+idg, ip+M+idg] *= 2
+                    op.L[ip+idg, ip+M+idg] *= 2
                     # left boundary, upper diag
-                    L[ip+M-1+idg, ip+M-1+M-1+idg] *= 2
+                    op.L[ip+M-1+idg, ip+M-1+M-1+idg] *= 2
 
                 # set non-diagonal entries (even moments)
                 jj = np.arange(0, n)
@@ -102,22 +98,20 @@ def setBCs(op, geometry):
 
                 if moment == 0:  # 1st row, eqs 1 and 2 (Upper)
                     # right boundary, lower diag
-                    L[ig, ig+iEv] = (Neq+1)/(2*Neq+1)*A[0, jj]  # angle>0
+                    op.L[ig, ig+iEv] = (Neq+1)/(2*Neq+1)*A[0, jj]  # angle>0
                     # left boundary, lower diag
-                    L[M+ig-1, ig+iEv+M-1] = (Neq+1)/(2*Neq+1)*A[m//2, jj]  # angle<0
+                    op.L[M+ig-1, ig+iEv+M-1] = (Neq+1)/(2*Neq+1)*A[m//2, jj]  # angle<0
 
                 else:
                     # sum coeffs in previous row (Lower)
-                    L[ip+idg, ig+iEv] = Neq/(2*Neq+1)*A[count, jj]  # angle>0
-                    L[ip+M-1+idg, ig+iEv+M-1] = Neq/(2*Neq+1)*A[count+m//2, jj]  # angle<0
+                    op.L[ip+idg, ig+iEv] = Neq/(2*Neq+1)*A[count, jj]  # angle>0
+                    op.L[ip+M-1+idg, ig+iEv+M-1] = Neq/(2*Neq+1)*A[count+m//2, jj]  # angle<0
 
                     if moment < n-1 or N % 2 != 0:
-                        L[ip+idg, ig+iEv] = L[ip+idg, ig+iEv]+(Neq+1)/(2*Neq+1)*A[count+1, jj]
-                        L[ip+M-1+idg, ig+iEv+M-1] = L[ip+M-1+idg, ig+iEv+M-1]+(Neq+1)/(2*Neq+1)*A[count+m//2+1, jj]
+                        op.L[ip+idg, ig+iEv] = op.L[ip+idg, ig+iEv]+(Neq+1)/(2*Neq+1)*A[count+1, jj]
+                        op.L[ip+M-1+idg, ig+iEv+M-1] = op.L[ip+M-1+idg, ig+iEv+M-1]+(Neq+1)/(2*Neq+1)*A[count+m//2+1, jj]
 
                 count = count + 1*(moment > 0)
-
-    op.L = L
     return op
 
 

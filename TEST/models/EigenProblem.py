@@ -227,15 +227,21 @@ class eigenproblem():
             n = self.operators.F.shape[0]
             S0 = np.ones((n,))
             Q = self.operators.F*S0
-            # mysrc = lambda x: S0 # , E: S0*(E>0.0625)+S0/2*(E<=0.0625) # *(x>=-H and x<=H)
         else:
             Q = guess
 
         err_vect = 1
         err_eigv = 1
+        err_hist = 1
         eig_old = 1
         if history:
             his_eig = [eig_old]
+
+        if tol < 0:
+            tol = -tol
+            conv_hist = True
+        else:
+            conv_hist = False
 
         # build source problems
         F = copy(self.operators.F) # FIXME
@@ -246,8 +252,9 @@ class eigenproblem():
         src_old.solution.flux = src_old.source
 
         n_iter = 0
+        condition = True
 
-        while n_iter <= n_iter_max and (err_vect > tol or err_eigv > tol*1E2):
+        while condition:
             # solve the source-driven problem
             src_new.solve()
             phi = copy(src_new.solution.flux) # FIXME
@@ -263,6 +270,7 @@ class eigenproblem():
 
             if history:
                 his_eig.append(eig_new)
+                err_his = (his_eig[n_iter] - his_eig[n_iter-1])/his_eig[n_iter]
             # update error
             err_eigv = 1E5*(eig_new - eig_old)
             # FIXME FIXME
@@ -271,9 +279,16 @@ class eigenproblem():
             src_old.solution.flux = src_new.solution.flux
             src_new.source = src_new.solution.flux/eig_new
             eig_old = eig_new
+
+            if conv_hist:
+                condition = (err_hist > tol)
+            else:
+                condition = (n_iter <= n_iter_max and (err_vect > tol or err_eigv > tol*1E2))
+
             n_iter += 1
 
         self.operators.F = F
+
         if history:
             return phi[:, np.newaxis], np.array([eig_new]), err_eigv, err_vect, his_eig
         else:

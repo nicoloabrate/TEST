@@ -8,7 +8,7 @@ Description: Finite Differences scheme for spatial derivates.
 import numpy as np
 
 
-def zero(ge, f, meshtype='edges'):
+def zero(ge, f, model, meshtype='edges'):
     """
     Evaluate a function with Central Difference Scheme.
 
@@ -39,10 +39,19 @@ def zero(ge, f, meshtype='edges'):
         bord = ge.layers[i+1]
         inner_pts = np.where(pts <= bord)[0]+q*(i > 0)
         q = q+len(inner_pts)
-        fx[0, inner_pts[0]:inner_pts[-1]+1] = f[i]*np.ones((1, len(inner_pts)))
+        if model > 0:
+            fx[0, inner_pts[0]:inner_pts[-1]+1] = f[i] * ge.dx[i] * np.ones((1, len(inner_pts)))
+        else:
+            fx[0, inner_pts[0]:inner_pts[-1]+1] = f[i] * np.ones((1, len(inner_pts)))
+
         if meshtype == 'edges':
-            if NL > 1 and i < NL-1 and ge.mesh[inner_pts[-1]] <= ge.layers[i+1]:
-                fx[0, inner_pts[-1]] = avg(f[i], f[i+1], ge.dx[i]/2, ge.dx[i+1]/2)
+            if model > 0: # PN or SN
+                if NL > 1 and i < NL-1 and ge.mesh[inner_pts[-1]] <= ge.layers[i+1]:
+                    fx[0, inner_pts[-1]] = avg(f[i], f[i+1], ge.dx[i]/2, ge.dx[i+1]/2) * (ge.dx[i]/2 + ge.dx[i+1]/2)
+            else: # Diffusion
+                if NL > 1 and i < NL-1 and ge.mesh[inner_pts[-1]] <= ge.layers[i+1]:
+                    fx[0, inner_pts[-1]] = avg(f[i], f[i+1], ge.dx[i]/2, ge.dx[i+1]/2)
+
     return fx
 
 
@@ -87,12 +96,7 @@ def first(ge, f, meshtype='edges', stag=True):
         P = len(inner_pts)
         q = q+P
 
-        dfdx[0, inner_pts[0]:inner_pts[-1]+1] = -f[i]/(m*dx[i])*np.ones((P, 1)).ravel()
-        # at the boundaries both right and left dxs are needed
-        if stag and meshtype == 'edges':
-            if NL > 1 and i < NL-1 and mesh[inner_pts[-1]] <= ge.layers[i+1]:
-                dfdx[0, inner_pts[-1]] = -f[i]/(m*(dx[i]/2+dx[i+1]/2))
-
+        dfdx[0, inner_pts[0]:inner_pts[-1]+1] = - f[i] / m * np.ones((P, 1)).ravel()
         dfdx[1, :] = -dfdx[0, :]
 
     return dfdx
@@ -124,13 +128,21 @@ def second(ge, f, meshtype='edges'):
     N_old = 0
     for i in range(0, NL):
         dx = ge.dx[i]
+        # unit_vect = np.ones((int(ge.Nx[i]), 1)).ravel()
         N = int(N_old+ge.Nx[i])
+        # # upper diagonal
+        # d2fdx2[0, N_old:N] = -f[i]/dx**2 * unit_vect
+        # # main diagonal
+        # d2fdx2[1, N_old:N] = 2*f[i]/dx**2 * unit_vect
+        # # lower diagonal
+        # d2fdx2[2, N_old:N] = -f[i]/dx**2 * unit_vect
         # upper diagonal
         d2fdx2[0, N_old:N] = -f[i]/dx**2*np.ones((int(ge.Nx[i]), 1)).ravel()
         # main diagonal
         d2fdx2[1, N_old:N] = 2*f[i]/dx**2*np.ones((int(ge.Nx[i]), 1)).ravel()
         # lower diagonal
         d2fdx2[2, N_old:N] = -f[i]/dx**2*np.ones((int(ge.Nx[i]), 1)).ravel()
+
 
         if NL > 1 and i < NL-1:
             d2fdx2[2, N-1] = -f[i+1]/ge.dx[i+1]/(dx/2+ge.dx[i+1]/2)
@@ -164,4 +176,4 @@ def avg(C1, C2, d1=1, d2=1):
         Weighted average.
 
     """
-    return (C1*d1+C2*d2)/(d1+d2)
+    return ( C1 * d1 + C2 * d2 ) / ( d1 + d2 )

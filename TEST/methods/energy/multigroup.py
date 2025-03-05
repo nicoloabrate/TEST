@@ -5,16 +5,16 @@ File: multigroup.py
 
 Description: Class for multi-energy group operators.
 """
-from numpy import newaxis, asarray, ones
+from numpy import newaxis, asarray, ones, savetxt
 from scipy.sparse import block_diag, bmat, hstack, vstack
 from TEST.methods.angle import Diffusion
 from TEST.methods.angle.discreteordinates import SN
 from TEST.methods.angle.sphericalharmonics import PN
 
 
-def time(ge, model, fmt='csc'):
+def time(ge, model, fmt='csc', importance=False):
     """
-    Assemble multi-group time operator sub-matrix.
+    Assemble multi-group time operator.
 
     Parameters
     ----------
@@ -31,7 +31,7 @@ def time(ge, model, fmt='csc'):
     """
     TMG = []
     TMGapp = TMG.append
-    invv = ge.getxs('Invv')
+    invv = ge.getxs('inv_vel')
 
     for gro in range(ge.nE):
 
@@ -46,12 +46,16 @@ def time(ge, model, fmt='csc'):
             raise OSError('%s model not available for angular variable!' % model)
 
     TMG = block_diag((TMG), format=fmt)
+
+    if importance:
+        TMG = - TMG
+
     return TMG
 
 
 def removal(ge, model, fmt='csc'):
     """
-    Assemble multi-group removal operator sub-matrix.
+    Assemble the multi-group removal by capture operator.
 
     Parameters
     ----------
@@ -68,7 +72,7 @@ def removal(ge, model, fmt='csc'):
     """
     RMG = []
     RMGapp = RMG.append
-    totxs = ge.getxs('Tot')   # if model != 'Diffusion' else ge.getxs('Abs')
+    totxs = ge.getxs('Sigma_tot')   # if model != 'Diffusion' else ge.getxs('Sigma_abs')
 
     for gro in range(ge.nE):
 
@@ -79,7 +83,7 @@ def removal(ge, model, fmt='csc'):
         elif model == 'Diffusion':
             RMGapp(PN.removal(ge, totxs[gro, :], fmt=fmt))
         else:
-            raise OSError('%s model not available!' % model)
+            raise OSError(f'{model} model not available!')
 
     RMG = block_diag((RMG), format=fmt)
     return RMG
@@ -104,7 +108,7 @@ def capture(ge, model, fmt='csc'):
     """
     CMG = []
     CMGapp = CMG.append
-    captxs = ge.getxs('Capt')   # if model != 'Diffusion' else ge.getxs('Abs')
+    captxs = ge.getxs('Sigma_capt')   # if model != 'Diffusion' else ge.getxs('Sigma_abs')
 
     for gro in range(ge.nE):
 
@@ -115,7 +119,7 @@ def capture(ge, model, fmt='csc'):
         elif model == 'Diffusion':
             CMGapp(PN.removal(ge, captxs[gro, :], fmt=fmt))
         else:
-            raise OSError('%s model not available!' % model)
+            raise OSError(f'{model} model not available!')
 
     CMG = block_diag((CMG), format=fmt)
     return CMG
@@ -123,7 +127,7 @@ def capture(ge, model, fmt='csc'):
 
 def fission(ge, model, fmt='csc'):
     """
-    Assemble multi-group fission operator sub-matrix.
+    Assemble multi-group removal by fission operator.
 
     Parameters
     ----------
@@ -140,7 +144,7 @@ def fission(ge, model, fmt='csc'):
     """
     FMG = []
     FMGapp = FMG.append
-    fissxs = ge.getxs('Fiss')   # if model != 'Diffusion' else ge.getxs('Abs')
+    fissxs = ge.getxs('Sigma_fiss')   # if model != 'Diffusion' else ge.getxs('Sigma_abs')
 
     for gro in range(ge.nE):
 
@@ -151,7 +155,7 @@ def fission(ge, model, fmt='csc'):
         elif model == 'Diffusion':
             FMGapp(PN.removal(ge, fissxs[gro, :], fmt=fmt))
         else:
-            raise OSError('%s model not available!' % model)
+            raise OSError(f'{model} model not available!')
 
     FMG = block_diag((FMG), format=fmt)
     return FMG
@@ -159,7 +163,7 @@ def fission(ge, model, fmt='csc'):
 
 def scatteringTot(ge, model, fmt='csc'):
     """
-    Assemble multi-group total scattering operator sub-matrix.
+    Assemble multi-group removal by scattering operator.
 
     Parameters
     ----------
@@ -187,15 +191,15 @@ def scatteringTot(ge, model, fmt='csc'):
         elif model == 'Diffusion':
             SMGapp(PN.removal(ge, scatxs[gro, :], fmt=fmt))
         else:
-            raise OSError('%s model not available!' % model)
+            raise OSError(f'{model} model not available!')
 
     SMG = block_diag((SMG), format=fmt)
     return SMG
 
 
-def leakage(ge, model, fmt='csc'):
+def leakage(ge, model, fmt='csc', importance=False):
     """
-    Assemble multi-group leakage operator sub-matrix.
+    Assemble the multi-group leakage operator.
 
     Parameters
     ----------
@@ -222,18 +226,21 @@ def leakage(ge, model, fmt='csc'):
             try:
                 dfc = ge.getxs('Diffcoef')
             except KeyError:
-                dfc = 1/(3*ge.getxs('Tot'))
+                dfc = 1/(3*ge.getxs('Sigma_tot'))
             # build leakage operator
             LMGapp(Diffusion.leakage(ge, dfc[gro, :], fmt=fmt))
         else:
-            raise OSError('%s model not available!' % model)
+            raise OSError(f'{model} model not available!')
 
     LMG = block_diag((LMG), format=fmt)
+
+    if importance:
+        LMG = - LMG
 
     return LMG
 
 
-def scattering(ge, model, prod=True, fmt='csc', adjoint=False):
+def scattering(ge, model, use_nxn=True, fmt='csc', adjoint=False, importance=False):
     """
     Assemble multi-group scattering operator sub-matrix.
 
@@ -243,7 +250,7 @@ def scattering(ge, model, prod=True, fmt='csc', adjoint=False):
         Geometry object.
     N : int
         Scattering Legendre moment.
-    prod: bool, optional
+    use_nxn: bool, optional
         Scattering production flag. Default is ``True``.
     meshtype : string, optional
         Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
@@ -256,8 +263,8 @@ def scattering(ge, model, prod=True, fmt='csc', adjoint=False):
     """
     SMG = []
     SMGapp = SMG.append
-    key = 'Sp' if prod is True else 'S'
-    sm = ge.getxs('%s' % key)
+    key = 'Sp' if use_nxn else 'S'
+    sm = ge.getxs(f'{key}')
 
     for dep_gro in range(ge.nE):  # departure group
 
@@ -275,12 +282,16 @@ def scattering(ge, model, prod=True, fmt='csc', adjoint=False):
                 Mapp(PN.scattering(ge, sm[dep_gro, arr_gro, :, 0, newaxis],
                                    fmt=fmt))
             else:
-                raise OSError('%s model not available!' % model)
+                raise OSError(f'{model} model not available!')
 
         # move along rows
         SMGapp(M)
 
-    if adjoint is True:
+    if importance:
+        SMG = asarray(SMG)
+        SMG = SMG.T
+
+    if adjoint:
         SMG = asarray(SMG)
         SMG = SMG.T
 
@@ -288,7 +299,7 @@ def scattering(ge, model, prod=True, fmt='csc', adjoint=False):
     return SMG
 
 
-def fissionprod(ge, model, fmt='csc', adjoint=False):
+def fissionprod(ge, model, fmt='csc', adjoint=False, importance=False):
     """
     Assemble multi-group total fission operator sub-matrix.
 
@@ -307,9 +318,9 @@ def fissionprod(ge, model, fmt='csc', adjoint=False):
     """
     FMG = []
     FMGapp = FMG.append
-    fxs = ge.getxs('Fiss')
-    nub = ge.getxs('Nubar')
-    chi = ge.getxs('Chit')
+    fxs = ge.getxs('Sigma_fiss')
+    nub = ge.getxs('nu_fiss')
+    chi = ge.getxs('chi_tot')
     for emi_gro in range(ge.nE):  # emission
 
         M = []
@@ -325,12 +336,16 @@ def fissionprod(ge, model, fmt='csc', adjoint=False):
             elif model == 'Diffusion':
                 Mapp(PN.fission(ge, chinusf, fmt=fmt))
             else:
-                raise OSError('%s model not available!' % model)
+                raise OSError(f'{model} model not available!')
 
         # move along rows
         FMGapp(M)
 
-    if adjoint is True:
+    if importance:
+        FMG = asarray(FMG)
+        FMG = FMG.T
+
+    if adjoint:
         FMG = asarray(FMG)
         FMG = FMG.T
 
@@ -338,7 +353,7 @@ def fissionprod(ge, model, fmt='csc', adjoint=False):
     return FMG
 
 
-def promptfiss(ge, model, fmt='csc', adjoint=False):
+def promptfiss(ge, model, fmt='csc', adjoint=False, importance=False):
     """
     Assemble multi-group prompt fission operator sub-matrix.
 
@@ -357,9 +372,9 @@ def promptfiss(ge, model, fmt='csc', adjoint=False):
     """
     PMG = []
     PMGapp = PMG.append
-    fxs = ge.getxs('Fiss')
-    nub = ge.getxs('Nubar')
-    chi = ge.getxs('Chip')
+    fxs = ge.getxs('Sigma_fiss')
+    nub = ge.getxs('nu_fiss')
+    chi = ge.getxs('chi_pro')
     beta = ge.getxs('beta')
 
 
@@ -370,20 +385,24 @@ def promptfiss(ge, model, fmt='csc', adjoint=False):
 
         for dep_gro in range(ge.nE):  # departure
 
-            chinusf = chi[emi_gro, :]*nub[dep_gro, :]*fxs[dep_gro, :]
+            fiss_src = chi[emi_gro, :]*(1-beta[dep_gro, :].sum())*nub[dep_gro, :]*fxs[dep_gro, :]
             if model == 'PN':
-                Mapp(PN.fission(ge, (1-sum(beta))*chinusf, fmt=fmt))
+                Mapp(PN.fission(ge, fiss_src, fmt=fmt))
             elif model == 'SN':
-                Mapp(SN.fission(ge, (1-sum(beta))*chinusf, fmt=fmt))
+                Mapp(SN.fission(ge, fiss_src, fmt=fmt))
             elif model == 'Diffusion':
-                Mapp(PN.fission(ge, (1-sum(beta))*chinusf, fmt=fmt))
+                Mapp(PN.fission(ge, fiss_src, fmt=fmt))
             else:
-                raise OSError('%s model not available!' % model)
+                raise OSError(f'{model} model not available!')
 
         # move along rows
         PMGapp(M)
 
-    if adjoint is True:
+    if importance:
+        PMG = asarray(PMG)
+        PMG = PMG.T
+
+    if adjoint:
         PMG = asarray(PMG)
         PMG = PMG.T
 
@@ -391,7 +410,7 @@ def promptfiss(ge, model, fmt='csc', adjoint=False):
     return PMG
 
 
-def delfiss(ge, model, fmt='csc'):
+def delfiss(ge, model, fmt='csc', adjoint=False, importance=False):
     """
     Assemble multi-group delayed fission operator sub-matrix.
 
@@ -408,8 +427,8 @@ def delfiss(ge, model, fmt='csc'):
     None.
 
     """
-    fxs = ge.getxs('Fiss')
-    nub = ge.getxs('Nubar')
+    fxs = ge.getxs('Sigma_fiss')
+    nub = ge.getxs('nu_fiss')
     beta = ge.getxs('beta')
 
     M = []
@@ -418,16 +437,21 @@ def delfiss(ge, model, fmt='csc'):
     for dep_gro in range(ge.nE):  # departure
         chinusf = nub[dep_gro, :]*fxs[dep_gro, :]
         if model == 'PN' or model == 'Diffusion':
-            Mapp(PN.delfission(ge, beta, chinusf, fmt=fmt))
+            Mapp(PN.delfission(ge, beta[dep_gro, :], chinusf, fmt=fmt))
         elif model == 'SN':
-            Mapp(SN.delfission(ge, beta, chinusf, fmt=fmt))
+            Mapp(SN.delfission(ge, beta[dep_gro, :], chinusf, fmt=fmt))
         else:
-            raise OSError('%s model not available!' % model)
+            raise OSError(f'{model} model not available!')
+
+    # FIXME 
+    if adjoint or importance:
+        raise OSError("Delayed fission operator adjoint/importance to be implemented")
 
     MG = hstack((M), format=fmt)
     return MG
 
-def delfissprod(ge, model, fmt='csc', adjoint=False):
+
+def delfissprod(ge, model, fmt='csc', adjoint=False, importance=False):
     """
     Assemble multi-group delayed fission emission operator sub-matrix.
     WATCH OUT: this operator is given as a list of operators
@@ -448,12 +472,12 @@ def delfissprod(ge, model, fmt='csc', adjoint=False):
     FMG = []
     FMGapp = FMG.append
 
-    fxs = ge.getxs('Fiss')
-    chid = ge.getxs('Chid')
-    nub = ge.getxs('Nubar')
+    fxs = ge.getxs('Sigma_fiss')
+    chid = ge.getxs('chi_del')
+    nub = ge.getxs('nu_fiss')
     beta = ge.getxs('beta')
 
-    NPF = beta.shape[0]
+    NPF = beta.shape[1]
 
     for i in range(NPF):
 
@@ -466,18 +490,22 @@ def delfissprod(ge, model, fmt='csc', adjoint=False):
             Mapp = M.append
 
             for dep_gro in range(ge.nE):  # departure
-                coeff = chid[emi_gro, i]*beta[i]*nub[dep_gro, :]*fxs[dep_gro, :]
+                coeff = chid[emi_gro, i]*beta[dep_gro, i]*nub[dep_gro, :]*fxs[dep_gro, :]
                 if model == 'PN' or model == 'Diffusion':
                     Mapp(PN.fission(ge, coeff, fmt=fmt))
                 elif model == 'SN':
                     Mapp(SN.fission(ge, coeff, fmt=fmt))
                 else:
-                    raise OSError('%s model not available!' % model)
+                    raise OSError(f'{model} model not available!')
 
             # move along rows
             MGapp(M)
 
-        if adjoint is True:
+        if importance and adjoint:
+            MG = asarray(MG)
+            MG = MG.T
+
+        if adjoint:
             MG = asarray(MG)
             MG = MG.T
 
@@ -502,7 +530,7 @@ def emission(ge, model, fmt):
     """
     APF = []
     APFapp = APF.append
-    chid = ge.getxs('Chid')
+    chid = ge.getxs('chi_del')
     for g in range(ge.nE):  # emission group
 
         if model == 'PN' or model == 'Diffusion':
@@ -510,10 +538,11 @@ def emission(ge, model, fmt):
         elif model == 'SN':
             M = SN.emission(ge, chid[g, :], fmt=fmt)
         else:
-            raise OSError('%s model not available!' % model)
+            raise OSError(f'{model} model not available!')
 
         # move along rows
         APFapp(hstack((M), format=fmt))
 
+    # TODO FIXME implement importance/adjoint
     APF = vstack((APF), format=fmt)
     return APF

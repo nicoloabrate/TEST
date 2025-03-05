@@ -3,30 +3,29 @@ Author: N. Abrate.
 
 File: AdjointTransportEquation.py
 
-Description: Class that defines numerically approximated adjoint neutron
+Description: Class that defines numerically approximated importance
              transport operators.
 """
 
 from TEST.methods.energy import multigroup as MG
-from TEST.methods.BCs import DiffusionBCs
+from TEST.methods.BCs import DiffusionBCs, PNBCs, SNBCs
 from scipy.sparse import block_diag, bmat, csr_matrix, hstack, vstack
 from matplotlib.pyplot import spy
 
-class ATE():
+class ITE():
 
-    def __init__(self, ge, model, steady, N=None, prod=None, BC=True, fmt='csr',
-                 prompt=False, allope=False):
-        # FIXME: this has to be tested!
+    def __init__(self, ge, model, steady, N=None, use_nxn=True, BC=True,
+                 fmt='csr', prompt=False, allope=False, adjoint=False):
         self.model = model
         if model == 'Diffusion':
-            self.nA = 0
+            N = 0
         else:
             if N is None:
                 if 'P' in model:
                     N = int(model.split('P')[1])
                     self.model = 'PN'
                 elif 'S' in model:
-                    N = int(model.split('S')[1]) 
+                    N = int(model.split('S')[1])
                     self.model = 'SN'
                 else:
                     raise OSError('Specify angular approximation order!')
@@ -34,55 +33,88 @@ class ATE():
         if self.model == 'SN':
             ge.computeQW()
 
-        self.nA = N        
+        self.nA = N
+        ge.nA = N
         self.nS = ge.nS
         self.nE = ge.nE
         self.geometry = ge.geometry
         self.spatial_scheme = ge.spatial_scheme
-        # assign operators
+        # assign interaction operators
         self.S0 = MG.scatteringTot(ge, self.model, fmt=fmt)
         self.F0 = MG.fission(ge, self.model, fmt=fmt)
         self.C = MG.capture(ge, self.model, fmt=fmt)
-        self.S = MG.scattering(ge, self.model, prod=prod, fmt=fmt, adjoint=True)
+        self.S = MG.scattering(ge, self.model, use_nxn=use_nxn, fmt=fmt, importance=True)
+        if adjoint: # retrieve the adjoint of the importance equation (related to the NTE)
+            self.S = self.S.T
 
-        if allope is True:
-            self.Fp = MG.promptfiss(ge, self.model, fmt=fmt, adjoint=True)
-            self.Fd = MG.delfiss(ge, self.model, fmt=fmt, adjoint=True)
-            self.F = MG.fissionprod(ge, self.model, fmt=fmt, adjoint=True)
-            self.T = MG.time(ge, self.model, fmt=fmt)
+        if allope:
+            self.Fp = MG.promptfiss(ge, self.model, fmt=fmt, importance=True)
+            self.Fd = MG.delfiss(ge, self.model, fmt=fmt, importance=True)
+            self.Fd_prod = MG.delfissprod(ge, self.model, fmt=fmt, importance=True)
+            self.F = MG.fissionprod(ge, self.model, fmt=fmt, importance=True)
+            self.T = MG.time(ge, self.model, fmt=fmt, importance=True)
+            if adjoint:
+                self.Fp = self.Fp.T
+                self.Fd = self.Fd.T
+                self.F = self.F.T
 
         else:
-            if steady is True:
-                self.F = MG.fissionprod(ge, self.model, fmt=fmt, adjoint=True)
+            if steady:
+                self.F = MG.fissionprod(ge, self.model, fmt=fmt, importance=True)
+                if adjoint:
+                    self.F = self.F.T
                 self.state = 'steady'
 
             else:
-                self.T = MG.time(ge, self.model, fmt=fmt)
+                self.T = MG.time(ge, self.model, fmt=fmt, importance=True)
 
-                if prompt is True:
-                    self.F = MG.fissionprod(ge, self.model, fmt=fmt, adjoint=True)
+                if prompt:
+                    self.F = MG.fissionprod(ge, self.model, fmt=fmt, importance=True)
+                    if adjoint:
+                        self.F = self.F.T
                 else:
-                    self.Fd = MG.delfiss(ge, self.model, fmt=fmt, adjoint=True)
-                    self.Fp = MG.promptfiss(ge, self.model, fmt=fmt, adjoint=True)
+                    self.Fd = MG.delfiss(ge, self.model, fmt=fmt, importance=True)
+                    self.Fp = MG.promptfiss(ge, self.model, fmt=fmt, importance=True)
+                    if adjoint:
+                        self.Fp = self.Fp.T
+                        self.Fd = self.Fd.T
 
                 self.state = 'transient'
 
-        if BC is True or 'zero' in ge.BC:
+        self.Linf = MG.leakage(ge, self.model, fmt=fmt, importance=True)
+        self.L = MG.leakage(ge, self.model, fmt=fmt, importance=True)
+        if BC or 'zero' in ge.BC:
             self.BC = ge.BC
-            self.Linf = MG.leakage(ge, self.model, fmt=fmt)
+
+            # transpose and then impose BCs
+            if adjoint == "continuous":
+                self.L = self.L.T
+
             if model == 'Diffusion':
-                self = DiffusionBCs.setBCs(self, ge)
+                self = DiffusionBCs.setBCs(self, ge, importance=True)
             elif 'P' in model:
                 self = PNBCs.setBCs(self, ge)
             elif 'S' in model:
                 self = SNBCs.setBCs(self, ge)
+                
+            if adjoint == "discrete":
+                self.L = self.L.T
+
         else:
             # leakage operator without boundary conditions (imposed later)
-            self.Linf = MG.leakage(ge, self.model, fmt=fmt)
+            self.Linf = MG.leakage(ge, self.model, fmt=fmt, importance=True)
+            # if adjoint:
+            #     self.Linf = self.Linf.T
             self.BC = False
 
     def spy(self, what, markersize=2):
         spy(self.__dict__[what], markersize=markersize)
+
+    def todense(self):
+        operators = ["F0", "C", "S0", "L", "Linf", "S", "F", "Fp", "Fd", "T"]
+        for ope in operators:
+            if hasattr(self, ope):
+                self.__dict__[ope] = self.__dict__[ope].todense()
 
 
 def couple2NPE(nteOper, npeOper, nF, model):
@@ -90,7 +122,7 @@ def couple2NPE(nteOper, npeOper, nF, model):
         # get dimensions
         nS, nE, nA = nteOper.nS, nteOper.nE, nteOper.nA
         n = nteOper.Fp.shape[0]
-        m = nE*nF*nS
+        m = nF*nS
 
         # define matrices to fill blocks
         A1 = csr_matrix((n, m))
@@ -102,8 +134,8 @@ def couple2NPE(nteOper, npeOper, nF, model):
             No = (nA+1)//2 if nA % 2 != 0 else nA//2
             Ne = nA+1-No
         elif model == 'Diffusion':
-            No = 1
-            Ne = 0
+            No = 0
+            Ne = 1
         else: # SN
             No = nA
             Ne = 0
@@ -138,7 +170,7 @@ def couple2NPE(nteOper, npeOper, nF, model):
         # leakage
         L = bmat([[nteOper.L, A1], [A1.T, A2]])
         # emission
-        if 'S' in model:
+        if 'S' in model:  # SN
             tmp = npeOper.E
         else:
             tmp = csr_matrix((n, m))

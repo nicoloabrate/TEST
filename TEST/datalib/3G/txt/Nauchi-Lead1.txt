@@ -1,0 +1,18 @@
+# Groups in energy decreasing order
+
+# Sigma_capt
+3.683E-05 1.276E-04 2783E-04
+
+# Sigma_fiss
+0.0 0.0 0.0
+
+# nu_fiss
+0.0 0.0 0.0
+
+# chi_tot
+0.0 0.0 0.0
+
+#  S0
+0.1667      0.00E+00    0.00E+00
+1.024E-02   2.6043E-01  0.00E+00
+1.61696E-06 1.563E-04   3.3095E-01

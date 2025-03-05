@@ -36,8 +36,6 @@ def setBCs(op, geometry):
     BCs = geometry.BC
     op.BC = BCs
 
-    # copy leakage operator to new variable
-    L = op.Linf
     for bc in BCs:
 
         # FIXME: actually only the same bc can be handled on two boundaries
@@ -47,10 +45,10 @@ def setBCs(op, geometry):
             # diffusion
             for gro in range(op.nE):
                 skip = gro*op.nS
-                L[skip, :] = 0
-                L[skip+op.nS-1, :] = 0
-                L[skip, skip] = 1  # right boundary
-                L[skip+op.nS-1, skip+op.nS-1] = 1  # left boundary
+                op.L[skip, :] = 0
+                op.L[skip+op.nS-1, :] = 0
+                op.L[skip, skip] = 1  # right boundary
+                op.L[skip+op.nS-1, skip+op.nS-1] = 1  # left boundary
                 if hasattr(op, 'Fp'):
                     op.Fp[[skip, skip+op.nS-1], :] = 0
                 else:
@@ -71,13 +69,13 @@ def setBCs(op, geometry):
             for gro in range(op.nE):
                 skip = gro*op.nS
                 # left boundary
-                L[skip, :] = 0
-                L[skip, skip+1] = -2*D_left[gro]/dx[0]**2
-                L[skip, skip] = 2/sqrt(3)/dx[0]+2*D_left[gro]/dx[0]**2
+                op.L[skip, :] = 0
+                op.L[skip, skip+1] = -2*D_left[gro]/dx[0]**2
+                op.L[skip, skip] = 2/sqrt(3)/dx[0]+2*D_left[gro]/dx[0]**2
                 # right boundary
-                L[skip+op.nS-1, :] = 0
-                L[skip+op.nS-1, skip+op.nS-1] = 2/sqrt(3)/dx[-1]+2*D_right[gro]/dx[-1]**2
-                L[skip+op.nS-1, skip+op.nS-2] = -2*D_right[gro]/dx[-1]**2
+                op.L[skip+op.nS-1, :] = 0
+                op.L[skip+op.nS-1, skip+op.nS-1] = 2/sqrt(3)/dx[-1]+2*D_right[gro]/dx[-1]**2
+                op.L[skip+op.nS-1, skip+op.nS-2] = -2*D_right[gro]/dx[-1]**2
 
         elif bc in ['marshak', 'Marshak']:
             # diffusion
@@ -89,11 +87,9 @@ def setBCs(op, geometry):
             for gro in range(op.nE):
                 skip = gro*op.nS
                 # left boundary
-                L[skip, skip+1] = -2*D_left[gro]/dx[0]**2
-                L[skip, skip] = 1/dx[0]+2*D_left[gro]/dx[0]**2
+                op.L[skip, skip+1] = -2*D_left[gro]/dx[0]**2
+                op.L[skip, skip] = 1/dx[0]+2*D_left[gro]/dx[0]**2
                 # right boundary
-                L[skip+op.nS-1, skip+op.nS-1] = 1/dx[-1]+2*D_right[gro]/dx[-1]**2
-                L[skip+op.nS-1, skip+op.nS-2] = -2*D_right[gro]/dx[-1]**2
-
-    op.L = L
+                op.L[skip+op.nS-1, skip+op.nS-1] = 1/dx[-1]+2*D_right[gro]/dx[-1]**2
+                op.L[skip+op.nS-1, skip+op.nS-2] = -2*D_right[gro]/dx[-1]**2
     return op

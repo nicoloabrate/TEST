@@ -19,57 +19,76 @@ from TEST.utils import get_energy_grid
 import logging
 import shutil
 
+logger = logging.getLogger(__name__)
+
+# matplotlib settings
 usetex = True if shutil.which('latex') else False
 rc("font", **{"family": "sans-serif", "sans-serif": ["Helvetica"]})
 rc("text", usetex=usetex)
 
+# serpentTools settings
 rcst['xs.reshapeScatter'] = True
 rcst['xs.getB1XS'] = False
 rcst['xs.variableGroups'] = ['kinetics', 'xs', 'xs-prod', 'gc-meta']
 
-# it depends on Serpent 2 highest Legendre polynomial expansion order
-scatt_keys = [*list(map(lambda z: "infS"+str(z), range(0, 3))),
-              *list(map(lambda z: "infSp"+str(z), range(0, 3))), 'infScatt1']
-xsdf_keys = ['infTot', 'infAbs', 'infDiffcoef', 'infTranspxs', 'infCapt',
-             'infRemxs', 'infFiss', 'infNsf']
-ene_keys = ['infNubar', 'infInvv', 'infKappa', 'infInvv',  'infChit',
-            'infChip', 'infChid']
+# names of the attributes
+sumxs = ['Sigma_tot', 'Sigma_abs', 'Sigma_rem']
+scatt_mat_keys = [*list(map(lambda z: "S"+str(z), range(8))),
+              *list(map(lambda z: "Sp"+str(z), range(8)))]
+indepdata = ['Sigma_capt', 'Sigma_fiss', 'S0', 'nu_fiss', 'Diffcoef', 'chi_del', 'chi_pro']
+basicdata = ['Sigma_fiss', 'nu_fiss', 'S0', 'Sp0', 'chi_tot', 'nuSigma_fiss']
+kinetic_data = ['lambda', 'beta', 'nu_fiss_del', 'chi_del', 'chi_pro']
+alldata = list(set([*sumxs, *indepdata, *basicdata, *kinetic_data]))
 
-serp_keys = [*scatt_keys, *xsdf_keys, *ene_keys, 'infFlx']
+# list for collapsing
+collapse_xs = ['Sigma_fiss', 'Sigma_capt', *list(map(lambda z: "S"+str(z), range(0, 1))),
+               *list(map(lambda z: "Sp"+str(z), range(0, 1))), 'inv_vel', 'Diffcoef']
+collapse_xsf = ['nu_fiss', 'chi_del', 'chi_tot', 'chi_pro', 'fiss_energy']
 
-sumxs = ['Tot', 'Abs', 'Remxs']
-indepdata = ['Capt', 'Fiss', 'S0', 'Nubar', 'Diffcoef', 'Chid', 'Chip']
-basicdata = ['Fiss', 'Nubar', 'S0', 'Chit']
-kinetics = ['lambda', 'beta']
-alldata = list(set([*sumxs, *indepdata, *basicdata, *kinetics]))
-
-collapse_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(0, 1))),
-               *list(map(lambda z: "Sp"+str(z), range(0, 1))), 'Invv', 'Diffcoef']
-collapse_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'Kappa']
-
-mix_xs = ['Fiss', 'Capt', *list(map(lambda z: "S"+str(z), range(0, 2))),
+# list for material mixing
+mix_xs = ['Sigma_fiss', 'Sigma_capt', *list(map(lambda z: "S"+str(z), range(0, 2))),
           *list(map(lambda z: "Sp"+str(z), range(0, 2)))]
-mix_xsf = ['Nubar', 'Chid', 'Chit', 'Chip', 'Kappa']
+mix_xsf = ['nu_fiss', 'chi_del', 'chi_tot', 'chi_pro', 'fiss_energy']
 
-units = {'Chid': '-', 'Chit': '-', 'Chip': '-', 'Tot': 'cm^{-1}',
-         'Capt': 'cm^{-1}', 'Abs': 'cm^{-1}', 'Fiss': 'cm^{-1}',
-         'Nsf': 'cm^{-1}', 'Remxs': 'cm^{-1}', 'Transpxs': 'cm^{-1}',
-         'Kappa': 'MeV', 'S': 'cm^{-1}', 'Nubar': '-', 'Invv': 's/cm',
-         'Difflenght': 'cm^2', 'Diffcoef': 'cm', 'Flx': 'a.u.'}
-xslabels = {'Chid': 'delayed fiss. emission spectrum', 'Chit': 'total fiss. emission spectrum',
-            'Chip': 'prompt fiss. emission spectrum', 'Tot': 'Total xs',
-            'Capt': 'Capture xs', 'Abs': 'Absorption xs', 'Fiss': 'Fission xs',
-            'Nsf': 'Fiss. production xs', 'Remxs': 'Removal xs', 'Transpxs': 'Transport xs',
-            'Kappa': 'Fiss. energy', 'S': 'Scattering xs', 'Nubar': 'neutrons by fission',
-            'Invv': 'Inverse velocity', 'Difflenght': 'Diff. length', 'Diffcoef': 'Diff. coeff.',
-            'Flx': 'Flux spectrum'}
+units = {'chi_del': '-', 'chi_tot': '-', 'chi_pro': '-', 'Sigma_tot': 'cm^{-1}',
+         'Sigma_capt': 'cm^{-1}', 'Sigma_abs': 'cm^{-1}', 'Sigma_fiss': 'cm^{-1}',
+         'nuSigma_fiss': 'cm^{-1}', 'Sigma_rem': 'cm^{-1}', 'Sigma_transp': 'cm^{-1}',
+         'fiss_energy': 'MeV', 'S': 'cm^{-1}', 'nu_fiss': '-', 'inv_vel': 's/cm',
+         'Difflenght': 'cm^2', 'Diffcoef': 'cm', 'flux': 'a.u.'}
+xslabels = {'chi_del': 'delayed fiss. emission spectrum', 'chi_tot': 'total fiss. emission spectrum',
+            'chi_pro': 'prompt fiss. emission spectrum', 'Sigma_tot': 'Total xs',
+            'Sigma_capt': 'Capture xs', 'Sigma_abs': 'Absorption xs', 'Sigma_fiss': 'Fission xs',
+            'nuSigma_fiss': 'Sigma_fiss. production xs', 'Sigma_rem': 'Removal xs', 'Sigma_transp': 'Transport xs',
+            'fiss_energy': 'Sigma_fiss. energy', 'S': 'Scattering xs', 'nu_fiss': 'neutrons by fission',
+            'inv_vel': 'Inverse velocity', 'Difflenght': 'Diff. length', 'Diffcoef': 'Diff. coeff.',
+            'flux': 'Flux spectrum'}
 
+# Serpent 2 keys
+serp_scatt_keys = [*list(map(lambda z: "infS"+str(z), range(0, 3))),
+              *list(map(lambda z: "infSp"+str(z), range(0, 3))), 'infScatt1']
+serp_xsdf_keys = ['infTot', 'infAbs', 'infDiffcoef', 'infTranspxs', 'infCapt',
+                 'infRemxs', 'infFiss', 'infNsf']
+serp_ene_keys = ['infNubar', 'infKappa', 'infInvv',  'infChit',
+                'infChip', 'infChid']
+
+scatt_keys = [*list(map(lambda z: "S"+str(z), range(0, 3))),
+              *list(map(lambda z: "Sp"+str(z), range(0, 3))), 'Scatt1']
+xsdf_keys = ['Sigma_tot', 'Sigma_abs', 'Diffcoef', 'Sigma_transp', 'Sigma_capt',
+                 'Sigma_rem', 'Sigma_fiss', 'nuSigma_fiss']
+ene_keys = ['nu_fiss', 'fiss_energy', 'inv_vel', 'chi_tot',
+            'chi_pro', 'chi_del']
+
+
+serp_dict = dict(zip(
+                     [*serp_scatt_keys, *serp_xsdf_keys, *serp_ene_keys, 'infFlx'],
+                     [*scatt_keys, *xsdf_keys, *ene_keys, 'flux']
+                     ))
 
 class Material():
     """Create material regions with multi-group constants."""
 
     def __init__(self, uniName=None, energygrid=None, datapath=None,
-                 egridname=None, h5file=None):
+                 egridname=None, h5file=None, fixdata=False, use_nxn=False, P1consistent=False):
         """
         Initialise object.
 
@@ -175,7 +194,7 @@ class Material():
                     fname = path.join(datapath, "txt", filename)
                     fname = f'{str(fname)}.{reader}'
                 if path.isfile(fname):
-                    self._readtxt(fname, nE)
+                    self._readtxt(fname)
                 else:
                     raise OSError(f'{fname} not found!')
 
@@ -183,23 +202,23 @@ class Material():
             self.egridname = egridname
             self.energygrid = energygrid
             self.UniName = uniName
-
-            try:
-                self.NPF = (self.beta).size
-            except AttributeError:
-                print('Kinetic parameters not available!')
-                self.NPF = None
+            self.P1consistent = P1consistent
+            self.use_nxn = use_nxn
 
             # --- complete data and perform sanity check
-            L = 0
+            self.L_anis = 0
             datastr = list(self.__dict__.keys())
             # //2 since there are 'S' and 'Sp'
             l = -1
             for i, s in enumerate(datastr):
                 if re.match(r'S\d', s):
                     l += 1
-            self.L = l if l > L else L  # get maximum scattering order
-            self.datacheck()
+            self.L_anis = l if l > self.L_anis else self.L_anis  # get maximum scattering order
+
+            self.add_missing_xs()
+
+            if fixdata:
+                self.repair_xs()
 
     def _readjson(self, path):
         """
@@ -207,7 +226,7 @@ class Material():
 
         Parameters
         ----------
-        filename : str
+        path: str
             Path to json file.
 
         Returns
@@ -239,7 +258,7 @@ class Material():
                           input grid!')
 
         selfdic = self.__dict__
-        for my_key in serp_keys:
+        for my_key in serp_dict.keys():
 
             if my_key.startswith('infScatt') or my_key.startswith('infSscattp'):
                 vals = data.infExp[my_key]
@@ -248,42 +267,47 @@ class Material():
             else:
                 vals = data.infExp[my_key]
 
-            selfdic[my_key.split('inf')[1]] = vals
+            selfdic[serp_dict[my_key]] = vals
 
         # kinetics parameters
-        selfdic['beta'] = res.resdata['fwdAnaBetaZero'][::2]
-        selfdic['beta_tot'] = selfdic['beta'][0]
-        selfdic['beta'] = selfdic['beta'][1:]
-        # this to avoid confusion with python lambda function
+        beta = res.resdata['fwdAnaBetaZero'][::2]
+        selfdic['beta'] = np.array([beta[1:]]*nE)
+        selfdic['beta_tot'] = beta[0]
+        # Serpent assumes same spectrum for all families
+        selfdic['chi_del'] = np.array([self.chi_del]*self.beta.shape[1]).T
+        # this to avoid issue with python "lambda" function
         selfdic['lambda'] = res.resdata['fwdAnaLambda'][::2]
-        selfdic['lambda_tot'] = selfdic['lambda'][0]
-        selfdic['lambda'] = selfdic['lambda'][1:]
+        selfdic['lambda_avg'] = selfdic['lambda'][0]
+        if len(selfdic['lambda']) > 1:
+            selfdic['lambda'] = selfdic['lambda'][1:]
+        else:
+            selfdic['lambda'] = np.array([selfdic['lambda_avg']])
 
-    def _readtxt(self, fname, nE):
+    def _readtxt(self, fname):
         """
         Parse the material data from a .txt file.
 
         Macro-group constants are parsed from a formatted file with column-wise
         data separated by headers beginning with "#" and the name of the data:
-            * Tot: total cross section [cm^-1]
-            * Transpxs: transport cross section [cm^-1]
+            * Sigma_tot: total cross section [cm^-1]
+            * Sigma_transp: transport cross section [cm^-1]
                         It is defined as total_xs-avg_direction*scattering_xs
                         according to P1 approximation.
             * Diffcoef: diffusion coefficient [cm]
-                        It is defined as 1/(3*Transpxs).
-            * Abs: absorption cross section [cm^-1]
-                   It is the sum of Capt and Fiss cross sections.
-            * Capt: capture cross section [cm^-1]
-            * Fiss: fission cross section [cm^-1]
-            * Remxs: removal cross section [cm^-1]
-                    It is the sum of Abs and group-removal.
-            * Chit: total emission spectrum [-]
-            * Chip: prompt emission spectrum [-]
-            * Chid: delayed emission spectrum [-]
-            * Nsf: fission production cross section [cm^-1]
-            * Nubar: neutron multiplicities [-]
-            * Kappa: average fission deposited heat [MeV]
-            * Invv: particle inverse velocity [s/cm]
+                        It is defined as 1/(3*Sigma_transp).
+            * Sigma_abs: absorption cross section [cm^-1]
+                   It is the sum of Sigma_capt and Sigma_fiss cross sections.
+            * Sigma_capt: capture cross section [cm^-1]
+            * Sigma_fiss: fission cross section [cm^-1]
+            * Sigma_rem: removal cross section [cm^-1]
+                    It is the sum of Sigma_abs and group-removal.
+            * chi_tot: total emission spectrum [-]
+            * chi_pro: prompt emission spectrum [-]
+            * chi_del: delayed emission spectrum [-]
+            * nuSigma_fiss: fission production cross section [cm^-1]
+            * nu_fiss: neutron multiplicities [-]
+            * fiss_energy: average fission deposited heat [MeV]
+            * inv_vel: particle inverse velocity [s/cm]
             * S0, S1, S2,... : scattering matrix cross section [cm^-1]
             * Sp0, Sp1, Sp2,... : scattering production matrix cross section
                                 [cm^-1]
@@ -294,8 +318,6 @@ class Material():
         ----------
         fname : string
             Material data file name.
-        nE : int
-            Number of energy groups.
 
         Returns
         -------
@@ -303,7 +325,7 @@ class Material():
 
         """
         selfdic = self.__dict__
-        G = None
+        nEl = None
 
         lines = open(fname).read().split('\n')
 
@@ -319,31 +341,31 @@ class Material():
             else:
 
                 data = np.asarray([float(val) for val in line.split()])
-                if G is None:
-                    G = len(data)
+                if nEl is None:
+                    nEl = len(data)
 
-                if G != nE:
-                    raise OSError('Number of groups in line %g is not \
-                                  consistent!', il)
-
-                if key.startswith('S') or key.startswith('Sp'):
-                    # multi-line data (scattering matrix)
+                if key in ["chi_del", *scatt_mat_keys]:
+                    # multi-line data
                     if matrix is None:
                         matrix = np.asarray(data)
                     else:
                         matrix = np.c_[matrix, data]
 
-                    if matrix.shape == (G, G):
-                        selfdic[key] = matrix.T
-                    elif matrix.shape == (G, ):
-                        selfdic[key] = matrix
+                    selfdic[key] = matrix
+
                 else:
-                    # single-line data (scattering matrix)
+                    # single-line data
                     selfdic[key] = np.asarray(data)
 
+        if hasattr(self, "chi_del"):
+            self.chi_del = self.chi_del.T
+        
+        for key in scatt_mat_keys:
+            if hasattr(self, key):
+                selfdic[key] = selfdic[key].T
+
     def getxs(self, key, pos1=None, pos2=None):
-        """
-        Get material data (for a certain energy group, if needed).
+        """Get material data (for a certain energy group, if needed).
 
         Parameters
         ----------
@@ -397,9 +419,9 @@ class Material():
                 whatlabel = f'{xslabels[what]} from g={dep_group}'
             else:
                 raise OSError('Material.plot: dep_group variable needed!')
-        elif what == 'Chid':
+        elif what == 'chi_del':
             xs = xs[family-1, :]
-        elif what == 'Flx':
+        elif what == 'flux':
             if normalise:
                 u = np.log(self.energygrid/self.energygrid[0])
                 xs = xs/np.diff(-u)
@@ -412,7 +434,7 @@ class Material():
         else:
             uom = units[what]
 
-        if 'Flx' in what and normalise:
+        if 'flux' in what and normalise:
             whatlabel = 'Flux per unit lethargy'
 
         if usetex:
@@ -426,7 +448,7 @@ class Material():
         ax.set_ylabel(f'{whatlabel} [{uom}]')
         if logx:
             ax.set_xscale('log')
-        if what not in ['Nubar', 'Chid', 'Chip', 'Chit']:
+        if what not in ['nu_fiss', 'chi_del', 'chi_pro', 'chi_tot']:
             ax.set_yscale('log')
 
         plt.grid(which='both', alpha=0.2)
@@ -434,7 +456,7 @@ class Material():
             plt.tight_layout()
             plt.savefig(f"{figname}.png")
 
-    def perturb(self, what, howmuch, depgro=None, sanitycheck=True):
+    def perturb(self, what, howmuch, depgro=None, fixdata=True):
         """
 
         Perturb material composition.
@@ -452,20 +474,20 @@ class Material():
 
         """
         if what == 'density':
-            densdata = ['Capt', 'Fiss', *list(map(lambda z: "S"+str(z), range(self.L+1))),
-                        *list(map(lambda z: "Sp"+str(z), range(self.L+1)))]
+            densdata = ['Sigma_capt', 'Sigma_fiss', *list(map(lambda z: "S"+str(z), range(self.L_anis+1))),
+                        *list(map(lambda z: "Sp"+str(z), range(self.L_anis+1)))]
             if howmuch < 0:
                 raise OSError('Cannot apply negative density perturbations!')
-            if sanitycheck:
+            if fixdata:
                 # ensure later consistency check
                 del self.Diffcoef
-                del self.Transpxs
+                del self.Sigma_transp
                 del self.DiffLength
             for xs in densdata:
                 self.__dict__[xs][:] = self.__dict__[xs][:]*howmuch
         else:
             depgro = depgro-1 if depgro is not None else depgro
-            for g in range(0, self.nE):
+            for g in range(self.nE):
                 # no perturbation
                 if howmuch[g] == 0:
                     continue
@@ -481,29 +503,29 @@ class Material():
                         mydic[what][depgro] = mydic[what][depgro]+delta
 
                     # select case to ensure data consistency
-                    if what == 'Fiss':
-                        self.Nsf[g] = self.Nubar[g]*mydic[what][g]
-                    elif what == 'Nubar':
-                        self.Nsf[g] = self.Fiss[g]*mydic[what][g]
+                    if what == 'Sigma_fiss':
+                        self.nuSigma_fiss[g] = self.nu_fiss[g]*mydic[what][g]
+                    elif what == 'nu_fiss':
+                        self.nuSigma_fiss[g] = self.Sigma_fiss[g]*mydic[what][g]
                         # computesumxs = False
                     elif what.startswith('Chi'):
-                        if what in ['Chit']:
+                        if what in ['chi_tot']:
                             mydic[what] = mydic[what]*(1+delta)
                         else:
                             raise OSError('Delayed/prompt spectra \
                                            perturbation still missing!')
                     elif what == 'Diffcoef':
                         # Hp: change in diffcoef implies change in capture
-                        delta = 1/(3*mydic[what][g])-self.Transpxs[g]
+                        delta = 1/(3*mydic[what][g])-self.Sigma_transp[g]
                     elif what == 'S0':
                         # change higher moments, if any
-                        for ll in range(self.L+1):
+                        for ll in range(self.L_anis+1):
                             R = (mydic[what][g]/mydic[what][g]-delta)
                             key = 'S%d' % ll
                             mydic[key][depgro][g] = mydic[key][depgro][g]*R
 
                 else:
-                    if sanitycheck:
+                    if fixdata:
                         raise OSError(f'{what} cannot be perturbed \
                                       directly!')
                     else:
@@ -515,167 +537,384 @@ class Material():
                             delta = mydic[what][depgro]*howmuch[g]
                             mydic[what][depgro] = mydic[what][depgro]+delta
 
-        if sanitycheck:
-            # force normalisation
-            if abs(self.Chit.sum() - 1) > 1E-4:
-                if np.any(self.Chit == 0) :
-                    pass
-                else:
-                    self.Chit = self.Chit/self.Chit.sum()
+        if fixdata:
+            self.repair_xs()
 
-            self.datacheck()
+    def repair_xs(self):
+        """Ensure data consistency.
 
-    def datacheck(self):
-        """
-        Check data consistency and add missing data.
+        Parameters
+        ----------
+        ``None``.
 
         Returns
         -------
-        None.
+        ``None``.
 
         """
+        # TODO FIXME impose Sp=S if Sp<S
+        datadic = self.__dict__
+        datavail = copy(list(datadic.keys()))
+
+        # ensure non-zero total XS
+        self.bad_data = False
+        if np.count_nonzero(self.Sigma_tot) != self.Sigma_tot.shape[0]:
+            self.bad_data = True
+            # ensure that capt matches tot where tot is zero
+            self.Sigma_capt[self.Sigma_tot <= 0] = 1E-5
+            # modify Sigma_tot accordingly
+            self.Sigma_tot[self.Sigma_tot <= 0] = 1E-5
+
+        # TODO propose a quick fix for bad_data True
+        self.nuSigma_fiss = self.Sigma_fiss*self.nu_fiss
+        self.Sigma_abs = self.Sigma_fiss + self.Sigma_capt
+        if np.count_nonzero(self.Sigma_abs == 0) > 0:
+            raise OSError
+
+        if self.use_nxn:
+            InScatt = np.diag(self.Sp0)
+            sTOT = self.Sp0.sum(axis=0) if len(self.Sp0.shape) > 1 else self.Sp0
+            if hasattr(self, 'Sp1'):
+                sTOT1 = self.Sp1.sum(axis=0) if len(self.Sp1.shape) > 1 else self.Sp1
+            else:
+                sTOT1 = np.zeros(sTOT.shape)
+            # if not np.array_equal(self.Sigma_abs_red, self.Sigma_abs):
+            #     if min(self.Sigma_abs_red) < 0:
+            #         self.Sigma_abs_red = self.Sigma_abs
+            #     self.Sigma_capt = self.Sigma_abs_red - self.Sigma_fiss
+        else:
+            InScatt = np.diag(self.S0)
+            sTOT = self.S0.sum(axis=0) if len(self.S0.shape) > 1 else self.S0
+            sTOT1 = self.S1.sum(axis=0) if len(self.S1.shape) > 1 else self.S1
+
+        # --- compute diffusion coefficient and transport xs
+        if self.P1consistent:
+            # --- compute transport xs (derivation from P1)
+            self.Sigma_transp = self.Sigma_tot-sTOT1
+            self.Diffcoef = 1/(3*self.Sigma_transp)
+        else:
+            self.Sigma_transp[self.Sigma_transp <= 1E-8] = 1E-8
+            self.Diffcoef = 1/(3*self.Sigma_transp)
+
+        self.Sigma_rem = self.Sigma_tot - InScatt
+
+        self.DiffLength = np.sqrt(self.Diffcoef / self.Sigma_rem)
+
+        self.MeanFreePath = 1/self.Sigma_tot
+
+        # ensure pdf normalisation
+        if self.isfiss:
+            self.chi_tot /= self.chi_tot.sum()
+            self.chi_pro /= self.chi_pro.sum()
+            for p in range(self.NPF):
+                self.chi_del[:, p] /= self.chi_del[:, p].sum()
+
+    def add_missing_xs(self):
+        """Add missing group constants.
+
+        Parameters
+        ----------
+        ``None``.
+
+        Returns
+        -------
+        ``None``.
+
+        """
+        # TODO if not existing, compute the flux assuming an infinite medium
         E = self.energygrid
         datadic = self.__dict__
         datavail = copy(list(datadic.keys()))
-        # check basic reactions existence
+        # --- check basic reactions existence
         for s in basicdata:
             if s not in datavail:
-                raise OSError(f'{s} is missing in {self.UniName} data!')
-        # --- compute in-group scattering
-        InScatt = np.diag(self.S0)
-        sTOT = self.S0.sum(axis=0) if len(self.S0.shape) > 1 else self.S0
+                if (s == 'nuSigma_fiss' and 'nu_fiss' in datavail) or (s == 'nu_fiss' and 'Sigma_fiss' in datavail and 'nu_fiss') or (s == 'Sigma_fiss' and 'nu_fiss' in datavail):
+                    continue
+                elif (s == 'S0' and 'Sp0' in datavail) or (s == 'Sp0' and 'S0' in datavail):
+                    continue
+                elif s == 'chi_tot' and ('chi_pro' in datavail and 'chi_del' in datavail) and ('beta' in datavail or 'nu_fiss_del' in datavail):
+                    continue
+                elif not self.isfiss:
+                    fiss_gc = ['nu_fiss', 'fiss_energy']
+                    for s in fiss_gc:
+                        self.__dict__[s] = np.zeros((self.nE, ))
+                    self.NPF = 0
+                else:
+                    msg = f'{s} is missing in {self.UniName} data!'
+                    logger.error(msg)
+                    raise OSError(msg)
+
         # --- compute fission production cross section
-        self.Nsf = self.Fiss*self.Nubar
-        # --- compute missing sum reactions
-        if 'Capt' in datavail:
-            self.Abs = self.Fiss+self.Capt
-        elif 'Abs' in datavail:
-            self.Capt = self.Abs-self.Fiss
-        elif 'Tot' in datavail:
-            self.Capt = self.Tot-sTOT-self.Fiss
-            self.Abs = self.Fiss+self.Capt
+        if hasattr(self, 'nu_fiss') and hasattr(self, 'Sigma_fiss'):
+            if not hasattr(self, 'nuSigma_fiss'):
+                self.nuSigma_fiss = self.Sigma_fiss*self.nu_fiss
+                logger.info(f"'nuSigma_fiss' defined from available 'nu_fiss' and 'Sigma_fiss' for {self.UniName}.")
+        elif hasattr(self, 'nuSigma_fiss') and hasattr(self, 'nu_fiss'):
+            if not hasattr(self, 'Sigma_fiss'):
+                if self.isfiss:
+                    self.Sigma_fiss = self.nuSigma_fiss / self.nu_fiss
+                    logger.info(f"'Sigma_fiss' defined from available 'nu_fiss' and 'nuSigma_fiss' for {self.UniName}.")
+                else:
+                    self.Sigma_fiss = np.zeros((self.nE, ))
+                    logger.info(f"'Sigma_fiss' set to zero for {self.UniName}.")
+        elif hasattr(self, 'nuSigma_fiss') and hasattr(self, 'Sigma_fiss'):
+            if not hasattr(self, 'nu_fiss'):
+                if min(self.Sigma_fiss) > 0: 
+                    self.nu_fiss = self.nuSigma_fiss / self.Sigma_fiss
+                    logger.info(f"'nu_fiss' defined from available 'nuSigma_fiss' and 'Sigma_fiss' for {self.UniName}.")
+                else:
+                    self.nu_fiss = copy(self.Sigma_fiss)
+                    logger.info(f"'nu_fiss' set to zero for {self.UniName}.")
+        # else:
+        #     # TODO this should be redundant after the first check
+        #     raise OSError('To compute fission data at least two out of the three data "nuSigma_fiss","nu_fiss" and "Sigma_fiss" are required')
 
-        self.Remxs = self.Abs+sTOT-InScatt
-        self.Tot = self.Remxs+InScatt
-        # ensure non-zero total XS
-        self.Tot[self.Tot <= 0] = 1E-8
-        if 'Invv' not in datavail:
-            avgE = 1/2*(E[:-1]+E[1:])*1.602176634E-13  # J
-            v = np.sqrt(2*avgE/1.674927351e-27)
-            self.Invv = 1/(v*100)  # s/cm
+        # --- add scattering matrices
+        if not hasattr(self, 'Sp0'):
+            self.Sp0 = self.S0
+            logger.info(f"'Sp0' set equal to 'S0' for {self.UniName}.")
 
-        self.CorngoldLimit = min(self.Tot/self.Invv)
+            if self.use_nxn:
+                self.use_nxn = False
+                logger.info(f"(n,xn) scattering reactions not considered for {self.UniName} since no Sp0 in input!")
 
-        # --- compute secondaries per collision
-        self.secpercoll = (sTOT+self.Nsf)/(self.Tot)
-        # --- compute diffusion coefficient and transport xs
-        if 'Diffcoef' in datavail:
-            self.Transpxs = 1/(3*self.Diffcoef)
-            self.Transpxs[self.Transpxs <= 0] = 1E-8
-            self.Diffcoef = 1/(3*self.Transpxs)
-            mubar = np.divide(self.Tot-self.Transpxs, self.S0.sum(axis=0), where=self.S0.sum(axis=0)!=0)
-            self.S1 = mubar*self.S0
-        elif 'Transpxs' in datavail:
-            self.Transpxs[self.Transpxs <= 0] = 1E-8
-            self.Diffcoef = 1/(3*self.Transpxs)
-            mubar = np.divide(self.Tot-self.Transpxs, self.S0.sum(axis=0), where=self.S0.sum(axis=0)!=0)
-            self.S1 = mubar*self.S0
-        elif 'S1' in datavail:
-            self.Transpxs = self.Tot-self.S1.sum(axis=0)
-            self.Diffcoef = 1/(3*self.Transpxs)
+        if not hasattr(self, 'S0'):
+            self.scat_n1n_exists = 0
+            self.S0 = self.Sp0
+            logger.info(f"'Sp0' set equal to 'S0' for {self.UniName}.")
         else:
-            self.Transpxs = self.Tot
-            self.Diffcoef = 1/(3*self.Transpxs)
-            mubar = np.divide(self.Tot-self.Transpxs, self.S0.sum(axis=0), where=self.S0.sum(axis=0)!=0)
-            self.S1 = mubar*self.S0
+            self.scat_n1n_exists = 1
+
+        if self.scat_n1n_exists:
+            InScatt = np.diag(self.S0)
+            sTOT = self.S0.sum(axis = 0) if len(self.S0.shape) > 1 else self.S0
+
+        # --- compute missing sum reactions
+        if hasattr(self, 'Sigma_capt') and hasattr(self, 'Sigma_fiss'):
+            if not hasattr(self, 'Sigma_abs'):
+                self.Sigma_abs = self.Sigma_fiss + self.Sigma_capt
+                logger.info(f"'Sigma_abs' defined from available 'Sigma_fiss' and 'Sigma_capt' for {self.UniName}.")
+
+        elif hasattr(self, 'Sigma_abs') and hasattr(self, 'Sigma_fiss'):
+            if not hasattr(self, 'Sigma_capt'):
+                self.Sigma_capt = self.Sigma_abs - self.Sigma_fiss
+                logger.info(f"'Sigma_capt' defined from available 'Sigma_fiss' and 'Sigma_abs' for {self.UniName}.")
+
+        elif hasattr(self, 'Sigma_abs') and hasattr(self, 'Sigma_capt'):
+            if not hasattr(self, 'Sigma_fiss'):
+                self.Sigma_fiss = self.Sigma_abs - self.Sigma_capt
+                logger.info(f"'Sigma_fiss' defined from available 'Sigma_capt' and 'Sigma_abs' for {self.UniName}.")
+
+        elif hasattr(self, 'Sigma_abs_red') and hasattr(self, 'Sigma_fiss'):
+            if not hasattr(self, 'Sigma_capt'):
+                self.Sigma_capt = self.Sigma_abs_red - self.Sigma_fiss
+                logger.info(f"'Sigma_capt' defined from available 'Sigma_fiss' and 'Sigma_abs_red' for {self.UniName}.")
+
+        elif hasattr(self, 'Sigma_abs_red') and hasattr(self, 'Sigma_capt'):
+            if not hasattr(self, 'Sigma_fiss'):
+                self.Sigma_fiss = self.Sigma_abs_red - self.Sigma_capt
+                logger.info(f"'Sigma_fiss' defined from available 'Sigma_capt' and 'Sigma_abs_red' for {self.UniName}.")
+
+        elif hasattr(self, 'Sigma_rem') and hasattr(self, 'Sigma_fiss'):
+            if not hasattr(self, 'Sigma_abs'):
+                self.Sigma_abs = self.Sigma_rem - sTOT + InScatt
+                logger.info(f"'Sigma_abs' defined from available 'Sigma_rem' and 'Sigma_fiss' for {self.UniName}.")
+
+            if not hasattr(self, 'Sigma_capt'):
+                self.Sigma_capt = self.Sigma_abs - self.Sigma_fiss
+                logger.info(f"'Sigma_capt' defined from available 'Sigma_rem' and 'Sigma_fiss' for {self.UniName}.")
+
+        elif hasattr(self, 'Sigma_rem') and hasattr(self, 'Sigma_capt'):
+            if not hasattr(self, 'Sigma_abs'):
+                self.Sigma_abs = self.Sigma_rem - sTOT + InScatt
+                logger.info(f"'Sigma_abs' defined from available 'Sigma_rem' and 'Sigma_fiss' for {self.UniName}.")
+
+            if not hasattr(self, 'Sigma_fiss'):
+                self.Sigma_fiss = self.Sigma_abs - self.Sigma_capt
+                logger.info(f"'Sigma_fiss' defined from available 'Sigma_rem' and 'Sigma_capt' for {self.UniName}.")
+
+        elif hasattr(self, 'Sigma_tot') and hasattr(self, 'Sigma_fiss'):
+            if not hasattr(self, 'Sigma_capt'):
+                self.Sigma_capt = self.Sigma_tot - sTOT - self.Sigma_fiss
+                logger.info(f"'Sigma_capt' defined from available 'Sigma_fiss' and 'Sigma_tot' for {self.UniName}.")
+
+            if not hasattr(self, 'Sigma_abs'):
+                self.Sigma_abs = self.Sigma_fiss + self.Sigma_capt
+                logger.info(f"'Sigma_abs' defined from available 'Sigma_capt' and 'Sigma_fiss' for {self.UniName}.")
+
+        # --- add missing data
+        if not hasattr(self, 'Sigma_abs_red'):
+            self.Sigma_abs_red = self.Sigma_abs
+            logger.info(f"'Sigma_abs_red' set equal to 'Sigma_abs' for {self.UniName}.")
+
+        if not hasattr(self, 'Sigma_abs'):
+            self.Sigma_abs = self.Sigma_abs_red
+            logger.info(f"'Sigma_abs' set equal to 'Sigma_abs_red' for {self.UniName}.")
+
+        if not hasattr(self, 'Sigma_rem'):
+            if self.scat_n1n_exists:
+                self.Sigma_rem = self.Sigma_abs + sTOT - InScatt
+                logger.info(f"'Sigma_rem' defined from available 'Sigma_abs' and 'S0' for {self.UniName}.")
+            else:
+                logger.info(f"'Sigma_rem' not defined because 'S0' is missing for {self.UniName}.")
+
+        if not hasattr(self, 'Sigma_tot'):
+            if self.scat_n1n_exists:
+                self.Sigma_tot = self.Sigma_abs + sTOT
+                logger.info(f"'Sigma_tot' defined from available 'Sigma_abs' and 'S0' for {self.UniName}.")
+            elif self.use_nxn:
+                self.Sigma_tot = self.Sigma_abs_red +  self.Sp0.sum(axis = 0)
+                logger.info(f"'Sigma_tot' defined from available 'Sigma_abs_red' and 'Sp0' for {self.UniName}.")
+
+        if not hasattr(self, 'S1'):
+            # FIXME ensure consistency with diffcoeff and transpxs, when possible
+            self.S1 = np.zeros((self.nE, self.nE))
+
+        # ensure non-zero total XS
+        self.bad_data = False
+        if np.count_nonzero(self.Sigma_tot) != self.Sigma_tot.shape[0]:
+            self.bad_data = True
+
+        if not hasattr(self, "inv_vel"):
+            if not hasattr(self, "fine_energygrid"):
+                avgE = 1/2*(E[:-1]+E[1:])*1.602176634E-13  # J
+                v = np.sqrt(2*avgE/1.674927351e-27)
+                self.inv_vel = 1/(v*100)  # s/cm
+                logger.warning(f"'inv_vel' defined from the average kinetic energy in group g for {self.UniName}.")
+
+        # --- compute diffusion coefficient and transport xs
+        if not hasattr(self, 'Sigma_transp'):
+            if hasattr(self, 'Diffcoef'):
+                self.Sigma_transp = 1/(3*self.Diffcoef)
+                logger.info(f"'Sigma_transp' defined from available 'Diffcoef' for {self.UniName}.")
+
+            else:
+                if hasattr(self, 'S1') and self.P1consistent:
+                    self.Sigma_transp = self.Sigma_tot-self.S1.sum(axis=0)
+                    logger.info(f"'Sigma_transp' defined from available 'Sigma_tot' and 'S1' for {self.UniName}.")
+
+                else:
+                    # assuming isotropic scattering
+                    self.Sigma_transp = self.Sigma_tot
+                    logger.info(f"'Sigma_transp' defined from available 'Diffcoef' for {self.UniName}.")
+
+        if not hasattr(self, 'Diffcoef'):
+            self.Diffcoef = 1/(3*self.Sigma_transp)
 
         # --- compute diffusion length
-        self.Remxs[self.Remxs <= 0] = 1E-8 # avoid huge diff. coeff. and length
-        self.DiffLength = np.sqrt(self.Diffcoef/self.Remxs)
-        # --- compute mean free path
-        self.MeanFreePath = 1/self.Tot
-        # --- ensure consistency kinetic parameters (if fissile medium)
-        self.Fiss[self.Fiss <= 5E-7] = 0
-        isFiss = self.Fiss.max() > 0
-        if isFiss:
-            # FIXME FIXME check Serpent RSD and do correction action
-            self.Chit[self.Chit <= 1E-4] = 0
-            if abs(self.Chit.sum() - 1) > 1E-4:
-                logging.debug(f'Total fission spectra in {self.UniName} not normalised!'
-                                 'Forcing normalisation...')
-
-            # ensure pdf normalisation
-            self.Chit /= self.Chit.sum()
-            if "Kappa" not in self.__dict__.keys():
-                self.Kappa = np.array([200]*self.nE)
-        else:
-            self.Kappa = np.array([0]*self.nE)
-
-        kincons = True
-        for s in kinetics:
-            if s not in datavail:
-                kincons = False
-                self.__dict__[s] = [0]
-
-        if kincons:
-            try:
-                self.beta_tot = self.beta.sum()
-
-                if isFiss:
-                    if len(self.Chid.shape) == 1:
-                        # each family has same emission spectrum
-                        # FIXME FIXME check Serpent RSD and do correction action
-                        self.Chid[self.Chid <= 1E-4] = 0
-                        self.Chid /= self.Chid.sum()
-                        self.Chid = np.asarray([self.Chid]*self.NPF)
-                    elif self.Chid.shape != (self.NPF, self.nE):
-                        raise MaterialError(f'Delayed fiss. spectrum should be \
-                                             ({self.NPF}, {self.nE})')
-
-                    # FIXME FIXME check Serpent RSD and do correction action
-                    self.Chip[self.Chip <= 1E-4] = 0
-
-                    try:
-                        for g in range(self.nE):
-                            chit = (1-self.beta.sum())*self.Chip[g] + \
-                                    np.dot(self.beta, self.Chid[:, g])
-                            if abs(self.Chit[g]-chit) > 1E-4:
-                                raise MaterialError()
-                    except MaterialError:
-                        logging.debug(f'Fission spectra or delayed fractions'
-                                      f' in {self.UniName} not consistent! '
-                                      'Forcing consistency acting on chi-prompt...')
-                        # self.Chip = (self.Chit-np.dot(self.beta, self.Chid))/(1-self.beta.sum())
-                        self.Chip /= self.Chip.sum()
-                        for g in range(self.nE):
-                            self.Chit[g] = (1-self.beta_tot)*self.Chip[g] + np.dot(self.beta, self.Chid[:, g])
-                        if abs(self.Chit.sum()-1) > 1E-6:
-                            raise MaterialError("Normalisation failed!")
-                else:
-                    self.Chit = np.zeros((self.nE, ))
-                    self.Chip = np.zeros((self.nE, ))
-                    self.Chid = np.zeros((self.NPF, self.nE))
-
-            except AttributeError as err:
-                if 'Chid' in str(err) or 'Chip' in str(err):
-                    self.Chid = np.asarray([self.Chit]*self.NPF)
-                    self.Chip = self.Chit
-                else:
-                    print(err)
-
-            # ensure pdf normalisation
-            if isFiss:
-                self.Chip /= self.Chip.sum()
-                for p in range(self.NPF):
-                    self.Chid[p, :] /= self.Chid[p, :].sum()
-        else:
-            if isFiss:
-                self.Chip = self.Chit
-                self.Chid = self.Chit
+        if not hasattr(self, 'DiffLength'):
+            if not hasattr(self, 'Sigma_rem'):
+                self.DiffLength = np.sqrt(self.Diffcoef / self.Sigma_abs)
             else:
-                self.Chit = np.zeros((self.nE, ))
-                self.Chip = np.zeros((self.nE, ))
-                self.Chid = np.zeros((self.NPF, self.nE))
+                self.DiffLength = np.sqrt(self.Diffcoef / self.Sigma_rem)
+        # --- compute mean free path
+        if not hasattr(self, 'MeanFreePath'):
+            self.MeanFreePath = 1/self.Sigma_tot
+        # --- ensure consistency kinetic parameters (if fissile medium)
+        if not hasattr(self, "fiss_energy"):
+            if self.isfiss:
+                self.fiss_energy = np.asarray([200]*self.nE)
+            else:
+                self.fiss_energy = np.asarray([0]*self.nE)
+
+        # --- kinetic constants
+        if self.isfiss:
+            kinconst = True
+            if hasattr(self, "beta"):
+                if len(self.beta.shape) > 1:
+                    self.NPF = self.beta.shape[1]
+                else:
+                    self.NPF = len(self.beta)
+                    self.beta = np.asarray([self.beta]*self.nE)
+                if not hasattr(self, "nu_fiss"):
+                    self.nu_fiss_del = np.zeros(self.beta.shape)
+                    for g in range(self.nE):
+                        self.nu_fiss_del[g, :] = self.nu_fiss[g]*self.beta[g, :]
+
+            elif hasattr(self, "nu_fiss_del"):
+                if len(self.nu_fiss_del.shape) > 1:
+                    self.NPF = self.nu_fiss_del.shape[1]
+                else:
+                    self.NPF = len(self.nu_fiss_del)
+                    self.beta = np.asarray([self.nu_fiss_del]*self.nE)
+                if not hasattr(self, "beta"):
+                    self.beta = np.zeros(self.nu_fiss_del.shape)
+                    for g in range(self.nE):
+                        self.beta[g, :] = self.nu_fiss_del[g, :]/self.nu_fiss[g]
+
+            else:
+                kinconst = False
+                self.NPF = 0
+                self.beta = np.zeros((self.nE, ))
+                self.beta_tot = np.zeros((self.nE, ))
+                self.nu_fiss_del = np.zeros((self.nE,))
+
+            if not hasattr(self, "lambda"):
+                if self.NPF == 0:
+                    self.__dict__["lambda"] = 0.0
+                    self.__dict__["lambda_avg"] = 0.0
+                else:
+                    self.__dict__["lambda"] = np.zeros((self.NPF, ))
+                    self.__dict__["lambda_avg"] = 0.0
+
+            if hasattr(self, "chi_del"):
+                if self.NPF == 0:
+                    self.chi_del = np.zeros((self.nE, ))
+                else:
+                    if len(self.chi_del.shape) == 1:
+                        self.chi_del = np.asarray([self.chi_del]*self.nE)
+
+            if kinconst:
+
+                if not hasattr(self,"beta_tot"):
+                    self.beta_tot = self.beta.sum(axis=1)
+                if not hasattr(self, "lambda_avg"):
+                    # TODO FIXME
+                    self.__dict__["lambda_avg"] = np.mean(self.__dict__["lambda"])
+
+                if hasattr(self, "chi_del") and hasattr(self, "chi_pro"):
+                    self.chi_tot = np.zeros((self.nE, ))
+                    for g in range(self.nE):
+                        self.chi_tot[g] = self.chi_pro[g]*(1-self.beta[g, :].sum()) + self.beta[g, :].dot(self.chi_del[g, :])
+                elif hasattr(self, "chi_del") and hasattr(self, "chi_tot"):
+                    self.chi_pro = np.zeros((self.nE, ))
+                    for g in range(self.nE):
+                        self.chi_pro[g] = (self.chi_tot[g] - self.beta[g, :].dot(self.chi_del[g, :]))/(1-self.beta[g, :].sum())
+                elif hasattr(self, "chi_pro") and hasattr(self, "chi_tot"):
+                    # assuming that each family has the same spectrum
+                    self.chi_del = np.zeros((self.nE, self.NPF))
+                    for r in range(self.NPF):
+                        for g in range(self.nE):
+                            self.chi_del[g, r] = (self.chi_tot[g] - self.chi_pro[g]*(1-self.beta[g, :].sum()))/self.beta[g, :].sum()
+
+            else:
+                if not hasattr(self, "chi_tot"):
+                    raise OSError(f"'chi_tot' is missing from data {self.UniName}")
+
+        else:
+            self.NPF = 0
+            self.beta = np.zeros((self.nE, ))
+            self.beta_tot = np.zeros((self.nE, ))
+            self.__dict__["lambda"] = 0.0
+            self.__dict__["lambda_avg"] = 0.0
+            self.nu_fiss_del = np.zeros((self.nE, ))
+            self.chi_tot = np.zeros((self.nE, ))
+            self.chi_del = np.zeros((self.nE, ))
+            self.chi_pro = np.zeros((self.nE, ))
+
+        if not hasattr(self, "Kerma"):
+            self.Kerma = np.zeros((self.nE, ))
+
+        if not hasattr(self, "flux"):
+            # FIXME: an improved option can be estimating the flux axial prof. with analytical profiles
+            # e.g. cos(Bz) if self.Sigma_fiss != 0 or exp(-z/L)+exp(+z/L) if self.Sigma_fiss = 0
+            self.flux = np.ones((self.nE, ))
+        
+        # --- add additional data
+        # Corngold limit
+        self.CorngoldLimit = min(self.Sigma_tot/self.inv_vel)
+        # secondaries per collision
+        self.secpercoll = (sTOT+self.nuSigma_fiss)/(self.Sigma_tot)
 
     def void(self, keepXS=None, sanitycheck=True):
         """
@@ -698,7 +937,7 @@ class Material():
 
         """
         # add anisotropic XS
-        for ll in range(self.L+1):
+        for ll in range(self.L_anis+1):
             new = f'S{ll}'
             newP = f'Sp{ll}'
             if new not in alldata:
@@ -754,14 +993,18 @@ class Material():
 
             json.dump(tmp, f, sort_keys=True, indent=10)
 
-    def collapse(self, fewgrp, spectrum=None, egridname=None):
-        """
-        Collapse in energy the multi-group data.
+    def collapse(self, fewgrp, spectrum=None, egridname=None, fixdata=True):
+        """Collapse in energy the multi-group data.
 
         Parameters
         ----------
         fewgrp : iterable
             Few-group structure to perform the collapsing.
+        spectrum: array, optional
+            Spectrum to perform the energy collapsing, by default ``None``. If ``None``,
+            the ``flux`` attribute is used as a weighting spectrum.
+        egridname: str, optional
+            Name of the energy grid, by default ``None``.
 
         Raises
         ------
@@ -774,13 +1017,13 @@ class Material():
 
         """
         if spectrum is not None:
-            flx = spectrum
+            flux = spectrum
         else:
-            if 'Flx' not in self.__dict__.keys():
-                raise OSError('Collapsing failed: weighting flux missing in'
+            if not hasattr(self, 'flux'):
+                raise OSError('Collapsing failed: weighting flux missing in '
                               f'{self.UniName}')
             else:
-                flx = self.Flx
+                flux = self.flux
 
         multigrp = self.energygrid
         if isinstance(fewgrp, list):
@@ -789,29 +1032,43 @@ class Material():
         fewgrp = fewgrp[np.argsort(-fewgrp)]
         H = len(multigrp)-1
         G = len(fewgrp)-1
-        # sanity check
-        if G > H:
-            raise OSError(f'Collapsing failed: few-group structure should \
-                          have less than {H} group')
-        if multigrp[0] != fewgrp[0] or multigrp[0] != fewgrp[0]:
-            raise OSError('Collapsing failed: few-group structure'
-                          'boundaries do not match with multi-group'
-                          'one')
+        # sanity checks
+        if G >= H:
+            raise MaterialError(f'Collapsing failed: few-group structure should',
+                          ' have less than {H} group')
+        if multigrp[0] != fewgrp[0] or multigrp[-1] != fewgrp[-1]:
+            raise MaterialError('Collapsing failed: few-group structure'
+                                'boundaries do not match with multi-group'
+                                'one')
+        # map fewgroup onto multigroup
+        few_into_multigrp = np.zeros((G+1,), dtype=int)
+        # multigrp_bin = np.zeros((H+1,), dtype=int)
         for ig, g in enumerate(fewgrp):
-            if g not in multigrp:
-                raise OSError(f'Group boundary n.{ig}, {g} MeV not present in fine grid!')
+            reldiff = abs(multigrp-g)/g
+            idx = np.argmin(reldiff)
+            if (reldiff[idx] > 1E-5):
+                raise MaterialError(f'Group boundary n.{ig}, {g} MeV not present in fine grid!')
+            else:
+                few_into_multigrp[ig] = idx
+                # multigrp_bin[idx] = 1
 
-        iS = 0
         collapsed = {}
-        collapsed['Flx'] = np.zeros((G, ))
+        collapsed['flux'] = np.zeros((G, ))
+
+        # manage reduced absorption collapsing
+        if hasattr(self, "Sigma_abs_red"):
+            # collapse the (n,xn) cross section
+            xs_abs_nxn = self.Sigma_abs - self.Sigma_abs_red
+            collapsed["Sigma_abs_red"] = np.zeros((G, ))
+
         for g in range(G):
             # select fine groups in g
             G1, G2 = fewgrp[g], fewgrp[g+1]
-            iE = np.argwhere(np.logical_and(multigrp[iS:] < G1,
-                                            multigrp[iS:] >= G2))[-1][0]+iS
+            iS = few_into_multigrp[g]
+            iE = few_into_multigrp[g+1]
             # compute flux in g
-            NC = flx[iS:iE].sum()
-            collapsed['Flx'][g] = NC
+            NC = flux[iS:iE].sum()
+            collapsed['flux'][g] = NC
             # --- collapse
             for key, v in self.__dict__.items():
                 # --- cross section and inverse of velocity
@@ -823,33 +1080,30 @@ class Material():
 
                     if len(dims) == 1:
                         if key == 'Diffcoef':
-                            v = self.Transpxs
+                            v = self.Sigma_transp
                             v = 1/3/v
-                        collapsed[key][g] = np.divide(flx[iS:iE].dot(v[iS:iE]), NC, where=NC!=0)
+                        collapsed[key][g] = np.divide(flux[iS:iE].dot(v[iS:iE]), NC, where=NC!=0)
                     else:
                         # --- scattering
-                        iS2 = 0
                         for g2 in range(G):  # arrival group
                             I1, I2 = fewgrp[g2], fewgrp[g2+1]
-                            iE2 = np.argwhere(np.logical_and
-                                              (multigrp[iS2:] < I1,
-                                               multigrp[iS2:] >= I2))
-                            iE2 = iE2[-1][0]+iS2
+                            iS2 = few_into_multigrp[g2]
+                            iE2 = few_into_multigrp[g2+1]
                             s = v[iS:iE, iS2:iE2].sum(axis=0)
-                            NCS = flx[iS2:iE2].sum()
-                            collapsed[key][g][g2] = np.divide(flx[iS2:iE2].dot(s), NCS, where=NCS!=0)
+                            NCS = flux[iS2:iE2].sum()
+                            collapsed[key][g][g2] = np.divide(flux[iS2:iE2].dot(s), NCS, where=NCS!=0)
                             iS2 = iE2
                 # --- fission-related data
                 elif key in collapse_xsf:
-                    if self.Fiss.max() <= 0:
-                        if key == 'Chid':
+                    if self.Sigma_fiss.max() <= 0:
+                        if key == 'chi_del':
                             collapsed[key] = np.zeros((self.NPF, G))
                         else:
                             collapsed[key] = np.zeros((G, ))
                         continue
-                    fissrate = flx[iS:iE]*self.Fiss[iS:iE]
+                    fissrate = flux[iS:iE]*self.Sigma_fiss[iS:iE]
                     FRC = fissrate.sum()
-                    if key == 'Chid':
+                    if key == 'chi_del':
                         if g == 0:
                             collapsed[key] = np.zeros((self.NPF, G))
                         for p in range(self.NPF):
@@ -858,31 +1112,46 @@ class Material():
                         if g == 0:
                             collapsed[key] = np.zeros((G, ))
 
-                        if key in ['Chit', 'Chip']:
+                        if key in ['chi_tot', 'chi_pro']:
                             collapsed[key][g] = v[iS:iE].sum()
                         else:
                             collapsed[key][g] = np.divide(fissrate.dot(v[iS:iE]), FRC, where=FRC!=0)
                 else:
                     continue
+
+            # --- reduced absorption
+            if hasattr(self, "Sigma_abs_red"):
+                xs_abs_nxn_g = np.divide(flux[iS:iE].dot(xs_abs_nxn[iS:iE]), NC, where=NC!=0)
+                collapsed["Sigma_abs_red"][g] = collapsed["Sigma_capt"][g] + collapsed["Sigma_fiss"][g] - xs_abs_nxn_g
+
             iS = iE
 
-        collapsed['Transpxs'] = 1/(3*collapsed['Diffcoef'])
+        collapsed['Sigma_transp'] = 1/(3*collapsed['Diffcoef'])
         # overwrite data
+        self.fine_energygrid = self.energygrid+0
         self.energygrid = fewgrp
         self.nE = G
         self.egridname = egridname if egridname else f'{G}G'
         for key in self.__dict__.keys():
             if key in collapsed.keys():
                 self.__dict__[key] = collapsed[key]
-        # ensure data consistency
-        self.datacheck()
 
+        self.add_missing_xs()
+        # ensure data consistency
+        if fixdata:
+            self.repair_xs()
+
+    @property
+    def isfiss(self):
+        """Assess whether the material is fissile"""
+        return self.Sigma_fiss.max() > 0 and self.nu_fiss.max() > 0
 
 class Mix(Material):
     """Create regions mixing other materials."""
 
     def __init__(self, *, universes, densities=None, energygrid, datapath=None,
-                 egridname=None, mixname=None):
+                 egridname=None, mixname=None, fixdata=True, use_nxn=False, 
+                 P1consistent=False):
         """
         Initialise object.
 
@@ -940,19 +1209,19 @@ class Mix(Material):
                     else:
                         self.__dict__[s] += densities[idx]*mat.__dict__[s]
                 elif s in mix_xsf:
-                    if s in ['Nubar', 'Kappa']:
+                    if s in ['nu_fiss', 'fiss_energy']:
                         if idx == 0:
-                            self.__dict__[s] = mat.__dict__[s]*mat.Fiss*densities[idx]
+                            self.__dict__[s] = mat.__dict__[s]*mat.Sigma_fiss*densities[idx]
                         else:
-                            self.__dict__[s] += mat.__dict__[s]*mat.Fiss*densities[idx]
-                    else:   # Chip and Chit
+                            self.__dict__[s] += mat.__dict__[s]*mat.Sigma_fiss*densities[idx]
+                    else:   # chi_pro and chi_tot
                         if idx == 0:
-                            self.__dict__[s] = mat.__dict__[s]*mat.Nubar*mat.Fiss*densities[idx]
+                            self.__dict__[s] = mat.__dict__[s]*mat.nu_fiss*mat.Sigma_fiss*densities[idx]
                         else:
-                            self.__dict__[s] += mat.__dict__[s]*mat.Nubar*mat.Fiss*densities[idx]
+                            self.__dict__[s] += mat.__dict__[s]*mat.nu_fiss*mat.Sigma_fiss*densities[idx]
 
-            fissprod += mat.Nubar*mat.Fiss*densities[idx]
-            totfiss += mat.Fiss*densities[idx]
+            fissprod += mat.nu_fiss*mat.Sigma_fiss*densities[idx]
+            totfiss += mat.Sigma_fiss*densities[idx]
 
             if 'beta' in mat.__dict__.keys():
                 if idx == 0:
@@ -965,10 +1234,10 @@ class Mix(Material):
 
         for key in mix_xsf:
             # normalise group constants
-            if key in ['Nubar', 'Kappa']:
+            if key in ['nu_fiss', 'fiss_energy']:
                 tmp = np.divide(self.__dict__[key], totfiss, where=totfiss!=0)
                 self.__dict__[key] = tmp
-            if key in ['Chit', 'Chip', 'Chid']:
+            if key in ['chi_tot', 'chi_pro', 'chi_del']:
                 tmp = np.divide(self.__dict__[key], fissprod, where=fissprod!=0)
                 self.__dict__[key] = tmp
 
@@ -980,6 +1249,9 @@ class Mix(Material):
         self.energygrid = energygrid
         self.UniName = mixname
 
+        self.P1consistent = P1consistent
+        self.use_nxn = use_nxn
+
         try:
             self.NPF = (self.beta).size
         except AttributeError:
@@ -987,15 +1259,19 @@ class Mix(Material):
             self.NPF = None
 
         # --- complete data and perform sanity check
-        L = 0
+        self.L_anis = 0
         datastr = list(self.__dict__.keys())
         # //2 since there are 'S' and 'Sp'
         l = -1
         for i, s in enumerate(datastr):
             if re.match(r'S\d', s):
                 l += 1
-        self.L = l if l > L else L  # get maximum scattering order
-        self.datacheck()
+        self.L_anis = l if l > self.L_anis else self.L_anis  # get maximum scattering order
+
+        self.add_missing_xs()
+
+        self.repair_xs()
+
 
 class MaterialError(Exception):
     pass

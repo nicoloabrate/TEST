@@ -28,7 +28,7 @@ def removal(ge, xs, fmt='csc'):
     """
     N = ge.nA
     if N < 0:
-        raise OSError('Cannot build P_{}'.format(N))
+        raise OSError(f'Cannot build P{N}')
     model = ge.spatial_scheme
     M = []
     appM = M.append
@@ -41,11 +41,11 @@ def removal(ge, xs, fmt='csc'):
             meshtype = 'centers'  # evaluate on staggered mesh if odd
 
         if model == 'FD':
-            r = FD.zero(ge, xs, meshtype)
+            r = FD.zero(ge, xs, N, meshtype)
         elif model == 'FV':
             r = FV.zero(ge, xs, meshtype)
         else:
-            raise OSError('%s model not available for spatial variable!' % model)
+            raise OSError(f'{model} model not available for spatial variable!')
 
         m = r.shape[1]
         n = m
@@ -74,7 +74,7 @@ def leakage(ge, fmt='csc'):
     """
     N = ge.nA
     if N < 0:
-        raise OSError('Cannot build P_{}'.format(N))
+        raise OSError(f'Cannot build P{N}')
     model = ge.spatial_scheme
     M = []
     appM = M.append
@@ -104,7 +104,7 @@ def leakage(ge, fmt='csc'):
                 upp = FV.first(ge, coeffs[1], meshtype)
                 m, n = upp.shape
             else:
-                raise OSError('%s model not available for spatial variable!' % model)
+                raise OSError(f'{model} model not available for spatial variable!')
 
             pos = np.array([-1, 0])
             UP = diags(upp, pos, (n, n-1), format=fmt)
@@ -117,7 +117,7 @@ def leakage(ge, fmt='csc'):
             elif model == 'FV':
                 low = FV.first(ge, coeffs[0], meshtype)
             else:
-                raise OSError('%s model not available for spatial variable!' % model)
+                raise OSError(f'{model} model not available for spatial variable!')
 
             m, n = low.shape
 
@@ -140,7 +140,7 @@ def leakage(ge, fmt='csc'):
                 upp = FV.first(ge, coeffs[1], meshtype)
                 low = FV.first(ge, coeffs[0], meshtype)
             else:
-                raise OSError('%s model not available for spatial variable!' % model)
+                raise OSError(f'{model} model not available for spatial variable!')
 
             n = upp.shape[1]
             m = low.shape[1]
@@ -188,10 +188,7 @@ def scattering(ge, sm, fmt='csc'):
         Geometry object.
     N : int
         Spherical harmonics approximation order.
-    L : int, optional
-        Scattering Legendre moment. Default is ``None``. In thi case, L is
-        taken equal to ``N``.
-    prod: bool, optional
+    use_nxn: bool, optional
         Scattering production flag. Default is ``True``.
 
     Returns
@@ -201,9 +198,8 @@ def scattering(ge, sm, fmt='csc'):
     """
     N = ge.nA
     if N < 0:
-        raise OSError('Cannot build P_{}'.format(N))
+        raise OSError(f'Cannot build P{N}')
     model = ge.spatial_scheme
-    L = sm.shape[1]
     M = []
     appM = M.append
 
@@ -214,17 +210,20 @@ def scattering(ge, sm, fmt='csc'):
         else:
             meshtype = 'centers'  # evaluate on standard mesh if even
 
-        if moment >= L:
+        if moment > ge.L_anis:
             xs = np.zeros((ge.nLayers,))
         else:
-            xs = sm[:, moment]
+            if moment >= sm.shape[1]:
+                xs = np.zeros((ge.nLayers,))
+            else:
+                xs = sm[:, moment]
 
         if model == 'FD':
-            s = FD.zero(ge, xs, meshtype)
+            s = FD.zero(ge, xs, N, meshtype)
         elif model == 'FV':
-            s = FV.zero(ge, xs, meshtype)
+            s = FV.zero(ge, xs, ge.nA, meshtype)
         else:
-            raise OSError('%s model not available for spatial variable!' % model)
+            raise OSError(f'{model} model not available for spatial variable!')
 
         m = s.shape[1]
         n = m
@@ -252,7 +251,7 @@ def fission(ge, xs, fmt='csc'):
     """
     N = ge.nA
     if N < 0:
-        raise OSError('Cannot build P_{}'.format(N))
+        raise OSError(f'Cannot build P{N}')
     model = ge.spatial_scheme
     M = []
     appM = M.append
@@ -265,11 +264,11 @@ def fission(ge, xs, fmt='csc'):
             meshtype = 'centers'
 
         if model == 'FD':
-            f = FD.zero(ge, xs, meshtype)
+            f = FD.zero(ge, xs, N, meshtype)
         elif model == 'FV':
-            f = FV.zero(ge, xs, meshtype)
+            f = FV.zero(ge, xs, ge.nA, meshtype)
         else:
-            raise OSError('%s model not available for spatial variable!' % model)
+            raise OSError(f'{model} model not available for spatial variable!')
 
         m = f.shape[1]
         n = m
@@ -308,11 +307,11 @@ def delfission(ge, beta, xs, fmt='csc'):
         meshtype = 'edges'
 
         if model == 'FD':
-            f = FD.zero(ge, beta[family, :]*xs, meshtype)
+            f = FD.zero(ge, beta[family, :]*xs, ge.nA, meshtype)
         elif model == 'FV':
-            f = FV.zero(ge, beta[family, :]*xs, meshtype)
+            f = FV.zero(ge, beta[family, :]*xs, ge.nA, meshtype)
         else:
-            raise OSError('%s model not available for spatial variable!' % model)
+            raise OSError(f'{model} model not available for spatial variable!')
 
         m = f.shape[1]
         n = m
@@ -340,7 +339,7 @@ def ptime(ge, fmt='csc'):
     Mapp = M.append
     xs = np.ones((ge.nLayers, ))
     for family in range(ge.NPF):  # precursor family
-        e = FD.zero(ge, xs, 'edges')
+        e = FD.zero(ge, xs, ge.nA, 'edges')
         if family == 0:
             m = e.shape[1]
             n = m
@@ -369,7 +368,7 @@ def emission(ge, chid, fmt='csc'):
     Mapp = M.append
     lambdas = ge.getxs('lambda')
     for family in range(ge.NPF):  # precursor family
-        e = FD.zero(ge, chid[family, :]*lambdas[family, :], 'edges')
+        e = FD.zero(ge, chid[family, :]*lambdas[family, :], ge.nA, 'edges')
         if family == 0:
             m = e.shape[1]
             n = m
@@ -396,7 +395,7 @@ def decay(ge, fmt='csc'):
     Mapp = M.append
     lambdas = ge.getxs('lambda')
     for family in range(ge.NPF):  # precursor family
-        e = FD.zero(ge, lambdas[family, :], 'edges')
+        e = FD.zero(ge, lambdas[family, :], ge.nA, 'edges')
         if family == 0:
             m = e.shape[1]
             n = m

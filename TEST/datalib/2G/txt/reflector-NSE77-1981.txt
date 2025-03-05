@@ -6,19 +6,19 @@
 
 # Groups in energy decreasing order
 
-# Abs
+# Sigma_abs
 2.5066E-4 8.0702E-3
 
-# Fiss
+# Sigma_fiss
 0.00 0.00
 
-# Nubar
+# nu_fiss
 0.0 0.0
 
-# Chit
-1.00000000e+00 0.00000000e+00
+# chi_tot
+1.000e+00 0.00000000e+00
 
-#  Kappa
+#  fiss_energy
 2.08077000e+02 2.08077000e+02
 
 #  S0

@@ -32,8 +32,6 @@ def setBCs(op, geometry):
 
     """
     BCs = geometry.BC
-    # copy leakage operator to new variable
-    L = op.Linf
     for bc in BCs:
 
         # TODO: actually only the same bc can be handled on two boundaries
@@ -41,10 +39,10 @@ def setBCs(op, geometry):
 
         if bc not in ['vacuum', 'mark', 'Mark']:
             raise OSError('Unknown boundary condition {}!'.format(bc))
-        if op.spatial_scheme == 'FV':
-            op.L = L
-        elif op.spatial_scheme == 'FD':
-            op.L = L
+        # if op.spatial_scheme == 'FV':
+        #     op.L = L
+        # elif op.spatial_scheme == 'FD':
+        #     op.L = L
             # FIXME: no BCs needed if zero flux, as one eq. like "a*phi_m=0" is formed
             # # op.L = op.L.tolil()
             # # op.F = op.F.tolil()
@@ -70,7 +68,6 @@ def setBCs(op, geometry):
             #         # op.S0[skip, :] = 0
             #         # op.F0[skip, :] = 0
             #         # op.C[skip, :] = 0
-        else:
-            raise OSError('{} model not available for spatial variable!'.format(op.spatial_scheme))
+        # else:
+        #     raise OSError('{} model not available for spatial variable!'.format(op.spatial_scheme))
 
-    return op

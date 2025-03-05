@@ -1,27 +1,22 @@
-# Tot
+# Sigma_tot
 1.100000000e00
-# Capt
+# Sigma_capt
 1.00000000e00
-# Fiss
+# Sigma_fiss
 0.00000000e+00
-# Chit
+# chi_tot
 0.00000000e+00
-# Chip
+# chi_pro
 0.00000000e+00
-# Chid
+# chi_del
+0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00
+# nuSigma_fiss
 0.00000000e+00
+# nu_fiss
 0.00000000e+00
+# fiss_energy
 0.00000000e+00
-0.00000000e+00
-0.00000000e+00
-0.00000000e+00
-# Nsf
-0.00000000e+00
-# Nubar
-0.00000000e+00
-# Kappa
-0.00000000e+00
-# Invv
+# inv_vel
 4.54545454e-06
 # S0
 0.1

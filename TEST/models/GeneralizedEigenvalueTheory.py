@@ -176,9 +176,9 @@ class GET(eigenproblem):
         else:
             self.A = LHS.L+LHS.C+LHS.S0+LHS.F0-LHS.S-LHS.F  # destruction operator
 
-        if 'Fiss' in self.eigposition:
+        if 'Sigma_fiss' in self.eigposition:
             self.B = -RHS.F0
-        elif 'Capt' in self.eigposition:
+        elif 'Sigma_capt' in self.eigposition:
             self.B = -RHS.C
         elif 'S0' in self.eigposition:
             self.B = -RHS.S0

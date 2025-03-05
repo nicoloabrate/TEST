@@ -362,9 +362,9 @@ class PhaseSpace:
         elif which == "power":
             # normalisation to have fixed power
             power = 1 if power is None else power
-            fisxs = self.geometry.getxs("Fiss")
+            fisxs = self.geometry.getxs("Sigma_fiss")
             try:
-                kappa = self.geometry.getxs("Kappa")*1.60217653e-13  # [J]
+                kappa = self.geometry.getxs("fiss_energy")*1.60217653e-13  # [J]
             except KeyError:
                 kappa = 200*1.6e-13  # J
 
@@ -373,9 +373,11 @@ class PhaseSpace:
                 if self.geometry.spatial_scheme == "FV":
                     KFiss[0+g*nS:nS+g*nS] = FV.zero(self.geometry,
                                                     fisxs[g, :]*kappa[g, :],
+                                                    self.nA,
                                                     meshtype="centers")
                 elif self.geometry.spatial_scheme == "FD":
                     KFiss[0+g*nS:nS+g*nS] = FD.zero(self.geometry,
+                                                    self.nA,
                                                     fisxs[g, :]*kappa[g, :])
 
             y = self.get(moment=0, mode=0)
@@ -464,7 +466,7 @@ class PhaseSpace:
         None.
 
         """
-        flx = spectrum
+        flux = spectrum
 
         multigrp = self.geometry.energygrid
         if isinstance(fewgrp, list):
@@ -494,7 +496,7 @@ class PhaseSpace:
             iE = np.argwhere(np.logical_and(multigrp[iS:] < G1,
                                             multigrp[iS:] >= G2))[-1][0]+iS
             # compute flux in g
-            collapsed[g] = flx[iS:iE].sum()
+            collapsed[g] = flux[iS:iE].sum()
             iS = iE
         return collapsed
 
@@ -1578,7 +1580,7 @@ class PhaseSpace:
                 if nA == 0 and moment == 1:
                     # compute current via finite difference
                     y[ig * dim: dim * (ig + 1)] = np.gradient(vect[iS:iE], self.geometry.mesh)
-                    diffcoef_g = FD.zero(self.geometry, D[ig, :])
+                    diffcoef_g = FD.zero(self.geometry, D[ig, :], self.nA)
                     y[ig * dim: dim * (ig + 1)] = -diffcoef_g*y[ig * dim: dim * (ig + 1)]
         else:
             # build angular flux and evaluate in angle

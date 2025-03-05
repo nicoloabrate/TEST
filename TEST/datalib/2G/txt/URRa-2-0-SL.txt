@@ -1,27 +1,32 @@
 # University Research Reactor Isotropic Benchmark at https://www.sciencedirect.com/science/article/pii/S0149197002000987
 # Groups in energy decreasing order
-# Tot
+# Sigma_tot
 6.56960000e-01 2.5202500000e+00
 
-#  Capt
+#  Sigma_capt
 1.00460000e-03 2.57880000e-02
 
-#  Fiss
+#  Sigma_fiss
 1.04840000e-03 5.06320000e-02
 
-# Chit
-1.00000000e+00 0.00000000e+00
+# chi_tot
+1.000e+00 0.00000000e+00
 
-#  Chip
-0 0
+# chi_pro
+1.000e+00 0.00000000e+00
 
-#  Nubar
+# chi_del
+1.000e+00 1.000e+00 1.000e+00 1.000e+00 1.000e+00 1.000e+00 
+0.00000000e+00 0.00000000e+00 0.00000000e+00 0.00000000e+00 0.00000000e+00 0.00000000e+00
+
+
+#  nu_fiss
 2.50000000e+00 2.50000000e+00
 
-#  Kappa
+#  fiss_energy
 2.08077000e+02 2.08077000e+02
 
-#  Invv
+#  inv_vel
 4.54545454e-06 4.54545454e-06
 
 #  S0

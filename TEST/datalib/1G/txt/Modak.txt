@@ -1,30 +1,30 @@
-# Tot
-1.00000000e+00
-# Transpxs
+# Sigma_tot
+1.000e+00
+# Sigma_transp
 0.00000000e+00
 # Diffcoef
 3.33333333e-01
-# Abs
+# Sigma_abs
 2.00000000e-01
-# Capt
+# Sigma_capt
 1.00000000e-01
-# Fiss
+# Sigma_fiss
 1.00000000e-01
-# Remxs
+# Sigma_rem
 2.00000000e-01
-# Chit
-1.00000000e+00
-# Chip
-1.00000000e+00
-# Chid
-1.00000000e+00
-# Nsf
-1.00000000e+00
-# Nubar
+# chi_tot
+1.000e+00
+# chi_pro
+1.000e+00
+# chi_del
+1.000e+00 1.000e+00 1.000e+00 1.000e+00 1.000e+00 1.000e+00 1.000e+00 1.000e+00 1.000e+00
+# nuSigma_fiss
+1.000e+00
+# nu_fiss
 1.00000000e+01
-# Kappa
+# fiss_energy
 2.08077000e+02
-# Invv
+# inv_vel
 4.54545454e-06
 # S0
 8.00000000e-01

@@ -15,7 +15,7 @@ from matplotlib.pyplot import spy
 
 class NTE():
 
-    def __init__(self, ge, model, steady, N=None, prod=None, BC=True,
+    def __init__(self, ge, model, steady, N=None, use_nxn=True, BC=True,
                  fmt='csr', prompt=False, allope=False, adjoint=False):
         self.model = model
         if model == 'Diffusion':
@@ -40,11 +40,11 @@ class NTE():
         self.nE = ge.nE
         self.geometry = ge.geometry
         self.spatial_scheme = ge.spatial_scheme
-        # assign operators
+        # assign interaction operators
         self.S0 = MG.scatteringTot(ge, self.model, fmt=fmt)
         self.F0 = MG.fission(ge, self.model, fmt=fmt)
         self.C = MG.capture(ge, self.model, fmt=fmt)
-        self.S = MG.scattering(ge, self.model, prod=prod, fmt=fmt)
+        self.S = MG.scattering(ge, self.model, use_nxn=use_nxn, fmt=fmt)
         if adjoint:
             self.S = self.S.T
 
@@ -82,13 +82,14 @@ class NTE():
 
                 self.state = 'transient'
 
+        self.Linf = MG.leakage(ge, self.model, fmt=fmt)
+        self.L = MG.leakage(ge, self.model, fmt=fmt)
         if BC or 'zero' in ge.BC:
             self.BC = ge.BC
-            self.Linf = MG.leakage(ge, self.model, fmt=fmt)
 
             # transpose and then impose BCs
             if adjoint == "continuous":
-                self.Linf = self.Linf.T
+                self.L = self.L.T
 
             if model == 'Diffusion':
                 self = DiffusionBCs.setBCs(self, ge)
@@ -97,9 +98,8 @@ class NTE():
             elif 'S' in model:
                 self = SNBCs.setBCs(self, ge)
                 
-            self.Linf = MG.leakage(ge, self.model, fmt=fmt)
-            if adjoint:
-                self.Linf = self.Linf.T
+            if adjoint == "discrete":
+                self.L = self.L.T
 
         else:
             # leakage operator without boundary conditions (imposed later)
@@ -108,14 +108,11 @@ class NTE():
             #     self.Linf = self.Linf.T
             self.BC = False
 
-        if adjoint == "discrete":
-            self.L = self.L.T
-
     def spy(self, what, markersize=2):
         spy(self.__dict__[what], markersize=markersize)
 
     def todense(self):
-        operators = ["F0", "C", "S0", "L", "S", "F", "Fp", "Fd", "T"]
+        operators = ["F0", "C", "S0", "L", "Linf", "S", "F", "Fp", "Fd", "T"]
         for ope in operators:
             if hasattr(self, ope):
                 self.__dict__[ope] = self.__dict__[ope].todense()

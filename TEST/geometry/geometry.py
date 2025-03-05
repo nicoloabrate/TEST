@@ -29,7 +29,7 @@ class Slab:
 
     def __init__(self, split=None, layers=None, regions=None, BCs=None,
                  energygrid=None, AngOrd=None, spatial_scheme=None,
-                 datapath=None, h5file=None, verbose=True):
+                 datapath=None, h5file=None, verbose=True, fixdata=False, L_anis=1):
 
         if h5file:
             if isinstance(h5file, dict):
@@ -116,7 +116,8 @@ class Slab:
 
             # set Boundary Conditions
             self.BC = BCs if isinstance(BCs, list) else [BCs]
-
+            # set order of the scattering anisotropy
+            self.L_anis = L_anis 
             # assign material properties
             self.regions = {}
             Nxf = np.zeros((self.nLayers,), dtype=bool)
@@ -137,28 +138,15 @@ class Slab:
                             raise OSError('{} not valid for \
                                           datapath'.format(type(datapath)))
 
-                    self.regions[uniName] = Material(uniName, self.energygrid,
+                    self.regions[uniName] = Material(
+                                                     uniName, self.energygrid,
                                                      egridname=self.egridname,
-                                                     datapath=path)
+                                                     datapath=path,
+                                                     fixdata=fixdata,
+                                                     )
                 # check if fissile
-                if self.regions[uniName].Nsf.any() > 0:
+                if self.regions[uniName].nuSigma_fiss.any() > 0:
                     Nxf[iLay] = True
-
-                # consistency check precursor families and decay constants
-                if 'lambda' in self.regions[uniName].__dict__.keys():
-                    if iLay == 0:
-                        self.NPF = self.regions[uniName].NPF
-                        lambdas = self.regions[uniName].__dict__['lambda']
-                    else:
-                        if self.NPF != self.regions[uniName].NPF:
-                            raise OSError('Number of precursor families in {} \
-                                          not consistent with other \
-                                          regions'.format(uniName))
-                        if not np.allclose(lambdas, self.regions[uniName].__dict__['lambda']):
-                            self.regions[uniName].__dict__['lambda'] = lambdas
-                            if verbose:
-                                print('Warning: Forcing decay constants'
-                                      'consistency in {}...'.format(uniName))
 
                 if AngOrd > 0:
                     minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
@@ -174,6 +162,8 @@ class Slab:
             self.nA = AngOrd  # angular approximation order
             self.spatial_scheme = spatial_scheme
             self.geometry = 'slab'
+            # check GCs consistency
+            nE, self.NPF = self.check_gc_consistency()
 
     def mesher(self, minmfp, spatial_scheme):
         """
@@ -356,16 +346,18 @@ class Slab:
             ``numpy.ndarray`` with nE (groups) rows and R (regions) columns.
 
         """
+        scatt_mat = ['S', 'Sp', *list(map(lambda z: "S"+str(z), range(self.L_anis + 1))),
+                     *list(map(lambda z: "Sp"+str(z), range(self.L_anis + 1)))]
         if region is None:
 
-            if key.startswith('S') or key.startswith('Sp'):
+            if key in scatt_mat:
                 if key == 'S' or key == 'Sp':  # take all moments
                     # look for maximum number of moments available in the data
-                    L = 0
-                    for ireg, reg in self.regionmap.items():
-                        S = self.regions[reg].L
-                        L = S if S > L else L  # get maximum scattering order
-                    shape = (self.nE, self.nE, self.nLayers, L+1)
+                    L_anis_max = 0
+                    for ireg, reg in enumerate(self.regions.keys()):
+                        S = self.regions[reg].L_anis
+                        L_anis_max = S if S > L_anis_max else L_anis_max  # get maximum scattering order
+                    shape = (self.nE, self.nE, self.nLayers, min(self.L_anis, L_anis_max)+1)
                     allL = True
                 else:
                     shape = (self.nE, self.nE, self.nLayers)
@@ -375,17 +367,14 @@ class Slab:
                 # loop over regions
                 for ireg, reg in self.regionmap.items():
                     if allL:
-                        old_key = 'S'
                         # get all scattering order matrices for each region
-                        for ll in range(L+1):
-                            key = '%s%d' % (old_key, ll)
-                            vals[:, :, ireg, ll] = self.regions[reg].\
-                                getxs(key, pos1, pos2)
+                        for ll in range(min(self.L_anis, L_anis_max)+1):
+                            s_key = f'{key}{ll}'
+                            vals[:, :, ireg, ll] = self.regions[reg].getxs(s_key, pos1, pos2)
                     else:
-                        vals[:, :, ireg] = self.regions[reg].\
-                            getxs(key, pos1, pos2)
+                        vals[:, :, ireg] = self.regions[reg].getxs(key, pos1, pos2)
 
-            elif key == 'beta' or key == 'lambda':
+            elif key == 'lambda':
 
                 for ireg, reg in self.regionmap.items():
                     NPF = self.regions[reg].NPF
@@ -395,7 +384,7 @@ class Slab:
                 for ireg, reg in self.regionmap.items():
                     vals[:, ireg] = self.regions[reg].getxs(key, pos1, pos2)
 
-            elif key == 'Chid':
+            elif key == 'beta' or key == 'chi_del':
 
                 for ireg, reg in self.regionmap.items():
                     NPF = self.regions[reg].NPF
@@ -403,7 +392,7 @@ class Slab:
                 # loop over regions
                 for ireg, reg in self.regionmap.items():
                     vals[:, :, ireg] = self.regions[reg].\
-                                        getxs(key, pos1, pos2).T
+                                        getxs(key, pos1, pos2)
 
             else:
                 vals = np.full((self.nE, self.nLayers), None)
@@ -431,8 +420,8 @@ class Slab:
         # TODO: enforce criticality also with gamma/theta/delta/k/zeta
         if "keff" in perturbation.keys():
             for reg in self.regions.values():
-                if reg.Fiss.max() > 0:
-                    reg.Nubar /= perturbation["keff"]
+                if reg.Sigma_fiss.max() > 0:
+                    reg.nu_fiss /= perturbation["keff"]
 
     def perturb(self, perturbation, sanitycheck=True, keepUnpert=True):
         """_summary_
@@ -563,7 +552,7 @@ class Slab:
 
                     self.mesher(minmfp, spatial_scheme=self.spatial_scheme)
 
-    def replace(self, replacement):
+    def replace(self, replacement, fixdata=False):
         # TODO: finish the implementation and test it
         regs = list(self.regionmap.values())
         # if 'name' in replacement.keys():
@@ -604,7 +593,9 @@ class Slab:
         self.regions[new_mat] = Material(uniName=new_mat,
                                          energygrid=self.energygrid,
                                          egridname=self.egridname,
-                                         datapath=path)
+                                         datapath=path,
+                                         fixdata=fixdata,
+                                        )
 
     def computeQW(self):
         """
@@ -617,24 +608,76 @@ class Slab:
 
         """
         # compute Legendre expansion coefficients for SN
-        sm = self.getxs('%s' % 'S')
-        L = sm.shape[3]
         mu, w = roots_legendre(self.nA)
         # ensure positive and then negative directions
         mu[::-1].sort()
 
-        PL = np.zeros((L, self.nA))
+        PL = np.zeros((self.L_anis + 1, self.nA))
         # TODO FIXME check that this is correct
-        for order in range(L):
+        for order in range(self.L_anis):
             PL[order, :] = eval_legendre(order, mu)
         C = (2*np.arange(0, self.nA)+1)/2
-        QW = {'L': L, 'mu': mu, 'w': w, 'PL': PL, 'C': C}
+        QW = {'L': self.L_anis + 1, 'mu': mu, 'w': w, 'PL': PL, 'C': C}
         self.QW = QW
 
     def updateN(self, N):
         """Update the angle order."""
         self.nA = N
 
+    def check_gc_consistency(self):
+        """Check consistency of group constants."""
+
+        egrid = None
+        nE = -1
+        nPrec = -1
+        fix_reg = []
+        nPrec_reg = []
+        for i, regname in enumerate(self.regions.keys()):
+            # --- check number of groups
+            if i == 0:
+                nE = self.regions[regname].nE
+                egrid = self.regions[regname].energygrid
+            else:
+                if nE != self.regions[regname].nE:
+                    raise OSError(f'Inconsistent number of energy groups in region {regname}')
+                elif not np.all(self.regions[regname].energygrid == egrid):
+                    raise OSError(f'Inconsistent energy grid in region {regname}')
+
+            # --- check number of precursor families
+            if self.regions[regname].NPF == 0:
+                fix_reg.append(regname)
+            else:
+                nPrec = self.regions[regname].NPF
+        # ensure dimensionality consistency
+        if nPrec == -1: # all regions have no delayed precursors data
+            nPrec = 0
+
+        if nPrec > 0:
+            for regname in fix_reg:
+                self.regions[regname].NPF = nPrec
+                self.regions[regname].beta = np.zeros((self.nE, nPrec))
+                self.regions[regname].beta_tot = np.zeros((self.nE, ))
+                self.regions[regname].__dict__["lambda"] = 0.0
+                self.regions[regname].__dict__["lambda_avg"] = 0.0
+                self.regions[regname].chi_tot = np.zeros((self.nE, ))
+                self.regions[regname].chi_pro = np.zeros((self.nE, ))
+                self.regions[regname].chi_del = np.zeros((self.nE, nPrec))
+                self.regions[regname].nu_fiss_del = np.zeros((self.nE, nPrec))
+
+        for i, (regname) in enumerate(self.regions.keys()):
+            if self.regions[regname].NPF != nPrec:
+                raise GeometryError(f"The number of delayed prec. familiies in {regname} is not consistent.")
+
+            if 'lambda' in self.regions[regname].__dict__.keys():
+                if i == 0:
+                    self.NPF = self.regions[regname].NPF
+                    lambdas = self.regions[regname].__dict__['lambda']
+                else:
+                    if not np.allclose(lambdas, self.regions[regname].__dict__['lambda']):
+                        self.regions[regname].__dict__['lambda'] = lambdas
+                        print(f'Warning: Forcing decay constants consistency in {regname}')
+
+        return nE, nPrec
 
 class GeometryError(Exception):
     pass

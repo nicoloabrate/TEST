@@ -35,17 +35,17 @@ def removal(ge, data, fmt='csc'):
     appM = M.append
     for order in range(N):
         if model == 'FD':
-            t = FD.zero(ge, data, meshtype='centers')*1/2  # DD scheme
+            t = FD.zero(ge, data, N, meshtype='centers')*1/2  # DD scheme
             if mu[order] < 0: t = np.flip(t)
             t = np.insert(t, 0, 1, axis=1)
             m = t.shape[1]
             if mu[order] != 0:
                 dia, pos = [t, t[:, 1:]], [0, -1]
             else:
-                t0 = FD.zero(ge, data, meshtype='edges')
+                t0 = FD.zero(ge, data, N, meshtype='edges')
                 dia, pos = [t0], [0]
         elif model == 'FV':
-            t = FV.zero(ge, data, meshtype='centers')
+            t = FV.zero(ge, data, N, meshtype='centers')
             if mu[order] < 0: t = np.flip(t)
             dia, pos = t, [0]
             m = t.shape[1]
@@ -83,17 +83,17 @@ def time(ge, data, fmt='csc'):
     appM = M.append
     for order in range(N):
         if model == 'FD':
-            t = FD.zero(ge, data, meshtype='centers')*1/2  # DD scheme
+            t = FD.zero(ge, data, N, meshtype='centers')*1/2  # DD scheme
             if mu[order] < 0: t = np.flip(t)
             t = np.insert(t, 0, t[0, 0], axis=1)
             m = t.shape[1]
             if mu[order] != 0:
                 dia, pos = [t, t[:, 1:]], [0, -1]
             else:
-                t0 = FD.zero(ge, data, meshtype='edges')
+                t0 = FD.zero(ge, data, N, meshtype='edges')
                 dia, pos = [t0], [0]
         elif model == 'FV':
-            t = FV.zero(ge, data, meshtype='centers')
+            t = FV.zero(ge, data, N, meshtype='centers')
             if mu[order] < 0: t = np.flip(t)
             dia, pos = t, [0]
             m = t.shape[1]
@@ -134,7 +134,7 @@ def leakage(ge, fmt='csc'):
 
     # fill lower triangular matrix (mu > 0)
     if model == 'FD':
-        d = FD.zero(ge, 1/ge.dx, meshtype='centers').T.flatten()
+        d = FD.zero(ge, 1/ge.dx, N, meshtype='centers').T.flatten()
         d_neg = np.flip(d[:])
         d = np.insert(d, 0, 0)
         d_neg = np.insert(d_neg, 0, 0)
@@ -145,7 +145,7 @@ def leakage(ge, fmt='csc'):
         tmpapp = tmp.append
         for i in range(ge.nS):
             if i == 0:
-                d = FV.zero(ge, 2/ge.dx, meshtype='centers').T.flatten()
+                d = FV.zero(ge, 2/ge.dx, N, meshtype='centers').T.flatten()
                 lst = list(d)
             else:
                 lst = list(-2*d[i:ge.nS]) if i % 2 != 0 else list(2*d[i:ge.nS])  #
@@ -157,7 +157,7 @@ def leakage(ge, fmt='csc'):
         tmpapp = tmp.append
         for i in range(ge.nS):
             if i == 0:
-                d = FD.zero(ge, -2/np.flipud(ge.dx), meshtype='centers').T.flatten()
+                d = FD.zero(ge, -2/np.flipud(ge.dx), N, meshtype='centers').T.flatten()
                 lst = list(d)
             else:
                 lst = list(-2*d[i:ge.nS]) if i % 2 != 0 else list(2*d[i:ge.nS])
@@ -185,10 +185,7 @@ def scattering(ge, sm, fmt='csc'):
         Geometry object.
     N : int
         Number of discrete ordinates.
-    L : int, optional
-        Scattering Legendre moment. Default is ``None``. In this case, L is
-        taken equal to ``N``.
-    prod: bool, optional
+    use_nxn: bool, optional
         Scattering production flag. Default is ``True``.
 
     Returns
@@ -204,7 +201,6 @@ def scattering(ge, sm, fmt='csc'):
     if sm.any() == 0:  # no interaction, empty operator
         M = csc_matrix((m*N, m*N))
     else:
-        L = sm.shape[1]
         # data for scattering
         w = ge.QW['w']
         mu = ge.QW['mu']
@@ -220,12 +216,12 @@ def scattering(ge, sm, fmt='csc'):
         M = []
         appM = M.append
 
-        if L <= 1:  # isotropic scattering like fission (faster algorithm)
+        if ge.L_anis <= 0:  # isotropic scattering like fission (faster algorithm)
 
             l = 0
             xs = sm[:, l]*C[l]
             if model == 'FD':
-                s = FD.zero(ge, xs, meshtype='centers')/2  # DD scheme
+                s = FD.zero(ge, xs, N, meshtype='centers')/2  # DD scheme
                 if ishet:
                     s_fl = np.flip(s[:]) # vacuum BCs
                     s_fl = np.insert(s_fl, 0, 0, axis=1)
@@ -233,13 +229,13 @@ def scattering(ge, sm, fmt='csc'):
                 s = np.insert(s, 0, 0, axis=1)
                 d = diags([s, s[:, 1:]], [0, -1], (m, m), format=fmt)
                 if isodd:
-                    s0 = FD.zero(ge, xs, meshtype='edges')
+                    s0 = FD.zero(ge, xs, N, meshtype='edges')
                     d0 = diags([s0], [0], (m, m), format=fmt)
                     if ishet:
                         s0_fl = np.flip(s0[:])
                         d0_fl = diags([s0_fl], [0], (m, m), format=fmt)
             elif model == 'FV':
-                s = FV.zero(ge, xs, meshtype='centers')
+                s = FV.zero(ge, xs, N, meshtype='centers')
                 if ishet:
                     s_fl = np.flip(s[:])
                     d_fl = diags(s_fl, [0], (m, m), format=fmt)
@@ -316,20 +312,20 @@ def scattering(ge, sm, fmt='csc'):
                 for n in range(N):  # loop over directions defining Leg. moment
                     # evaluate coefficients
                     xs = sm[:, 0]*0
-                    for l in range(L):  # loop over Legendre expansion moments
+                    for l in range(ge.L_anis):  # loop over Legendre expansion moments
                         if l < N:
                             coeff = PL[l, order]*PL[l, n]*w[n]*C[l]
                             xs = xs+sm[:, l]*coeff
 
                     # build sub-matrix for n-th order
                     if model == 'FD':
-                        s = FD.zero(ge, xs, meshtype='centers')/2  # DD scheme
+                        s = FD.zero(ge, xs, N, meshtype='centers')/2  # DD scheme
                         if mu[order] < 0:
                             s_fl = np.flip(s[:])
                             s_fl = np.insert(s_fl, 0, 0, axis=1)
                             d = diags([s_fl, s_fl[:, 1:]], [0, -1], (m, m), format=fmt)
                         elif isodd and order == zeropos:
-                            s = FD.zero(ge, xs, meshtype='edges')
+                            s = FD.zero(ge, xs, N, meshtype='edges')
                             if mu[n] >= 0:
                                 d = diags([s], [0], (m, m), format=fmt)
                             else:
@@ -340,7 +336,7 @@ def scattering(ge, sm, fmt='csc'):
                             s = np.insert(s, 0, 0, axis=1)
                             d = diags([s, s[:, 1:]], [0, -1], (m, m), format=fmt)
                     elif model == 'FV':
-                        s = FV.zero(ge, xs, meshtype='centers')
+                        s = FV.zero(ge, xs, N, meshtype='centers')
                         if mu[order] < 0:
                             s_fl = np.flip(s[:])
                             d = diags(s_fl, [0], (m, m), format=fmt)
@@ -399,7 +395,7 @@ def fission(ge, xs, fmt='csc'):
         ishet = ~np.all(xs == xs[0])
 
         if model == 'FD':
-            f = FD.zero(ge, 1/2*xs, meshtype='centers')/2  # DD scheme
+            f = FD.zero(ge, 1/2*xs, N, meshtype='centers')/2  # DD scheme
             if ishet:
                 f_fl = np.flip(f[:])
                 f_fl = np.insert(f_fl, 0, 0, axis=1)
@@ -407,13 +403,13 @@ def fission(ge, xs, fmt='csc'):
             f = np.insert(f, 0, 0, axis=1)
             d = diags([f, f[:, 1:]], [0, -1], (m, m), format=fmt)
             if isodd:
-                f0 = FD.zero(ge, 1/2*xs, meshtype='edges')  # DD scheme
+                f0 = FD.zero(ge, 1/2*xs, N, meshtype='edges')  # DD scheme
                 d0 = diags([f0], [0], (m, m), format=fmt)
                 if ishet:
                     f0_fl = np.flip(f0[:])
                     d0_fl = diags([f0_fl], [0], (m, m), format=fmt)
         elif model == 'FV':
-            f = FV.zero(ge, 1/2*xs, meshtype='centers')
+            f = FV.zero(ge, 1/2*xs, N, meshtype='centers')
             if ishet:
                 f_fl = np.flip(f[:])
                 d_fl = diags(f_fl, [0], (m, m), format=fmt)
@@ -525,14 +521,14 @@ def delfission(ge, beta, xs, fmt='csc'):
             ishet = ~np.all(xs == xs[0])
 
             if model == 'FD':
-                f = FD.zero(ge, beta[family, :]*xs[family, :], meshtype='edges')
+                f = FD.zero(ge, beta[family, :]*xs[family, :], N, meshtype='edges')
                 if ishet:
                     f_fl = np.flip(f[:])
                     d_fl = diags([f_fl], [0], (m, m), format=fmt)
                 d = diags([f], [0], (m, m), format=fmt)
 
             elif model == 'FV':
-                f = FV.zero(ge, beta[family, :]*xs[family, :], meshtype='centers')
+                f = FV.zero(ge, beta[family, :]*xs[family, :], N, meshtype='centers')
                 if ishet:
                     f_fl = np.flip(f[:])
                     d_fl = diags(f_fl, [0], (m, m), format=fmt)
@@ -585,9 +581,9 @@ def ptime(ge, fmt='csc'):
     xs = np.ones((ge.nLayers))
     for family in range(ge.NPF):  # precursors
         if model == 'FD':
-            e = FD.zero(ge, xs, meshtype='edges')
+            e = FD.zero(ge, xs, N, meshtype='edges')
         else:
-            e = FV.zero(ge, xs, meshtype='centers')
+            e = FV.zero(ge, xs, N, meshtype='centers')
         if family == 0:
             m = e.shape[1]
             n = m
@@ -629,14 +625,14 @@ def emission(ge, fmt='csc'):
             mu = ge.QW['mu']
             ishet = ~np.all(lambdas == lambdas[0])
             if model == 'FD':
-                f = FD.zero(ge, lambdas[family, :]/2, meshtype='edges')
+                f = FD.zero(ge, lambdas[family, :]/2, N, meshtype='edges')
                 if ishet:
                     f_fl = np.flip(f[:])
                     d_fl = diags([f_fl], [0], (m, m), format=fmt)
                 d = diags([f], [0], (m, m), format=fmt)
 
             elif model == 'FV':
-                f = FV.zero(ge, lambdas[family, :]/2, meshtype='centers')
+                f = FV.zero(ge, lambdas[family, :]/2, N, meshtype='centers')
                 if ishet:
                     f_fl = np.flip(f[:])
                     d_fl = diags(f_fl, [0], (m, m), format=fmt)
@@ -688,9 +684,9 @@ def decay(ge, fmt='csc'):
     lambdas = ge.getxs('lambda')
     for family in range(ge.NPF):  # precursors
         if model == 'FD':
-            e = FD.zero(ge, lambdas[family, :], 'edges')
+            e = FD.zero(ge, lambdas[family, :], N, 'edges')
         else:
-            e = FV.zero(ge, lambdas[family, :], meshtype='centers')
+            e = FV.zero(ge, lambdas[family, :], N, meshtype='centers')
         if family == 0:
             m = e.shape[1]
             n = m

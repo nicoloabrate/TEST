@@ -1,17 +1,17 @@
 # Benchmark data for alpha eigenvalues taken from ANE(33) - 2003,  A simple scheme for the direct evaluation of time-eigenvalues of neutron transport equation
-# Tot
+# Sigma_tot
 1.00000000e+01
-# Capt
+# Sigma_capt
 0.00000000e+00
-# Fiss
+# Sigma_fiss
 0.00000000e+00
-# Chit
+# chi_tot
 0.00000000e+00
-# Nubar
+# nu_fiss
 0.00000000e+00
-# Kappa
+# fiss_energy
 0.00000000e+00
-# Invv
-1.00000000e+00
+# inv_vel
+1.000e+00
 # S0
 1.00000000e+01

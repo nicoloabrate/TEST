@@ -2,28 +2,32 @@
 # half thickness [cm] 846.632726
 # Groups in energy decreasing order
 
-# Capt
+# Sigma_capt
 0.0087078 0.02518
 
-#  Fiss
+#  Sigma_fiss
 0.002817 0.097
 
-# Remxs
+# Sigma_rem
 0.33588 0.54628
 
-# Chit
-1 0
+# chi_tot
+1.000e+00 0.00000000e+00
 
-#  Chip
-1 0
+# chi_pro
+1.000e+00 0.00000000e+00
 
-#  Nubar
+# chi_del
+1.000e+00 1.000e+00 1.000e+00 1.000e+00 1.000e+00 1.000e+00 
+0.00000000e+00 0.00000000e+00 0.00000000e+00 0.00000000e+00 0.00000000e+00 0.00000000e+00
+
+#  nu_fiss
 2.5 2.5
 
-#  Kappa
+#  fiss_energy
 2.08077000e+02 2.08077000e+02
 
-#  Invv
+#  inv_vel
 4.54545454e-06 4.54545454e-06
 
 #  S0

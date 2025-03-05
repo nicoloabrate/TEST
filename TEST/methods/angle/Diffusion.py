@@ -33,7 +33,7 @@ def leakage(ge, dfc, fmt='csc'):
     elif model == 'FV':
         M = FV.second(ge, dfc, meshtype)
     else:
-        raise OSError('%s model not available for spatial variable!' % model)
+        raise OSError(f'{model} model not available for spatial variable!')
 
     m, n = M.shape
     pos = np.array([-1, 0, 1])

@@ -4,31 +4,38 @@
 # power fractions: 0.2790, 0.4421, 0.2790
 
 # Groups in energy decreasing order
-# Tot
+# Sigma_tot
 0.2222222222222222 0.6666666666666666
 
 # Diffcoef
 1.50 0.50
 
-# Capt
+# Sigma_capt
 0.006999999999999999 0.09999999999999999
 
-# Remxs
+# Sigma_rem
 0.026 0.18
 
-# Fiss
+# Sigma_fiss
 0.004 0.08
 
-# Nubar
+# nu_fiss
 2.5 2.5
 
-# Chit
-1.00000000e+00 0.00000000e+00
+# chi_tot
+1.000e+00 0.00000000e+00
 
-#  Kappa
+# chi_pro
+1.000e+00 0.00000000e+00
+
+# chi_del
+1.000e+00 1.000e+00 1.000e+00 1.000e+00 1.000e+00 1.000e+00 
+0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00 0.000e+00
+
+#  fiss_energy
 2.08077000e+02 2.08077000e+02
 
-#  Invv
+#  inv_vel
 1.0e-07 3.3333333333333333e-06
 
 #  S0

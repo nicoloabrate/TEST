@@ -1,30 +1,31 @@
 # Pu-239 Isotropic Benchmark at https://www.sciencedirect.com/science/article/pii/S0149197002000987
 # Groups in energy decreasing order
-# Tot
+# Sigma_tot
 2.208000e-01 3.3600000000e-01
 
-#  Capt
+#  Sigma_capt
 4.80000000e-03 1.44000000e-02
 
-#  Fiss
+#  Sigma_fiss
 9.36000000e-02 8.54400000e-02
 
-# Chit
+# chi_tot
 5.75000000e-01 4.25000000e-01
 
-#  Chip
+#  chi_pro
 5.75000000e-01 4.25000000e-01
 
-#  Chid
-5.75000000e-01 4.25000000e-01
+#  chi_del
+5.75000000e-01 5.75000000e-01 5.75000000e-01 5.75000000e-01 5.75000000e-01 5.75000000e-01 
+4.25000000e-01 4.25000000e-01 4.25000000e-01 4.25000000e-01 4.25000000e-01 4.25000000e-01
 
-#  Nubar
+#  nu_fiss
 3.10000000e+00 2.93000000e+00
 
-#  Kappa
+#  fiss_energy
 2.08077000e+02 2.08077000e+02
 
-#  Invv
+#  inv_vel
 4.53849E-08 2.18142E-06
 
 #  S0
