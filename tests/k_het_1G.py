@@ -11,7 +11,7 @@ sys.path.append('C:\\Users\\39346\\Documenti\\mycodes')
 sys.path.append('/opt/programs_nabrate/mycodes/TEST_GTE')
 import numpy as np
 from TEST.geometry import Slab
-import TEST.models.NeutronTransportEquation as NTE
+from TEST.models.NeutronTransportEquation import NTE
 from TEST.models.EigenProblem import eigenproblem
 from TEST.models.GeneralizedEigenTheory import GET
 import matplotlib.pyplot as plt
@@ -30,7 +30,7 @@ xlayers = [-H, -a, a, H]
 # define geometry and mesh
 myslab = Slab(M, xlayers, matname, [bc], G, N, 'FD')
 # myPN = NTE.PN(myslab, N, steady=True, fmt='csc')
-myPN = NTE.Diffusion(myslab, steady=True, fmt='csc')
+myPN = NTE(myslab, "Diffusion", steady=True, fmt='csc')
 # --- kappa eigenvalue
 k = eigenproblem(myPN, 'kappa', myslab, nev=nev)
 k.solve(algo='eig')
@@ -53,7 +53,7 @@ F0p1=np.asarray(myPN.F0.todense())
 
 
 # analytic
-A1=myslab.regions['Fissile'].Abs
+A1=myslab.regions['Fissile'].Sigma_abs
 D1=myslab.regions['Fissile'].Diffcoef
 dx = myslab.dx
 c1 = 2*D1/dx[0]**2

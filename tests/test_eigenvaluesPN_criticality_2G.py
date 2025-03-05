@@ -10,7 +10,7 @@ import sys
 sys.path.append('../../')
 import time as t
 from TEST.geometry import Slab
-import TEST.models.NeutronTransportEquation as NTE
+from TEST.models.NeutronTransportEquation import NTE
 from TEST.models.EigenProblem import eigenproblem
 
 
@@ -26,14 +26,14 @@ def test_PNcriticality():
     xlayers = [-H, H]
     # define geometry and mesh
     myslab = Slab(M, xlayers, matname, [bc], G, N, 'FD')
-    myPN = NTE.PN(myslab, N, steady=False, fmt='csc', prompt=True)
+    myPN = NTE(myslab, "PN", N=N, steady=False, fmt='csc', prompt=True)
 
-    a = eigenproblem(myPN, 'alpha', myslab, nev=nev)
-    g = eigenproblem(myPN, 'gamma', myslab, nev=nev)
+    a = eigenproblem(nte=myPN, which='alpha', ge=myslab, nev=nev)
+    g = eigenproblem(nte=myPN, which='gamma', ge=myslab, nev=nev)
     g.solve(algo='SLEPc')
-    d = eigenproblem(myPN, 'delta', myslab, nev=nev+5)
+    d = eigenproblem(nte=myPN, which='delta', ge=myslab, nev=nev+5)
     d.solve(algo='SLEPc')
-    k = eigenproblem(myPN, 'kappa', myslab, nev=nev)
+    k = eigenproblem(nte=myPN, which='kappa', ge=myslab, nev=nev)
     k.solve(algo='SLEPc')
 
     # flxk1, _ = k.solution.get(1, angle=0, mode=0)
@@ -53,14 +53,14 @@ def test_SNcriticality():
     xlayers = [-H, H]
     # define geometry and mesh
     myslab = Slab(M, xlayers, matname, [bc], G, N+1, 'FD')
-    mySN = NTE.SN(myslab, N+1, steady=False, fmt='csc', prompt=True)
+    mySN = NTE(myslab, "SN", N=N+1, steady=False, fmt='csc', prompt=True)
 
-    a = eigenproblem(mySN, 'alpha', myslab, nev=nev)
-    g = eigenproblem(mySN, 'gamma', myslab, nev=nev)
+    a = eigenproblem(nte=mySN, which='alpha', ge=myslab, nev=nev)
+    g = eigenproblem(nte=mySN, which='gamma', ge=myslab, nev=nev)
     g.solve(algo='SLEPc')
-    d = eigenproblem(mySN, 'delta', myslab, nev=nev+2)
+    d = eigenproblem(nte=mySN, which='delta', ge=myslab, nev=nev+2)
     d.solve(algo='SLEPc')
-    k = eigenproblem(mySN, 'kappa', myslab, nev=nev)
+    k = eigenproblem(nte=mySN, which='kappa', ge=myslab, nev=nev)
     k.solve(algo='SLEPc')
 
     # flxk1, _ = k.solution.get(1, angle=0, mode=0)

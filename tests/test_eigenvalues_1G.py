@@ -9,7 +9,7 @@ import sys
 sys.path.append('../../')
 import pytest
 from TEST.geometry import Slab
-import TEST.models.NeutronTransportEquation as NTE
+from TEST.models.NeutronTransportEquation import NTE
 from TEST.models.EigenProblem import eigenproblem
 
 
@@ -39,8 +39,8 @@ def test_Modak_kappa0_1G(H, N, ref, algo):
     xlayers = [0, H]
     # define geometry and mesh for PN
     myslabP = Slab(M, xlayers, ['Modak'], [bc], G, N, 'FD')
-    myPN = NTE.PN(myslabP, N, steady=True, fmt='csc')
-    kP = eigenproblem(myPN, 'kappa', myslabP, nev=nev)
+    myPN = NTE(myslabP, "PN", N=N, steady=True, fmt='csc')
+    kP = eigenproblem(nte=myPN, which='kappa', ge=myslabP, nev=nev)
     try:
         kP.solve(verbose=True, algo=algo)
         assert abs(kP.solution.eigvals[0]-ref)*1E5 < 5
@@ -48,8 +48,8 @@ def test_Modak_kappa0_1G(H, N, ref, algo):
         print('MemoryError occurred with {}'.format(algo))
     # define geometry and mesh for SN
     myslabS = Slab(M, xlayers, ['Modak'], [bc], G, N+1, 'FD')
-    mySN = NTE.SN(myslabS, N+1, steady=True, fmt='csc')
-    kS = eigenproblem(mySN, 'kappa', myslabS, nev=nev)
+    mySN = NTE(myslabS, "SN", N=N+1, steady=True, fmt='csc')
+    kS = eigenproblem(nte=mySN, which='kappa', ge=myslabS, nev=nev)
     try:
         kS.solve(verbose=True, algo=algo)
         assert abs(kS.solution.eigvals[0]-ref)*1E5 < 5
@@ -78,16 +78,16 @@ def test_Modak_kappa0_aniso_1G(algo):
     bc = 'Mark'
     xlayers = [0, H]
     # define geometry and mesh (PN)
-    myslab = Slab(M, xlayers, ['ModakAni'], [bc], G, N, 'FD')
-    myPN = NTE.PN(myslab, N, steady=True, fmt='csc')
-    k1 = eigenproblem(myPN, 'kappa', myslab, nev=nev)
+    myslab = Slab(M, xlayers, ['ModakAni'], [bc], G, N, 'FD', L_anis=1)
+    myPN = NTE(myslab, "PN", N=N, steady=True, fmt='csc')
+    k1 = eigenproblem(nte=myPN, which='kappa', ge=myslab, nev=nev)
     k1.solve(verbose=True, algo=algo)
     assert abs(k1.solution.eigvals[0]-ref)*1E5 < 5
 
     # define geometry and mesh (SN)
-    myslabS = Slab(M, xlayers, ['ModakAni'], [bc], G, N+1, 'FD')
-    mySN = NTE.SN(myslabS, N+1, steady=True, fmt='csc')
-    kS = eigenproblem(mySN, 'kappa', myslabS, nev=nev)
+    myslabS = Slab(M, xlayers, ['ModakAni'], [bc], G, N+1, 'FD', L_anis=2)
+    mySN = NTE(myslabS, "SN", N=N+1, steady=True, fmt='csc')
+    kS = eigenproblem(nte=mySN, which='kappa', ge=myslabS, nev=nev)
     kS.solve(verbose=True, algo=algo)
     assert abs(kS.solution.eigvals[0]-ref)*1E5 < 5
 
@@ -116,16 +116,16 @@ def test_Modak_kappa_higher_1G(algo):
     xlayers = [0, H]
     # define geometry and mesh (PN)
     myslab = Slab(M, xlayers, ['Modak'], [bc], G, N, 'FD')
-    myPN = NTE.PN(myslab, N, steady=True, fmt='csc')
-    k1 = eigenproblem(myPN, 'kappa', myslab, nev=nev)
+    myPN = NTE(myslab, "PN", N=N, steady=True, fmt='csc')
+    k1 = eigenproblem(nte=myPN, which='kappa', ge=myslab, nev=nev)
     k1.solve(verbose=True, algo=algo)
     for i, k in enumerate(k1.solution.eigvals[0::2]):
         assert abs(k-ref[i])*1E5 < tol[i]
 
     # define geometry and mesh (SN)
     myslabS = Slab(M, xlayers, ['Modak'], [bc], G, N+1, 'FD')
-    mySN = NTE.SN(myslabS, N+1, steady=True, fmt='csc')
-    kS = eigenproblem(mySN, 'kappa', myslabS, nev=nev)
+    mySN = NTE(myslabS, "SN", N=N+1, steady=True, fmt='csc')
+    kS = eigenproblem(nte=mySN, which='kappa', ge=myslabS, nev=nev)
     kS.solve(verbose=True, algo=algo)
     for i, k in enumerate(kS.solution.eigvals[0::2]):
         assert abs(k-ref[i])*1E5 < tol[i]
@@ -155,8 +155,8 @@ def test_Modak_gamma_higher_1G(algo):
     xlayers = [0, H]
     # define geometry and mesh
     myslab = Slab(M, xlayers, ['Modak'], [bc], G, N, 'FD')
-    myPN = NTE.PN(myslab, N, steady=True, fmt='csc')
-    g1 = eigenproblem(myPN, 'gamma', myslab, nev=nev)
+    myPN = NTE(myslab, "PN", N=N, steady=True, fmt='csc')
+    g1 = eigenproblem(nte=myPN, which='gamma', ge=myslab, nev=nev)
     g1.solve(verbose=True, algo=algo)
     for i, g in enumerate(g1.solution.eigvals[0::2]):
         g = 1/g*(1.8)  # c=(XS_S-NU*XS_F)/XS_T/gamma
@@ -164,8 +164,8 @@ def test_Modak_gamma_higher_1G(algo):
 
     # define geometry and mesh (SN)
     myslabS = Slab(M, xlayers, ['Modak'], [bc], G, N+1, 'FD')
-    mySN = NTE.SN(myslabS, N+1, steady=True, fmt='csc')
-    gS = eigenproblem(mySN, 'gamma', myslabS, nev=nev)
+    mySN = NTE(myslabS, "SN", N=N+1, steady=True, fmt='csc')
+    gS = eigenproblem(nte=mySN, which='gamma', ge=myslabS, nev=nev)
     gS.solve(verbose=True, algo=algo)
     for i, g in enumerate(gS.solution.eigvals[0::2]):
         g = 1/g*(1.8)  # c=(XS_S-NU*XS_F)/XS_T/gamma
@@ -197,16 +197,26 @@ def test_Modak_alpha_higher_1G(N, ref, tol, algo):
     xlayers = [0, H]
     # define geometry and mesh
     myslab = Slab(M, xlayers, ['Dahl'], [bc], G, N, 'FD')
-    myPN = NTE.PN(myslab, N, steady=False, prompt=True, fmt='csc')
-    a1 = eigenproblem(myPN, 'alpha', myslab, nev=nev)
+    myPN = NTE(myslab, "PN", N=N, steady=False, prompt=True, fmt='csc')
+    a1 = eigenproblem(nte=myPN, which='alpha', ge=myslab, nev=nev)
     a1.solve(verbose=True, algo=algo)
     for i, a in enumerate(a1.solution.eigvals):
         assert abs(a-ref[i])*1E5 < tol[i]
 
     # define geometry and mesh (SN)
     myslabS = Slab(M, xlayers, ['Dahl'], [bc], G, N+1, 'FD')
-    mySN = NTE.SN(myslabS, N+1, steady=False, prompt=True, fmt='csc')
-    a1 = eigenproblem(mySN, 'alpha', myslabS, nev=nev)
+    mySN = NTE(myslabS, "SN", N=N+1, steady=False, prompt=True, fmt='csc')
+    a1 = eigenproblem(nte=mySN, which='alpha', ge=myslabS, nev=nev)
     a1.solve(verbose=True, algo=algo)
     for i, a in enumerate(a1.solution.eigvals):
         assert abs(a-ref[i])*1E5 < tol[i]
+
+
+
+if __name__ == '__main__':
+
+    algo='SLEPc'
+    N = 7
+    ref = [-2.53782E-02, -1.03353E-01, -2.38497E-01, -4.43506E-01]
+    tol = [5, 50, 50, 100]
+    test_Modak_alpha_higher_1G(N, ref, tol, algo)
