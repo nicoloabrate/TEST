@@ -99,17 +99,24 @@ def setBCs(op, geometry):
                 if moment == 0:  # 1st row, eqs 1 and 2 (Upper)
                     # right boundary, lower diag
                     op.L[ig, ig+iEv] = (Neq+1)/(2*Neq+1)*A[0, jj]  # angle>0
+                    op.dx[ig] = geometry.dx[0]
                     # left boundary, lower diag
                     op.L[M+ig-1, ig+iEv+M-1] = (Neq+1)/(2*Neq+1)*A[m//2, jj]  # angle<0
+                    op.dx[M+ig-1] = geometry.dx[-1]
 
                 else:
                     # sum coeffs in previous row (Lower)
                     op.L[ip+idg, ig+iEv] = Neq/(2*Neq+1)*A[count, jj]  # angle>0
+                    op.dx[ip+idg] = geometry.dx[0]
+
                     op.L[ip+M-1+idg, ig+iEv+M-1] = Neq/(2*Neq+1)*A[count+m//2, jj]  # angle<0
+                    op.dx[ip+M-1+idg] = geometry.dx[-1]
 
                     if moment < n-1 or N % 2 != 0:
                         op.L[ip+idg, ig+iEv] = op.L[ip+idg, ig+iEv]+(Neq+1)/(2*Neq+1)*A[count+1, jj]
+                        op.dx[ip+idg] = geometry.dx[0]
                         op.L[ip+M-1+idg, ig+iEv+M-1] = op.L[ip+M-1+idg, ig+iEv+M-1]+(Neq+1)/(2*Neq+1)*A[count+m//2+1, jj]
+                        op.dx[ip+M-1+idg] = geometry.dx[-1]
 
                 count = count + 1*(moment > 0)
     return op

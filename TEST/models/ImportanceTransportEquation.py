@@ -11,6 +11,7 @@ from TEST.methods.energy import multigroup as MG
 from TEST.methods.BCs import DiffusionBCs, PNBCs, SNBCs
 from scipy.sparse import block_diag, bmat, csr_matrix, hstack, vstack
 from matplotlib.pyplot import spy
+import numpy as np
 
 class ITE():
 
@@ -83,6 +84,8 @@ class ITE():
 
         self.Linf = MG.leakage(ge, self.model, fmt=fmt, importance=True)
         self.L = MG.leakage(ge, self.model, fmt=fmt, importance=True)
+        self.dx = MG.dx_scaling(ge, self.model)
+
         if BC or 'zero' in ge.BC:
             self.BC = ge.BC
 
@@ -91,7 +94,7 @@ class ITE():
                 self.L = self.L.T
 
             if model == 'Diffusion':
-                self = DiffusionBCs.setBCs(self, ge, importance=True)
+                self = DiffusionBCs.setBCs(self, ge)
             elif 'P' in model:
                 self = PNBCs.setBCs(self, ge)
             elif 'S' in model:
@@ -106,6 +109,18 @@ class ITE():
             # if adjoint:
             #     self.Linf = self.Linf.T
             self.BC = False
+
+        # --- divide by mesh width to ensure consistency
+        if model == 'PN':
+            r, c = self.L.nonzero()
+            val = np.repeat(1.0/self.dx, self.L.getnnz(axis=1))
+            dx_mat = csr_matrix((val, (r,c)), shape=(self.L.shape))
+            self.L = self.L.multiply(dx_mat)
+
+            r, c = self.Linf.nonzero()
+            val = np.repeat(1.0/self.dx, self.Linf.getnnz(axis=1))
+            dx_mat = csr_matrix((val, (r,c)), shape=(self.Linf.shape))
+            self.Linf = self.Linf.multiply(dx_mat)
 
     def spy(self, what, markersize=2):
         spy(self.__dict__[what], markersize=markersize)

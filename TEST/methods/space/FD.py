@@ -39,18 +39,11 @@ def zero(ge, f, model, meshtype='edges'):
         bord = ge.layers[i+1]
         inner_pts = np.where(pts <= bord)[0]+q*(i > 0)
         q = q+len(inner_pts)
-        if model > 0:
-            fx[0, inner_pts[0]:inner_pts[-1]+1] = f[i] * ge.dx[i] * np.ones((1, len(inner_pts)))
-        else:
-            fx[0, inner_pts[0]:inner_pts[-1]+1] = f[i] * np.ones((1, len(inner_pts)))
+        fx[0, inner_pts[0]:inner_pts[-1]+1] = f[i] * np.ones((1, len(inner_pts)))
 
         if meshtype == 'edges':
-            if model > 0: # PN or SN
-                if NL > 1 and i < NL-1 and ge.mesh[inner_pts[-1]] <= ge.layers[i+1]:
-                    fx[0, inner_pts[-1]] = avg(f[i], f[i+1], ge.dx[i]/2, ge.dx[i+1]/2) * (ge.dx[i]/2 + ge.dx[i+1]/2)
-            else: # Diffusion
-                if NL > 1 and i < NL-1 and ge.mesh[inner_pts[-1]] <= ge.layers[i+1]:
-                    fx[0, inner_pts[-1]] = avg(f[i], f[i+1], ge.dx[i]/2, ge.dx[i+1]/2)
+            if NL > 1 and i < NL-1 and ge.mesh[inner_pts[-1]] <= ge.layers[i+1]:
+                fx[0, inner_pts[-1]] = avg(f[i], f[i+1], ge.dx[i]/2, ge.dx[i+1]/2)
 
     return fx
 

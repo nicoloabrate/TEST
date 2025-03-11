@@ -5,11 +5,49 @@ File: multigroup.py
 
 Description: Class for multi-energy group operators.
 """
-from numpy import newaxis, asarray, ones, savetxt
+from numpy import newaxis, asarray, ones, savetxt, concatenate
 from scipy.sparse import block_diag, bmat, hstack, vstack
 from TEST.methods.angle import Diffusion
 from TEST.methods.angle.discreteordinates import SN
 from TEST.methods.angle.sphericalharmonics import PN
+
+
+def dx_scaling(ge, model, fmt='csc'):
+    """
+    Assemble multi-group mesh-scaling vector.
+
+    Parameters
+    ----------
+    ge : object
+        Geometry object.
+    meshtype : string, optional
+        Mesh type. It can be 'mesh' or 'stag_mesh' for the staggered
+        mesh. The default is 'mesh'.
+
+    Returns
+    -------
+    None.
+
+    """
+    TMG = []
+    TMGapp = TMG.append
+    dx = ge.dx
+
+    for gro in range(ge.nE):
+
+        if model == 'PN':
+            TMGapp(PN.dx(ge, dx, fmt=fmt))
+        # TODO FIXME
+        elif model == 'SN':
+            TMGapp(SN.time(ge, dx, fmt=fmt))
+        elif model == 'Diffusion':
+            TMGapp(PN.removal(ge, dx, fmt=fmt))
+        else:
+            raise OSError('%s model not available for angular variable!' % model)
+
+    dx_array = concatenate([*TMG])
+
+    return dx_array
 
 
 def time(ge, model, fmt='csc', importance=False):

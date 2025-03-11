@@ -10,6 +10,50 @@ from TEST.methods.space import FD, FV
 from scipy.sparse import diags, block_diag, bmat, vstack
 
 
+def dx(ge, xs, fmt='csc'):
+    """
+    Assemble spherical harmonics approximation for time/rem/capt/... operator.
+
+    Parameters
+    ----------
+    ge : object
+        Geometry object.
+    N : int
+        Spherical harmonics approximation order.
+
+    Returns
+    -------
+    None.
+
+    """
+    N = ge.nA
+    if N < 0:
+        raise OSError(f'Cannot build P{N}')
+    model = ge.spatial_scheme
+    dx_array = np.array([])
+
+    for moment in range(N+1):
+
+        if moment % 2 == 0:
+            meshtype = 'edges'  # evaluate on standard mesh if even
+        else:
+            meshtype = 'centers'  # evaluate on staggered mesh if odd
+
+        if model == 'FD':
+            r = FD.zero(ge, xs, N, meshtype)
+        elif model == 'FV':
+            r = FV.zero(ge, xs, meshtype)
+        else:
+            raise OSError(f'{model} model not available for spatial variable!')
+
+        m = r.shape[1]
+        n = m
+
+        dx_array = np.concatenate([dx_array, r[0, :]])
+
+    return dx_array
+
+
 def removal(ge, xs, fmt='csc'):
     """
     Assemble spherical harmonics approximation for time/rem/capt/... operator.
