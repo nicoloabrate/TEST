@@ -134,7 +134,7 @@ class PhaseSpace:
                         type(solution))
                 raise OSError(msg)
 
-    def braket(self, v1, v2=None, phasespacevolume=None, dims=("nE*nS")):
+    def braket(self, v1, v2=None, phasespacevolume=None, **kwargs):
         """
         Compute bra-ket product over the phase space.
 
@@ -157,23 +157,59 @@ class PhaseSpace:
 
         Returns
         -------
-        II : float or ndarray
+        value : float or ndarray
             Integration output.
 
         """
-        # get array dimensions
-        if isinstance(dims, str):
+        # --- get array dimensions
+        if self.model == "Diffusion":
+            value = self.braketDiffusion(v1=v1, v2=v2, phasespacevolume=phasespacevolume, **kwargs)
+        elif self.model == "PN":
+            value = self.braketPN(v1=v1, v2=v2, phasespacevolume=phasespacevolume, **kwargs)
+        else:
+            raise PhaseSpaceError(f"{self.model} braket not supported yet!")
+
+        return value
+
+    def braketDiffusion(self, v1, v2=None, phasespacevolume=None, dims=("nE*nS")):
+        """
+        Compute bra-ket product over the phase space.
+
+        Parameters
+        ----------
+        v1 : ndarray
+            Array with dimensions specified in ``dims`` variable.
+        v2 : ndarray
+            Array with dimensions specified in ``dims`` variable.
+        phasespacevolume : dict
+            Dict containing 'g' and 'x' keys to specify integration boundaries.
+        dims : tuple
+            Dimensions can be (nS), (nE), (nS*nE), (nS, nE).
+            Multiple dimensions can be in whichever order, e.g. also (nE, nS)
+            is good.
+            WATCH OUT: 1D array are assumed to be ordered as space, angle,
+            energy, e.g. all nodes for mu=mu1, g=g1, all nodes for mu=mu2 and
+            g=g1 and so on.
+
+        Returns
+        -------
+        value : float or ndarray
+            Integration output.
+
+        """
+        # --- get array dimensions
+        if isinstance(dims, str): # 1d arrays
             vdim = 1
             for d in dims.split("*"):
                 vdim *= self.__dict__[d]
             vdim = (vdim, )
-        elif isinstance(dims, tuple):
+        elif isinstance(dims, tuple): # multi-d arrays
             vdim = ()
             for d in dims:
                 vdim = vdim+(self.__dict__[d],)
         else:
             raise TypeError("phasespace.braket: dims must be tuple or str,"
-                            " not {}".format(type(dims)))
+                            f" not {type(dims)}")
         # consistency check
         if v1.shape != vdim:
             raise OSError("phasespace.braket: v1 and dims argument mismatch!")
@@ -186,14 +222,14 @@ class PhaseSpace:
 
         # initialisation
         G = self.geometry.nE
-        # A = self.geometry.nA  # FIXME, TODO: how to handle PN and A?
-        S = self.geometry.nS
+        Nx = self.geometry.nS
         xgrid = self.geometry.mesh
         egrid = self.geometry.energygrid
-        idx1, idx2 = 0, S-1
+        idx1, idx2 = 0, Nx-1
         ide1, ide2 = 0, G
 
         if isinstance(phasespacevolume, dict):
+
             if "x" in phasespacevolume.keys():
                 if hasattr(phasespacevolume["x"], "__iter__"):
                     if len(phasespacevolume["x"]) > 2:
@@ -204,11 +240,191 @@ class PhaseSpace:
                     x1, x2 = phasespacevolume["x"]
                     idx1 = np.argmin(abs(xgrid - x1))
                     idx2 = np.argmin(abs(xgrid - x2))
+
                 elif phasespacevolume["x"] is None:
                     idx1, idx2 = None, None
+
                 else:
                     raise TypeError(
                         "x entry must be iterable of two elements!")
+
+            if "g" in phasespacevolume.keys():
+
+                if hasattr(phasespacevolume["g"], "__iter__"):
+                    if len(phasespacevolume["g"]) > 2:
+                        raise OSError("g must consist of only two elements!")
+                    phasespacevolume["g"].sort(reverse=True)
+                    e1, e2 = phasespacevolume["g"]
+                    ide1 = np.argmin(abs(egrid - e1))
+                    ide2 = np.argmin(abs(egrid - e2))
+
+                elif phasespacevolume["g"] is None:
+                    ide1, ide2 = None, None
+
+                else:
+                    raise TypeError(
+                        "g entry must be iterable of two elements!")
+
+        elif phasespacevolume is not None:
+
+            raise TypeError("phasespacevolume argument must be of type dict"
+                            f"not of type {type(phasespacevolume())}!")
+
+        # --- perform integration
+        if len(vdim) != 1:  # 1D array (flattened)
+            if dims == ('nS', 'nE'):
+                order = 'F'
+            else:
+                order = 'C'
+            v1 = v1.flatten(order=order)
+
+        if (ide1, ide2) == (None, None):  # integrate over space
+
+            n = G if "nE" in dims else 1
+            value = np.zeros((n,))
+            for g in range(n):
+                skip = g * Nx
+                iS = skip+idx1
+                iE = skip+idx2
+                value[g] = np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
+
+        elif (idx1, idx2) == (None, None):  # integrate over energy
+
+            n = Nx if "nS" in dims else 1
+            value = np.zeros((n,))
+            for idx in range(n):
+                value[idx] = v1[range(idx, idx + (G) * Nx, Nx)].sum()
+
+        else:  # integrate in energy and space
+
+            value = 0
+            for g in range(G):
+                skip = g*Nx
+                if g >= ide1 and g < ide2:
+                    iS = skip+idx1
+                    iE = skip+idx2
+                    value = value+np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
+
+        return value
+
+    def braketPN(self, v1, v2=None, phasespacevolume=None, dims=("nE*nA*nS")):
+        """
+        Compute bra-ket product over the phase space.
+
+        Parameters
+        ----------
+        v1 : ndarray
+            Array with dimensions specified in ``dims`` variable.
+        v2 : ndarray
+            Array with dimensions specified in ``dims`` variable.
+        phasespacevolume : dict
+            Dict containing 'g' and 'x' keys to specify integration boundaries.
+        dims : tuple
+            Dimensions can be (nS), (nE), (nA), (nS*nE), (nS*nA), (nE*nA),
+            (nS*nE*nA), (nS, nE), (nS, nA), (nE, nA), (nS, nE, nA).
+            Multiple dimensions can be in whichever order, e.g. also (nA, nS)
+            is good.
+            WATCH OUT: 1D array are assumed to be ordered as space, angle,
+            energy, e.g. all nodes for mu=mu1, g=g1, all nodes for mu=mu2 and
+            g=g1 and so on.
+
+        Returns
+        -------
+        value : float or ndarray
+            Integration output.
+
+        """
+        # nS, nA, nE, nE*nS, nE*nA, nA*nS, nE*nA*nS
+        # --- get array dimensions
+        if isinstance(dims, str): # 1d arrays
+            dim_size = {}
+            for i, d in enumerate(dims.split("*")):
+                dim_size[d] = self.__dict__[d]
+            
+            if len(dims.split("*")) == 1:
+                vdim = dim_size[d]
+            elif len(dims.split("*")) == 2:
+
+                if "nE" in dim_size.keys() and "nS" in dim_size.keys():
+                    vdim = self.nE*self.nS
+
+                elif "nE" in dim_size.keys() and "nA" in dim_size.keys():
+                    vdim = self.nE*self.nS
+
+                elif "nA" in dim_size.keys() and "nS" in dim_size.keys():
+
+                    if self.model == 'PN':
+                        if self.nA == 0:
+                            No = 0
+                            Ne = 1
+                        else:
+                            No = (self.nA+1)//2 if self.nA % 2 != 0 else self.nA // 2
+                            Ne = self.nA+1-No
+
+                        vdim = Ne * self.nS + No * (self.nS + 1)
+
+                    else:
+                        vdim = self.nA*self.nS
+
+            elif len(dims.split("*")) == 3:
+
+                    if self.nA == 0:
+                        No = 0
+                        Ne = 1
+
+                    else:
+                        No = (self.nA+1)//2 if self.nA % 2 != 0 else self.nA // 2
+                        Ne = self.nA+1-No
+
+                    vdim = self.nE*(Ne * self.nS + No * (self.nS - 1))
+
+            else:
+                raise PhaseSpaceError(f"Cannot perform braket with {dims}")
+
+            vdim = (vdim, )
+
+        elif isinstance(dims, tuple): # multi-d arrays
+            vdim = ()
+            for d in dims:
+                vdim = vdim+(self.__dict__[d],)
+        
+        else:
+            raise TypeError("phasespace.braket: dims must be tuple or str,"
+                            f" not {type(dims)}")
+        # consistency check
+        if v1.shape != vdim:
+            raise OSError("phasespace.braket: v1 and dims argument mismatch!")
+
+        if v2 is not None:
+            if v1.shape != v2.shape:
+                raise OSError("phasespace.braket: v1 and v2 shape mismatch!")
+
+        # initialisation
+        G = self.geometry.nE
+        N = self.geometry.nA
+        Nx = self.geometry.nS
+
+        xgrid = self.geometry.mesh
+        egrid = self.geometry.energygrid
+
+        whole_vol = True
+        ide1, ide2 = 0, G
+
+        if isinstance(phasespacevolume, dict):
+
+            if "x" in phasespacevolume.keys():
+                if hasattr(phasespacevolume["x"], "__iter__"):
+                    if len(phasespacevolume["x"]) > 2:
+                        raise OSError("x must consist of only two elements!")
+                    if not isinstance(phasespacevolume["x"], list):
+                        phasespacevolume["x"] = list(phasespacevolume["x"])
+                    phasespacevolume["x"].sort()
+                    x1, x2 = phasespacevolume["x"]
+                    whole_vol = False
+                else:
+                    raise TypeError(
+                        "x entry must be iterable of two elements!")
+
             if "g" in phasespacevolume.keys():
                 if hasattr(phasespacevolume["g"], "__iter__"):
                     if len(phasespacevolume["g"]) > 2:
@@ -222,42 +438,72 @@ class PhaseSpace:
                 else:
                     raise TypeError(
                         "g entry must be iterable of two elements!")
+
+            if "a" in phasespacevolume.keys():
+                raise OSError(f"Cannot perform a partial integration over the angle!")
+
         elif phasespacevolume is not None:
             raise TypeError("phasespacevolume argument must be of type dict"
-                            "not of type {}!".format(type(phasespacevolume())))
+                            f"not of type {type(phasespacevolume())}!")
 
         # --- perform integration
         if len(vdim) != 1:  # 1D array (flattened)
-            # TODO FIXME this is hardcoded and assumes no angular flux is given as v1
-            if dims == ('nS', 'nE'):
+            if dims == ('nS', 'nA', 'nE'):
                 order = 'F'
             else:
                 order = 'C'
             v1 = v1.flatten(order=order)
 
-        if (ide1, ide2) == (None, None):  # integrate over space
-            n = G if "nE" in dims else 1
-            II = np.zeros((n,))
-            for g in range(n):
-                skip = g * S
-                iS = skip+idx1
-                iE = skip+idx2
-                II[g] = np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
-        elif (idx1, idx2) == (None, None):  # integrate over energy
-            n = S if "nS" in dims else 1
-            II = np.zeros((n,))
-            for idx in range(n):
-                II[idx] = v1[range(idx, idx + (G) * S, S)].sum()
-        else:  # integrate in energy and space
-            II = 0
-            for g in range(G):
-                skip = g*S
-                if g >= ide1 and g < ide2:
-                    iS = skip+idx1
-                    iE = skip+idx2
-                    II = II+np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
+            if v2 is not None:
+                v2 = v2.flatten(order=order)
 
-        return II
+        # perform the integration over the phase space
+        value = 0
+        for ig in range(G):
+            for n in range(N + 1):
+
+                if n % 2 == 0:
+                    x = self.geometry.mesh
+                    if whole_vol:
+                        idx1, idx2 = 0, Nx-1
+                    else:
+                        idx2 = np.argmin(abs(x - x2))
+                        idx1 = np.argmin(abs(x - x1))
+
+                else:
+                    x = self.geometry.ghostmesh
+                    if whole_vol:
+                        idx1, idx2 = 0, Nx-2
+                    else:
+                        idx2 = np.argmin(abs(x - x2))
+                        idx1 = np.argmin(abs(x - x1))
+
+                # --- get slice position
+                # skip previous group-wise moments
+                No = ( N + 1 ) // 2 if N % 2 != 0 else N // 2
+                Ne = N + 1 - No
+                skip = (Ne * Nx + No * (Nx - 1)) * ig
+                # skip in-group previous moments
+                NO = (n + 1) // 2 if (n - 1) % 2 != 0 else n // 2
+                NE = n - NO
+                M = Nx if n % 2 == 0 else Nx - 1
+                skip += NE * Nx + NO * (Nx - 1)
+
+                if ig >= ide1 and ig < ide2:
+                    iS = skip + idx1
+                    iE = skip + idx2
+                    if v2 is None:
+                        delta = np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
+                        value += delta
+                        break # higher order terms vanish when integrated between -1 and +1
+                    else:
+                        vec1 = v1[iS:iE+1]
+                        vec2 = v2[iS:iE+1]
+                        vec = np.multiply( vec1, vec2 )
+                        delta = (2*n + 1) / 2 * np.trapz(vec, x=x[idx1:idx2+1])
+                        value += delta
+
+        return value
 
     def interp(self, yp, xx, isref=True):
         """
