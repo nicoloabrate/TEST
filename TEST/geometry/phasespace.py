@@ -342,7 +342,9 @@ class PhaseSpace:
                 dim_size[d] = self.__dict__[d]
             
             if len(dims.split("*")) == 1:
+
                 vdim = dim_size[d]
+
             elif len(dims.split("*")) == 2:
 
                 if "nE" in dim_size.keys() and "nS" in dim_size.keys():
@@ -387,7 +389,7 @@ class PhaseSpace:
             vdim = ()
             for d in dims:
                 vdim = vdim+(self.__dict__[d],)
-        
+
         else:
             raise TypeError("phasespace.braket: dims must be tuple or str,"
                             f" not {type(dims)}")
@@ -409,6 +411,7 @@ class PhaseSpace:
 
         whole_vol = True
         ide1, ide2 = 0, G
+        mu1, mu2 = None, None
 
         if isinstance(phasespacevolume, dict):
 
@@ -439,8 +442,19 @@ class PhaseSpace:
                     raise TypeError(
                         "g entry must be iterable of two elements!")
 
-            if "a" in phasespacevolume.keys():
-                raise OSError(f"Cannot perform a partial integration over the angle!")
+            if "mu" in phasespacevolume.keys():
+                if hasattr(phasespacevolume["mu"], "__iter__"):
+                    if len(phasespacevolume["mu"]) > 2:
+                        raise OSError("'mu' must consist of only two elements!")
+                    phasespacevolume["mu"].sort(reverse=True)
+                    a1, a2 = phasespacevolume["mu"]
+                    mu1 = np.argmin(abs(egrid - e1))
+                    mu2 = np.argmin(abs(egrid - e2))
+                elif phasespacevolume["mu"] is None:
+                    mu1, mu2 = -1, 1
+                else:
+                    raise TypeError(
+                        "'mu' entry must be iterable of two elements!")
 
         elif phasespacevolume is not None:
             raise TypeError("phasespacevolume argument must be of type dict"
@@ -457,51 +471,101 @@ class PhaseSpace:
             if v2 is not None:
                 v2 = v2.flatten(order=order)
 
-        # perform the integration over the phase space
-        value = 0
-        for ig in range(G):
-            for n in range(N + 1):
 
-                if n % 2 == 0:
-                    x = self.geometry.mesh
-                    if whole_vol:
+        if (mu1, mu2) == (-1, +1): # integrate over angle
+
+            nS = Nx if "nS" in dims else 1
+            nE = G if "nE" in dims else 1
+            value = np.zeros((nS, nE))
+
+            for ig in range(G):
+                for n in range(N + 1):
+                    delta = np.zeros((nS, nE))
+                    # space is broadcasted
+                    if n % 2 == 0:
+                        interp = False
                         idx1, idx2 = 0, Nx-1
                     else:
-                        idx2 = np.argmin(abs(x - x2))
-                        idx1 = np.argmin(abs(x - x1))
-
-                else:
-                    x = self.geometry.ghostmesh
-                    if whole_vol:
+                        interp = True
+                        x = self.geometry.ghostmesh
+                        xq = self.geometry.mesh
                         idx1, idx2 = 0, Nx-2
-                    else:
-                        idx2 = np.argmin(abs(x - x2))
-                        idx1 = np.argmin(abs(x - x1))
 
-                # --- get slice position
-                # skip previous group-wise moments
-                No = ( N + 1 ) // 2 if N % 2 != 0 else N // 2
-                Ne = N + 1 - No
-                skip = (Ne * Nx + No * (Nx - 1)) * ig
-                # skip in-group previous moments
-                NO = (n + 1) // 2 if (n - 1) % 2 != 0 else n // 2
-                NE = n - NO
-                M = Nx if n % 2 == 0 else Nx - 1
-                skip += NE * Nx + NO * (Nx - 1)
+                    # --- get slice position
+                    # skip previous group-wise moments
+                    No = ( N + 1 ) // 2 if N % 2 != 0 else N // 2
+                    Ne = N + 1 - No
+                    skip = (Ne * Nx + No * (Nx - 1)) * ig
+                    # skip in-group previous moments
+                    NO = (n + 1) // 2 if (n - 1) % 2 != 0 else n // 2
+                    NE = n - NO
+                    M = Nx if n % 2 == 0 else Nx - 1
+                    skip += NE * Nx + NO * (Nx - 1)
 
-                if ig >= ide1 and ig < ide2:
-                    iS = skip + idx1
-                    iE = skip + idx2
-                    if v2 is None:
-                        delta = np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
-                        value += delta
-                        break # higher order terms vanish when integrated between -1 and +1
+                    if ig >= ide1 and ig < ide2:
+                        iS = skip + idx1
+                        iE = skip + idx2
+                        if v2 is None:
+                            delta[:, ig] = v1[iS:iE+1]
+                            value += delta
+                            break # higher order terms vanish when integrated between -1 and +1
+                        else:
+                            vec1 = v1[iS:iE+1]
+                            vec2 = v2[iS:iE+1]
+                            if interp:
+                                vec1 = np.interp(xq, x, vec1)
+                                vec2 = np.interp(xq, x, vec2)
+
+                            vec = np.multiply( vec1, vec2 )
+                            delta[:, ig] = (2*n + 1) / 2 * vec
+                            value += delta
+
+        else: # perform the integration over the phase space
+            value = 0
+            for ig in range(G):
+
+                for n in range(N + 1):
+
+                    if n % 2 == 0:
+                        x = self.geometry.mesh
+                        if whole_vol:
+                            idx1, idx2 = 0, Nx-1
+                        else:
+                            idx2 = np.argmin(abs(x - x2))
+                            idx1 = np.argmin(abs(x - x1))
+
                     else:
-                        vec1 = v1[iS:iE+1]
-                        vec2 = v2[iS:iE+1]
-                        vec = np.multiply( vec1, vec2 )
-                        delta = (2*n + 1) / 2 * np.trapz(vec, x=x[idx1:idx2+1])
-                        value += delta
+                        x = self.geometry.ghostmesh
+                        if whole_vol:
+                            idx1, idx2 = 0, Nx-2
+                        else:
+                            idx2 = np.argmin(abs(x - x2))
+                            idx1 = np.argmin(abs(x - x1))
+
+                    # --- get slice position
+                    # skip previous group-wise moments
+                    No = ( N + 1 ) // 2 if N % 2 != 0 else N // 2
+                    Ne = N + 1 - No
+                    skip = (Ne * Nx + No * (Nx - 1)) * ig
+                    # skip in-group previous moments
+                    NO = (n + 1) // 2 if (n - 1) % 2 != 0 else n // 2
+                    NE = n - NO
+                    M = Nx if n % 2 == 0 else Nx - 1
+                    skip += NE * Nx + NO * (Nx - 1)
+
+                    if ig >= ide1 and ig < ide2:
+                        iS = skip + idx1
+                        iE = skip + idx2
+                        if v2 is None:
+                            delta = np.trapz(v1[iS:iE+1], x=xgrid[idx1:idx2+1])
+                            value += delta
+                            break # higher order terms vanish when integrated between -1 and +1
+                        else:
+                            vec1 = v1[iS:iE+1]
+                            vec2 = v2[iS:iE+1]
+                            vec = np.multiply( vec1, vec2 )
+                            delta = (2*n + 1) / 2 * np.trapz(vec, x=x[idx1:idx2+1])
+                            value += delta
 
         return value
 
