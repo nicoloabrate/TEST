@@ -63,7 +63,7 @@ class eigenproblem():
                 if which in ['gamma']:
                     evp(diffusion=diffusion, adjoint=adjoint)
                 else:
-                    evp(adjoint=adjoint)
+                    evp()
         except AttributeError as ierr:
             print(ierr)
             raise OSError('{} eigenproblem not available!'.format(which))
