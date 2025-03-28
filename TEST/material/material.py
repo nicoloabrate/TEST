@@ -26,11 +26,6 @@ usetex = True if shutil.which('latex') else False
 rc("font", **{"family": "sans-serif", "sans-serif": ["Helvetica"]})
 rc("text", usetex=usetex)
 
-# serpentTools settings
-rcst['xs.reshapeScatter'] = True
-rcst['xs.getB1XS'] = False
-rcst['xs.variableGroups'] = ['kinetics', 'xs', 'xs-prod', 'gc-meta']
-
 # names of the attributes
 sumxs = ['Sigma_tot', 'Sigma_abs', 'Sigma_rem']
 scatt_mat_keys = [*list(map(lambda z: "S"+str(z), range(8))),
