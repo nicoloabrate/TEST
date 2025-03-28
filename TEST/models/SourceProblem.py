@@ -233,6 +233,31 @@ class sourceproblem():
         isinvertible = shapecheck and rankcheck
         return isinvertible
 
+    def static_no_fiss(self):
+        """
+        Cast operators into the static form of the transport equation excluding 
+        the fission multiplication. This method is intended to work for the power method.
+
+        Returns
+        -------
+        None.
+
+        """
+        op = self.operators
+        # define static transport operators
+        if self.BC is False:  # kappa infinite
+            if self.model != 'Diffusion':
+                self.A = op.Linf + op.R - op.S # no leakage, infinite medium
+            else:
+                R = op.F0 + op.C + op.S0
+                self.A = R - op.S   # no leakage, infinite medium
+            self.nev = 1
+        else:
+            R = op.F0 + op.C + op.S0
+            self.A = op.L + R - op.S  # destruction operator
+
+        self.which = 'static'
+
     def static(self):
         """
         Cast operators into the static form of the transport equation.

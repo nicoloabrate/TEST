@@ -222,6 +222,45 @@ class eigenproblem():
 
     def power_iteration(self, guess=None, tol=1E-12, history=True,
                         sigma=None, n_iter_max=1000, normalisation=None):
+        """Perform the power iteration method for solving eigenvalue problems.
+
+        Parameters
+        ----------
+        guess : np.array, optional
+            initial flux guess, by default None
+        tol : numerical tolerance, optional
+            numerical tolerance accepted on the eigenvector. The solution
+            on the eigenvalue is 100*tol. If negative, 
+            the tolerance is checked against the eigenvalue relative variation
+            from one iteration to the other. The default is 1E-12.
+        history : bool, optional
+            flag to return the succession of the eigenvalues, by default True
+        sigma : float, optional
+            value of the shift for the shift-and-invert, not implemented yet.
+            By default None
+        n_iter_max : int, optional
+            maximum number of power iterations, by default 1000
+        normalisation : str, optional
+            type of normalisation for the eigenvalue, not implemented. 
+            By default None
+
+        Returns
+        -------
+        phi, np.array
+            Fundamental eigenvector.
+
+        eig_new, np.array
+            Fundamental eigenvalue.
+
+        err_vect, float
+            Numerical error on the eigenvector
+
+        err_eigv, float
+            Numerical error on the eigenvalue
+
+        his_eig, list
+            List of the eigenvalues at each iteration.
+        """
 
         if guess is None:
             n = self.operators.F.shape[0]
@@ -230,6 +269,7 @@ class eigenproblem():
         else:
             Q = guess
 
+        # --- initialisation
         err_vect = 1
         err_eigv = 1
         err_hist = 1
@@ -244,26 +284,22 @@ class eigenproblem():
             conv_hist = False
 
         # build source problems
-        F = copy(self.operators.F) # FIXME
-        self.operators.F = diags([0], [0], F.shape, format=F.format)
-        src_new = sourceproblem(self.operators, 'static', self.geometry, Q)
-        src_old = sourceproblem(self.operators, 'static', self.geometry, Q) # FIXME
-        src_old.solve()
-        src_old.solution.flux = src_old.source
+        src_new = sourceproblem(self.operators, 'static_no_fiss', self.geometry, Q)
+        src_old = sourceproblem(self.operators, 'static_no_fiss', self.geometry, Q)
 
+        src_old.solve()
+
+        src_old.solution.flux = src_old.source
         n_iter = 0
         condition = True
 
         while condition:
             # solve the source-driven problem
             src_new.solve()
-            phi = copy(src_new.solution.flux) # FIXME
-            src_new.solution.flux = F*phi
-            # update eigenvalue
-            Q_new = src_new.solution.get(moment=0)
+            Q_new = self.operators.F*src_new.solution.flux
             Q_new_braket = src_new.solution.braket(Q_new)
 
-            Q_old = src_old.solution.get(moment=0)
+            Q_old = src_old.solution.flux
             Q_old_braket = src_old.solution.braket(Q_old)
 
             eig_new = eig_old * Q_new_braket / Q_old_braket
@@ -271,13 +307,14 @@ class eigenproblem():
             if history:
                 his_eig.append(eig_new)
                 err_his = (his_eig[n_iter] - his_eig[n_iter-1])/his_eig[n_iter]
+
             # update error
             err_eigv = 1E5*(eig_new - eig_old)
-            # FIXME FIXME
             err_vect = np.linalg.norm(Q_new - Q_old) / np.linalg.norm(Q_new)
+
             # update source and eigenvalue
-            src_old.solution.flux = src_new.solution.flux
-            src_new.source = src_new.solution.flux/eig_new
+            src_old.solution.flux = self.operators.F*src_new.solution.flux
+            src_new.source = self.operators.F*src_new.solution.flux/eig_new
             eig_old = eig_new
 
             if conv_hist:
@@ -287,11 +324,12 @@ class eigenproblem():
 
             n_iter += 1
 
-        self.operators.F = F
+        phi = src_new.solution.flux
 
         if history:
             return phi[:, np.newaxis], np.array([eig_new]), err_eigv, err_vect, his_eig
         else:
+
             return phi[:, np.newaxis], np.array([eig_new]), err_eigv, err_vect
 
     def fundamentalconverged(self):
@@ -302,6 +340,7 @@ class eigenproblem():
             ans = False
             if 'No fundamental eigenvalue detected!' not in str(ierr):
                 print(ierr)
+
         return ans
 
     def issingular(self, which_operator):
