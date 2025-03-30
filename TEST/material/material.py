@@ -30,19 +30,19 @@ rc("text", usetex=usetex)
 sumxs = ['Sigma_tot', 'Sigma_abs', 'Sigma_rem']
 scatt_mat_keys = [*list(map(lambda z: "S"+str(z), range(8))),
               *list(map(lambda z: "Sp"+str(z), range(8)))]
-indepdata = ['Sigma_capt', 'Sigma_fiss', 'S0', 'nu_fiss', 'Diffcoef', 'chi_del', 'chi_pro']
+indepdata = ['Sigma_capt', 'Sigma_fiss', 'S0', 'nu_fiss', 'chi_del', 'chi_pro']
 basicdata = ['Sigma_fiss', 'nu_fiss', 'S0', 'Sp0', 'chi_tot', 'nuSigma_fiss']
 kinetic_data = ['lambda', 'beta', 'nu_fiss_del', 'chi_del', 'chi_pro']
 alldata = list(set([*sumxs, *indepdata, *basicdata, *kinetic_data]))
 
 # list for collapsing
-collapse_xs = ['Sigma_fiss', 'Sigma_capt', *list(map(lambda z: "S"+str(z), range(0, 1))),
-               *list(map(lambda z: "Sp"+str(z), range(0, 1))), 'inv_vel', 'Diffcoef']
+collapse_xs = ['Sigma_fiss', 'Sigma_capt', *list(map(lambda z: "S"+str(z), range(0, 3))),
+               *list(map(lambda z: "Sp"+str(z), range(0, 3))), 'inv_vel', 'Diffcoef']
 collapse_xsf = ['nu_fiss', 'chi_del', 'chi_tot', 'chi_pro', 'fiss_energy']
 
 # list for material mixing
-mix_xs = ['Sigma_fiss', 'Sigma_capt', *list(map(lambda z: "S"+str(z), range(0, 2))),
-          *list(map(lambda z: "Sp"+str(z), range(0, 2)))]
+mix_xs = ['Sigma_fiss', 'Sigma_capt', *list(map(lambda z: "S"+str(z), range(0, 3))),
+          *list(map(lambda z: "Sp"+str(z), range(0, 3))), 'inv_vel', 'Diffcoef', 'Kerma']
 mix_xsf = ['nu_fiss', 'chi_del', 'chi_tot', 'chi_pro', 'fiss_energy']
 
 units = {'chi_del': '-', 'chi_tot': '-', 'chi_pro': '-', 'Sigma_tot': 'cm^{-1}',
@@ -867,20 +867,22 @@ class Material():
                     # TODO FIXME
                     self.__dict__["lambda_avg"] = np.mean(self.__dict__["lambda"])
 
-                if hasattr(self, "chi_del") and hasattr(self, "chi_pro"):
-                    self.chi_tot = np.zeros((self.nE, ))
-                    for g in range(self.nE):
-                        self.chi_tot[g] = self.chi_pro[g]*(1-self.beta[g, :].sum()) + self.beta[g, :].dot(self.chi_del[g, :])
-                elif hasattr(self, "chi_del") and hasattr(self, "chi_tot"):
-                    self.chi_pro = np.zeros((self.nE, ))
-                    for g in range(self.nE):
-                        self.chi_pro[g] = (self.chi_tot[g] - self.beta[g, :].dot(self.chi_del[g, :]))/(1-self.beta[g, :].sum())
-                elif hasattr(self, "chi_pro") and hasattr(self, "chi_tot"):
-                    # assuming that each family has the same spectrum
-                    self.chi_del = np.zeros((self.nE, self.NPF))
-                    for r in range(self.NPF):
+                if not (hasattr(self, "chi_tot") and hasattr(self, "chi_del") and hasattr(self, "chi_pro")):
+
+                    if hasattr(self, "chi_del") and hasattr(self, "chi_pro"):
+                        self.chi_tot = np.zeros((self.nE, ))
                         for g in range(self.nE):
-                            self.chi_del[g, r] = (self.chi_tot[g] - self.chi_pro[g]*(1-self.beta[g, :].sum()))/self.beta[g, :].sum()
+                            self.chi_tot[g] = self.chi_pro[g]*(1-self.beta[g, :].sum()) + self.beta[g, :].dot(self.chi_del[g, :])
+                    elif hasattr(self, "chi_del") and hasattr(self, "chi_tot"):
+                        self.chi_pro = np.zeros((self.nE, ))
+                        for g in range(self.nE):
+                            self.chi_pro[g] = (self.chi_tot[g] - self.beta[g, :].dot(self.chi_del[g, :]))/(1-self.beta[g, :].sum())
+                    elif hasattr(self, "chi_pro") and hasattr(self, "chi_tot"):
+                        # assuming that each family has the same spectrum
+                        self.chi_del = np.zeros((self.nE, self.NPF))
+                        for r in range(self.NPF):
+                            for g in range(self.nE):
+                                self.chi_del[g, r] = (self.chi_tot[g] - self.chi_pro[g]*(1-self.beta[g, :].sum()))/self.beta[g, :].sum()
 
             else:
                 if not hasattr(self, "chi_tot"):
@@ -1199,10 +1201,22 @@ class Mix(Material):
             # density multiplication and summation
             for s in mat.__dict__.keys():
                 if s in mix_xs:
-                    if idx == 0:
-                        self.__dict__[s] = densities[idx]*mat.__dict__[s]
+                    if s == 'inv_vel':
+                        if hasattr(mat, 'flux'):
+                            weight = mat.flux
+                        else:
+                            weight = densities[idx]
+
+                        if idx == 0:
+                            self.__dict__[s] = mat.__dict__[s]*weight
+                        else:
+                            self.__dict__[s] += mat.__dict__[s]*weight
+
                     else:
-                        self.__dict__[s] += densities[idx]*mat.__dict__[s]
+                        if idx == 0:
+                            self.__dict__[s] = densities[idx]*mat.__dict__[s]
+                        else:
+                            self.__dict__[s] += densities[idx]*mat.__dict__[s]
                 elif s in mix_xsf:
                     if s in ['nu_fiss', 'fiss_energy']:
                         if idx == 0:
@@ -1210,14 +1224,30 @@ class Mix(Material):
                         else:
                             self.__dict__[s] += mat.__dict__[s]*mat.Sigma_fiss*densities[idx]
                     else:   # chi_pro and chi_tot
-                        if idx == 0:
-                            self.__dict__[s] = mat.__dict__[s]*mat.nu_fiss*mat.Sigma_fiss*densities[idx]
+                        if s == 'chi_del':
+                            if mat.NPF > 0:
+                                for r in range(mat.NPF):
+                                    if idx == 0:
+                                        if r == 0:
+                                            self.__dict__[s] = np.zeros((len(energygrid)-1, mat.NPF))
+
+                                        self.__dict__[s][:, r] = mat.__dict__[s][:, r]*mat.nu_fiss*mat.Sigma_fiss*densities[idx]
+
+                                    else:
+                                        self.__dict__[s][:, r] += mat.__dict__[s][:, r]*mat.nu_fiss*mat.Sigma_fiss*densities[idx]
+
+                            else:
+                                self.__dict__[s] = np.zeros((len(energygrid)-1, ))
                         else:
-                            self.__dict__[s] += mat.__dict__[s]*mat.nu_fiss*mat.Sigma_fiss*densities[idx]
+                            if idx == 0:
+                                self.__dict__[s] = mat.__dict__[s]*mat.nu_fiss*mat.Sigma_fiss*densities[idx]
+                            else:
+                                self.__dict__[s] += mat.__dict__[s]*mat.nu_fiss*mat.Sigma_fiss*densities[idx]
 
             fissprod += mat.nu_fiss*mat.Sigma_fiss*densities[idx]
             totfiss += mat.Sigma_fiss*densities[idx]
 
+            # FIXME define a consistent definition for the homogenised beta and lambda
             if 'beta' in mat.__dict__.keys():
                 if idx == 0:
                     self.beta = mat.__dict__['beta']
@@ -1233,8 +1263,17 @@ class Mix(Material):
                 tmp = np.divide(self.__dict__[key], totfiss, where=totfiss!=0)
                 self.__dict__[key] = tmp
             if key in ['chi_tot', 'chi_pro', 'chi_del']:
-                tmp = np.divide(self.__dict__[key], fissprod, where=fissprod!=0)
-                self.__dict__[key] = tmp
+                if key != "chi_del":
+                    tmp = np.divide(self.__dict__[key], fissprod, where=fissprod!=0)
+                    self.__dict__[key] = tmp
+                else:
+                    if len(self.chi_del.shape) > 1:
+                        for r in range(self.chi_del.shape[1]):
+                            tmp = np.divide(self.chi_del[:, r], fissprod, where=fissprod!=0)
+                            self.chi_del[:, r] = tmp
+                    else:
+                        tmp = np.divide(self.__dict__[key], fissprod, where=fissprod!=0)
+
 
         if mixname is None:
             mixname = '_'.join(universes)
