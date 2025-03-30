@@ -17,6 +17,7 @@ class NTE():
 
     def __init__(self, ge, model, steady, N=None, use_nxn=True, BC=True,
                  fmt='csr', prompt=False, allope=False, adjoint=False):
+
         self.model = model
         if model == 'Diffusion':
             N = 0
@@ -84,7 +85,7 @@ class NTE():
 
         self.Linf = MG.leakage(ge, self.model, fmt=fmt)
         self.L = MG.leakage(ge, self.model, fmt=fmt)
-        if model == 'PN':
+        if self.model == 'PN':
             self.dx = MG.dx_scaling(ge, self.model)
 
         if BC or 'zero' in ge.BC:
@@ -94,7 +95,7 @@ class NTE():
             if adjoint == "continuous":
                 self.L = self.L.T
 
-            if model == 'Diffusion':
+            if self.model == 'Diffusion':
                 self = DiffusionBCs.setBCs(self, ge)
             elif 'P' in model:
                 self = PNBCs.setBCs(self, ge)
@@ -112,7 +113,7 @@ class NTE():
             self.BC = False
 
         # --- divide by mesh width to ensure consistency
-        if model == 'PN':
+        if self.model == 'PN':
             r, c = self.L.nonzero()
             val = np.repeat(1.0/self.dx, self.L.getnnz(axis=1))
             dx_mat = csr_matrix((val, (r,c)), shape=(self.L.shape))
