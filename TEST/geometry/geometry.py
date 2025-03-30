@@ -182,26 +182,23 @@ class Slab:
         old_grid_stag = np.empty(0)
 
         for iLay in range(self.nLayers):
+            deltalay = self.layers[iLay+1]-self.layers[iLay]
             # compute grid spacing
             if max(self._split) < 0:  # assign user-defined number of points
                 if abs(max(self._split)) < 3:
                     raise OSError('Number of meshes must be >2!')
-                deltalay = self.layers[iLay+1]-self.layers[iLay]
                 dx[iLay] = deltalay/abs(self._split[iLay])
-                N[iLay] = np.ceil(deltalay/dx[iLay])
                 uselinsp = True
 
             elif sum([isinstance(s, float) for s in self._split]) == len(self._split):  # user-defined dx
-                deltalay = self.layers[iLay+1]-self.layers[iLay]
                 dx[iLay] = self._split[iLay]
-                N[iLay] = np.ceil(deltalay/dx[iLay])
                 uselinsp = False
 
             else:
-                deltalay = self.layers[iLay+1]-self.layers[iLay]
                 dx[iLay] = minmfp[iLay]/self._split[iLay]
-                N[iLay] = np.ceil(deltalay/dx[iLay])
                 uselinsp = True
+
+            N[iLay] = np.ceil(deltalay/dx[iLay])
 
             # grid
             if uselinsp:
