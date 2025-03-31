@@ -15,6 +15,7 @@ from pathlib import Path
 from copy import deepcopy as cp
 from scipy.special import roots_legendre, eval_legendre
 import shutil 
+import logging
 
 usetex = True if shutil.which('latex') else False
 rc('text', usetex=usetex)
@@ -74,7 +75,7 @@ class Slab:
             elif isinstance(energygrid, str):
                 pwd = Path(__file__).parent.parent
                 egridpath = pwd.joinpath('datalib', 'group_structures',
-                                         '{}.txt'.format(energygrid))
+                                         f'{energygrid}.txt')
                 self.egridname = str(energygrid)
                 self.energygrid = np.loadtxt(egridpath)
                 self.nE = len(self.energygrid)-1
@@ -86,13 +87,12 @@ class Slab:
                 else:
                     pwd = Path(__file__).parent.parent
                     egridpath = pwd.joinpath('datalib', 'group_structures',
-                                             '{}G.txt'.format(energygrid))
+                                             f'{energygrid}G.txt')
                     self.energygrid = np.loadtxt(egridpath)
                     self.nE = len(self.energygrid)-1
-                    self.egridname = '{}G'.format(self.nE)
+                    self.egridname = f'{self.nE}G'
             else:
-                raise OSError('Unknown energygrid {} \
-                              type'.format(type(energygrid)))
+                raise OSError(f'Unknown energygrid {type(energygrid)} type')
 
             if self.energygrid[0] < self.energygrid[0]:
                 self.energygrid[np.argsort(-self.energygrid)]
@@ -135,8 +135,7 @@ class Slab:
                         elif isinstance(datapath, str):
                             path = datapath
                         else:
-                            raise OSError('{} not valid for \
-                                          datapath'.format(type(datapath)))
+                            raise OSError(f'{type(datapath)} not valid fo datapath')
 
                     self.regions[uniName] = Material(
                                                      uniName, self.energygrid,
@@ -184,10 +183,10 @@ class Slab:
         for iLay in range(self.nLayers):
             deltalay = self.layers[iLay+1]-self.layers[iLay]
             # compute grid spacing
-            if max(self._split) < 0:  # assign user-defined number of points
-                if abs(max(self._split)) < 3:
+            if self._split[iLay] < 0:  # assign user-defined number of points
+                if -self._split[iLay] < 3:
                     raise OSError('Number of meshes must be >2!')
-                dx[iLay] = deltalay/abs(self._split[iLay])
+                dx[iLay] = deltalay/-self._split[iLay]
                 uselinsp = True
 
             elif sum([isinstance(s, float) for s in self._split]) == len(self._split):  # user-defined dx
@@ -196,6 +195,11 @@ class Slab:
 
             else:
                 dx[iLay] = minmfp[iLay]/self._split[iLay]
+                if dx[iLay] > deltalay:
+                    if abs(max(self._split)) < 3:
+                        dx[iLay] = deltalay / 5 # FIXME 5 nodes assumed as default
+                    else:
+                        dx[iLay] = deltalay/abs(self._split[iLay])
                 uselinsp = True
 
             N[iLay] = np.ceil(deltalay/dx[iLay])
@@ -420,14 +424,14 @@ class Slab:
                 if reg.Sigma_fiss.max() > 0:
                     reg.nu_fiss /= perturbation["keff"]
 
-    def perturb(self, perturbation, sanitycheck=True, keepUnpert=True):
+    def perturb(self, perturbation, fixdata=True, keepUnpert=True):
         """_summary_
 
         Parameters
         ----------
         perturbation : _type_
             _description_
-        sanitycheck : bool, optional
+        fixdata : bool, optional
             _description_, by default True
         keepUnpert : bool, optional
             Keep unperturbed material when whole regions are perturbed, by default True
@@ -513,7 +517,7 @@ class Slab:
                             self.regions[mystr] = cp(self.regions[oldreg])
                         else:
                             mystr = oldreg
-                        self.regions[mystr].perturb(k, hw, dg, sanitycheck=sanitycheck)
+                        self.regions[mystr].perturb(k, hw, dg, fixdata=fixdata)
                     # perturbation between two or more regions
                     elif x1 < l and x2 > l:
                         raise OSError('Perturbations can be applied one region at a time!')
@@ -654,8 +658,8 @@ class Slab:
                 self.regions[regname].NPF = nPrec
                 self.regions[regname].beta = np.zeros((self.nE, nPrec))
                 self.regions[regname].beta_tot = np.zeros((self.nE, ))
-                self.regions[regname].__dict__["lambda"] = 0.0
-                self.regions[regname].__dict__["lambda_avg"] = 0.0
+                self.regions[regname].__dict__["lambda"] = np.asarray([0.0])
+                self.regions[regname].__dict__["lambda_avg"] = np.asarray([0.0])
                 self.regions[regname].chi_tot = np.zeros((self.nE, ))
                 self.regions[regname].chi_pro = np.zeros((self.nE, ))
                 self.regions[regname].chi_del = np.zeros((self.nE, nPrec))
@@ -672,7 +676,7 @@ class Slab:
                 else:
                     if not np.allclose(lambdas, self.regions[regname].__dict__['lambda']):
                         self.regions[regname].__dict__['lambda'] = lambdas
-                        print(f'Warning: Forcing decay constants consistency in {regname}')
+                        logging.info(f'Warning: Forcing decay constants consistency in {regname}')
 
         return nE, nPrec
 
