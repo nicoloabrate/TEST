@@ -532,6 +532,8 @@ class Material():
                             delta = mydic[what][depgro]*howmuch[g]
                             mydic[what][depgro] = mydic[what][depgro]+delta
 
+        self.add_missing_xs()
+
         if fixdata:
             self.repair_xs()
 
@@ -846,8 +848,8 @@ class Material():
 
             if not hasattr(self, "lambda"):
                 if self.NPF == 0:
-                    self.__dict__["lambda"] = 0.0
-                    self.__dict__["lambda_avg"] = 0.0
+                    self.__dict__["lambda"] = np.asarray([0.0])
+                    self.__dict__["lambda_avg"] = np.asarray([0.0])
                 else:
                     self.__dict__["lambda"] = np.zeros((self.NPF, ))
                     self.__dict__["lambda_avg"] = 0.0
@@ -892,8 +894,8 @@ class Material():
             self.NPF = 0
             self.beta = np.zeros((self.nE, ))
             self.beta_tot = np.zeros((self.nE, ))
-            self.__dict__["lambda"] = 0.0
-            self.__dict__["lambda_avg"] = 0.0
+            self.__dict__["lambda"] = np.asarray([0.0])
+            self.__dict__["lambda_avg"] = np.asarray([0.0])
             self.nu_fiss_del = np.zeros((self.nE, ))
             self.chi_tot = np.zeros((self.nE, ))
             self.chi_del = np.zeros((self.nE, ))
