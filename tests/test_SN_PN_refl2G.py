@@ -10,7 +10,7 @@ import sys
 sys.path.append('../../')
 # import pytest
 from TEST.geometry import Slab
-import TEST.models.NeutronTransportEquation as NTE
+from TEST.models.NeutronTransportEquation import NTE
 import TEST.models.AdjointTransportEquation as ATE
 from TEST.models.EigenProblem import eigenproblem
 # import matplotlib.pyplot as plt

@@ -10,8 +10,7 @@ import sys
 sys.path.append('../../')
 import pytest
 from TEST.geometry import Slab
-import TEST.models.NeutronTransportEquation as NTE
-import TEST.models.AdjointTransportEquation as ATE
+from TEST.models.NeutronTransportEquation import NTE
 from TEST.models.EigenProblem import eigenproblem
 import matplotlib.pyplot as plt
 
@@ -30,28 +29,28 @@ N = 0
 bc = 'zero'
 # Diffusion
 myslabD = Slab(M, xlayers, mats, [bc], G, N, 'FD')
-myPN = NTE.Diffusion(myslabD, steady=True, fmt='csc')
-kD = eigenproblem(myPN, 'kappa', myslabD, nev=nev)
+myPN = NTE(myslabD, "Diffusion", steady=True, fmt='csc')
+kD = eigenproblem(nte=myPN, which='kappa', ge=myslabD, nev=nev)
 kD.solve(algo=algo)
-print('kD={:5f}'.format(kD.solution.eigvals[0]))
+print(f'kD={kD.solution.eigvals[0]:5f}')
 
 # P1
 N = 1
 bc = 'Mark'
 myslabP = Slab(M, xlayers, mats, [bc], G, N, 'FD')
-myPN = NTE.PN(myslabP, N, steady=True, fmt='csc')
-kP1 = eigenproblem(myPN, 'kappa', myslabP, nev=nev)
+myPN = NTE(myslabP, "PN", N, steady=True, fmt='csc')
+kP1 = eigenproblem(nte=myPN, which='kappa', ge=myslabP, nev=nev)
 kP1.solve(algo=algo)
-print('kP1={:5f}'.format(kP1.solution.eigvals[0]))
+print(f'kP1={kP1.solution.eigvals[0]:5f}')
 
 # S2
 N = N+1
 bc = 'Mark'
 myslabS = Slab(M, xlayers, mats, [bc], G, N, 'FV')
-mySN = NTE.SN(myslabS, N, steady=True, fmt='csc', BC=True)
-kS2 = eigenproblem(mySN, 'kappa', myslabS, nev=nev)
+mySN = NTE(myslabS, "SN", N, steady=True, fmt='csc', BC=True)
+kS2 = eigenproblem(nte=mySN, which='kappa', ge=myslabS, nev=nev)
 kS2.solve(algo=algo)
-print('kS2={:5f}'.format(kS2.solution.eigvals[0]))
+print(f'kS2={kS2.solution.eigvals[0]:5f}')
 
 phiD_g1 = kD.solution.get(group=1, moment=0, mode=0, normalise='peaktotalflux')
 phiP1_g1 = kP1.solution.get(group=1, moment=0, mode=0, normalise='peaktotalflux')

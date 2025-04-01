@@ -30,8 +30,8 @@ NG = 1
 slab = Slab(-Nx, xlayers, mat, BC, G, N, 'FD', datapath=datapath)
 # %%
 mat=slab.regions['Pu239']
-mat.Diffcoef = 1/3/mat.Tot
-slab.perturb({"Nubar": {"howmuch": [1/1.1250616548935823-1], 'where': [(-H, H)]}})
+mat.Diffcoef = 1/3/mat.Sigma_tot
+slab.perturb({"nu_fiss": {"howmuch": [1/1.1250616548935823-1], 'where': [(-H, H)]}})
 
 #  check k eigenproblem response
 myP = NTE(slab, model, steady=True)

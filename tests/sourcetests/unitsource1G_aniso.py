@@ -9,7 +9,7 @@ import sys
 sys.path.append('/opt/programs_nabrate/mycodes')
 import numpy as np
 from TEST.geometry import Slab
-import TEST.models.NeutronTransportEquation as NTE
+from TEST.models.NeutronTransportEquation import NTE
 from TEST.models.EigenProblem import eigenproblem
 from TEST.models.SourceProblem import sourceproblem
 import matplotlib.pyplot as plt
@@ -67,7 +67,7 @@ phi1_num = np.zeros((myslab.nS, ))
 phi2_num = np.zeros((myslab.nS, ))
 q = (S0/2)*20
 mu = 1/np.sqrt(3)
-XS = myslab2.regions[material].Tot
+XS = myslab2.regions[material].Sigma_tot
 MFP = 1/XS
 for i in range(1, myslab.nS):
     phi1_num[i] = q/(mu/dx+XS/2)+phi1_num[i-1]*(1-XS*dx/(2*mu))/(1+XS*dx/(2*mu))

@@ -9,7 +9,7 @@ import sys
 sys.path.append('/opt/programs_nabrate/mycodes')
 sys.path.append('C:\\Users\\39346\\Documenti\\mycodes\\TEST')
 from TEST.geometry import Slab
-import TEST.models.NeutronTransportEquation as NTE
+from TEST.models.NeutronTransportEquation import NTE
 from TEST.models.EigenProblem import eigenproblem
 import matplotlib.pyplot as plt
 

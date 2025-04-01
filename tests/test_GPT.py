@@ -11,7 +11,7 @@ sys.path.append('../../')
 import numpy as np
 import pytest
 from TEST.geometry import Slab
-import TEST.models.NeutronTransportEquation as NTE
+from TEST.models.NeutronTransportEquation import NTE
 import TEST.models.AdjointTransportEquation as ATE
 from TEST.models.EigenProblem import eigenproblem
 from TEST.methods.GPT import GPT
@@ -47,7 +47,7 @@ def test_GPT_vs_analytical(delta):
 
     # --- perturbation
     slab = Slab(M, xlayers, matname, [bc], G, 0, 'FD')
-    perturbation = {'Nubar': {'where': [(-H, H)], 'howmuch': [0, delta]}}
+    perturbation = {'nu_fiss': {'where': [(-H, H)], 'howmuch': [0, delta]}}
     slab.perturb(perturbation)
     slab.displaygeom()
     # --- initialise perturbed problem
@@ -59,7 +59,7 @@ def test_GPT_vs_analytical(delta):
     L2 = m.DiffLength[1]
     B = np.pi/(2*H)
     # analytical perturbed eigenvalue
-    keff = m.Nsf[1]*m.S0[0, 1]/(m.Remxs[0]*m.Remxs[1]*(1+L1**2*B**2)*(1+L2**2*B**2))
+    keff = m.nuSigma_fiss[1]*m.S0[0, 1]/(m.Sigma_rem[0]*m.Sigma_rem[1]*(1+L1**2*B**2)*(1+L2**2*B**2))
     # --- GPT
     gpt = GPT(PO, forward, pert, adjoint)
     # --- analytical perturbation
@@ -92,7 +92,7 @@ def test_GPT_vs_DirectPerturbation(delta):
 
     # --- perturbation
     slab = Slab(M, xlayers, matname, [bc], G, 0, 'FD')
-    perturbation = {'Nubar': {'where': [(0, H/2)], 'howmuch': [0, delta]}}
+    perturbation = {'nu_fiss': {'where': [(0, H/2)], 'howmuch': [0, delta]}}
     slab.perturb(perturbation)
     slab.displaygeom()
     # --- solve perturbed problem
