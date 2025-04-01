@@ -314,10 +314,10 @@ class Slab:
                     handles.append(h1)
         if ncols is None:
             ncols = 4 if len(self.regions.keys()) > 2 else 2
-        xlabel = xlabel if xlabel is not None else 'x coordinate [cm]'
+        xlabel = xlabel if xlabel is not None else 'z coordinate [cm]'
         ax.set_xlabel(xlabel)
         # ax.set_xticks(self.layers)
-        leg = ax.legend(handles, labels, bbox_to_anchor=(0, -0.2, 1, 0),
+        leg = ax.legend(handles, labels, bbox_to_anchor=(0, -0.2, 1.0, 0),
                         mode="expand", ncol=ncols, framealpha=1, shadow=1)
         ax.add_artist(leg)
         ax.set_xlim((self.layers[0], self.layers[-1]))

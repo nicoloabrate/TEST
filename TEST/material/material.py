@@ -402,7 +402,7 @@ class Material():
         return vals
 
     def plot(self, what, dep_group=None, family=1, ax=None, figname=None,
-             normalise=True, logx=True, **kwargs):
+             normalise=True, logx=True, xlabel=True, ylabel=True, **kwargs):
 
         E = self.energygrid
         ax = ax or plt.gca()
@@ -415,7 +415,7 @@ class Material():
             else:
                 raise OSError('Material.plot: dep_group variable needed!')
         elif what == 'chi_del':
-            xs = xs[family-1, :]
+            xs = xs[:, family-1]
         elif what == 'flux':
             if normalise:
                 u = np.log(self.energygrid/self.energygrid[0])
@@ -439,8 +439,11 @@ class Material():
             kwargs['label'] = what
 
         plt.stairs(xs, edges=E, baseline=None, **kwargs)
-        ax.set_xlabel('E [MeV]')
-        ax.set_ylabel(f'{whatlabel} [{uom}]')
+        if xlabel:
+            ax.set_xlabel('E [MeV]')
+
+        if ylabel:
+            ax.set_ylabel(f'{whatlabel} [{uom}]')
         if logx:
             ax.set_xscale('log')
         if what not in ['nu_fiss', 'chi_del', 'chi_pro', 'chi_tot']:
