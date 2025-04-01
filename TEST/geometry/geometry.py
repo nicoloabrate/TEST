@@ -274,7 +274,7 @@ class Slab:
         ax.set_xlabel(xlabel)
         ax.set_xticks(self.layers)
 
-    def displaygeom(self, ax=None, xlabel=None, labels=None, ncols=None, cols=None):
+    def displaygeom(self, ax=None, xlabel=None, labels=None, ncols=None, cols=None, legend=True):
         """Plot regions."""
         ax = ax or gca()
         if cols is None:
@@ -312,14 +312,18 @@ class Slab:
                 else:
                     labels.append(which)
                     handles.append(h1)
+
         if ncols is None:
             ncols = 4 if len(self.regions.keys()) > 2 else 2
+
         xlabel = xlabel if xlabel is not None else 'z coordinate [cm]'
         ax.set_xlabel(xlabel)
-        # ax.set_xticks(self.layers)
-        leg = ax.legend(handles, labels, bbox_to_anchor=(0, -0.2, 1.0, 0),
-                        mode="expand", ncol=ncols, framealpha=1, shadow=1)
-        ax.add_artist(leg)
+
+        if legend:
+            leg = ax.legend(handles, labels, bbox_to_anchor=(0, -0.2, 1.0, 0),
+                            mode="expand", ncol=ncols, framealpha=1, shadow=1)
+            ax.add_artist(leg)
+
         ax.set_xlim((self.layers[0], self.layers[-1]))
 
     def getxs(self, key, pos1=None, pos2=None, region=None):

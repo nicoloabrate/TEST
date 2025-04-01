@@ -1056,8 +1056,15 @@ class PhaseSpace:
 
         if plotfund:
             val, _ = self.getfundamental()
-            ifund = np.where(self.eigvals == val)
+            if len(val) > 1:
+                ifund = []
+                for v in val:
+                    ifund.append(np.where(self.eigvals == v))
+            else:
+                ifund = np.where(self.eigvals == val)
+
             evals = np.delete(self.eigvals, ifund)
+
         else:
             evals = self.eigvals
         # eliminate nans and inf
