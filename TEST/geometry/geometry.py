@@ -71,7 +71,7 @@ class Slab:
             if isinstance(energygrid, (list, np.ndarray, tuple)):
                 self.nE = len(energygrid)-1
                 self.egridname = '{}G'.format(self.nE)
-                self.energygrid = energygrid
+                self.energygrid = np.sort(energygrid)[::-1]
             elif isinstance(energygrid, str):
                 pwd = Path(__file__).parent.parent
                 egridpath = pwd.joinpath('datalib', 'group_structures',
@@ -427,6 +427,35 @@ class Slab:
             for reg in self.regions.values():
                 if reg.Sigma_fiss.max() > 0:
                     reg.nu_fiss /= perturbation["keff"]
+
+    def collapse(self, fewgrp, spectrum=None, egridname=None, fixdata=True):
+        """Collapse the group constants assigned to the geometry to a few-group structure.
+
+        Parameters
+        ----------
+        fewgrp : iterable
+            Few-group structure to perform the collapsing.
+        spectrum: array, optional
+            Spectrum to perform the energy collapsing, by default ``None``. If ``None``,
+            the ``flux`` attribute is used as a weighting spectrum.
+        egridname: str, optional
+            Name of the energy grid, by default ``None``.
+        fixdata: bool, optional
+            Flag to ensure data consistency after collapsing, by default ``True``.
+
+        Returns
+        -------
+
+        """
+        for regname, reg in self.regions.items():
+            reg.collapse(fewgrp, spectrum=spectrum,
+                         egridname=egridname,
+                         fixdata=fixdata)
+        self.fine_energygrid = self.energygrid[:]
+        self.fine_egridname = cp(self.egridname)
+        self.energygrid = fewgrp
+        self.egridname = egridname if egridname is not None else f'{len(fewgrp) - 1}G'
+        self.nE = len(fewgrp) - 1
 
     def perturb(self, perturbation, fixdata=True, keepUnpert=True):
         """_summary_
