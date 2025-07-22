@@ -37,8 +37,10 @@ alldata = list(set([*sumxs, *indepdata, *basicdata, *kinetic_data]))
 
 # list for collapsing
 collapse_xs = ['Sigma_fiss', 'Sigma_capt', *list(map(lambda z: "S"+str(z), range(0, 3))),
-               *list(map(lambda z: "Sp"+str(z), range(0, 3))), 'inv_vel', 'Diffcoef']
+               *list(map(lambda z: "Sp"+str(z), range(0, 3))), 'inv_vel', 'Diffcoef', 'Kerma']
 collapse_xsf = ['nu_fiss', 'chi_del', 'chi_tot', 'chi_pro', 'fiss_energy']
+remove_after_collapsing = ['Sigma_tot', 'Sigma_abs', 'Sigma_abs_red', 'Sigma_rem', 'Sigma_transp', 
+                           'nuSigma_fiss', 'DiffLength',]
 
 # list for material mixing
 mix_xs = ['Sigma_fiss', 'Sigma_capt', *list(map(lambda z: "S"+str(z), range(0, 3))),
@@ -607,7 +609,7 @@ class Material():
             self.chi_tot /= self.chi_tot.sum()
             self.chi_pro /= self.chi_pro.sum()
             for p in range(self.NPF):
-                self.chi_del[:, p] /= self.chi_del[:, p].sum()
+                self.chi_del[p, :] /= self.chi_del[p, :].sum()
 
     def add_missing_xs(self):
         """Add missing group constants.
@@ -990,6 +992,8 @@ class Material():
             for k, v in self.__dict__.items():
                 if isinstance(v, (np.ndarray)):
                     tmp[k] = v.tolist()
+                elif isinstance(v, Path):
+                    tmp[k] = str(v)
                 else:
                     tmp[k] = v
 
@@ -1007,6 +1011,9 @@ class Material():
             the ``flux`` attribute is used as a weighting spectrum.
         egridname: str, optional
             Name of the energy grid, by default ``None``.
+        fixdata: bool, optional
+            Flag to ensure data consistency after collapsing, by default ``True``.
+
 
         Raises
         ------
@@ -1035,15 +1042,15 @@ class Material():
         H = len(multigrp)-1
         G = len(fewgrp)-1
         # sanity checks
-        if G >= H:
-            raise MaterialError(f'Collapsing failed: few-group structure should',
-                          ' have less than {H} group')
+        if G > H:
+            raise MaterialError(f'Collapsing failed: number of groups in the few-group structure should',
+                          ' have <= {H} group')
         if multigrp[0] != fewgrp[0] or multigrp[-1] != fewgrp[-1]:
             raise MaterialError('Collapsing failed: few-group structure'
                                 'boundaries do not match with multi-group'
                                 'one')
         # map fewgroup onto multigroup
-        few_into_multigrp = np.zeros((G+1,), dtype=int)
+        few_into_multigrp = np.zeros((G + 1,), dtype=int)
         # multigrp_bin = np.zeros((H+1,), dtype=int)
         for ig, g in enumerate(fewgrp):
             reldiff = abs(multigrp-g)/g
@@ -1076,7 +1083,11 @@ class Material():
                 # --- cross section and inverse of velocity
                 if key in collapse_xs:
                     # --- preallocation
-                    dims = (G, G) if 'S' in key else (G, )
+                    if v.ndim == 1 or (v.ndim == 2 and (v.shape[1] == 1 or v.shape[0] == 1)):
+                        dims = (G,)
+                    else:
+                        dims = (G, G)
+
                     if g == 0:
                         collapsed[key] = np.zeros(dims)
 
@@ -1137,6 +1148,11 @@ class Material():
         for key in self.__dict__.keys():
             if key in collapsed.keys():
                 self.__dict__[key] = collapsed[key]
+
+        # remove sum reactions
+        for key in remove_after_collapsing:
+            if key in self.__dict__.keys():
+                del self.__dict__[key]
 
         self.add_missing_xs()
         # ensure data consistency
