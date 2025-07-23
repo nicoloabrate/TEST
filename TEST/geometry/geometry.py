@@ -212,8 +212,12 @@ class Slab:
                 if iLay == self.nLayers-1:
                     ngrid = np.arange(self.layers[iLay], self.layers[iLay+1]+dx[iLay]/2,
                                       dx[iLay])
-                    ngrid = np.append(ngrid, self.layers[iLay+1])
-                    N[iLay] = N[iLay]+1
+                    if (ngrid[-1] - self.layers[iLay+1]) > dx[iLay]/2:
+                        ngrid = np.append(ngrid, self.layers[iLay+1])
+                        N[iLay] = N[iLay]+1
+                    else:
+                        ngrid[-1] = self.layers[iLay+1]
+                        N[iLay] = len(ngrid)
                 else:
                     ngrid = np.arange(self.layers[iLay], self.layers[iLay+1]+dx[iLay]/2,
                                       dx[iLay])
@@ -232,7 +236,7 @@ class Slab:
 
             if len(np.unique(grid)) < len(grid):
                 grid = np.unique(grid)
-                N[iLay] = len(grid)
+                N[iLay] = N[iLay]-1
 
         # if np.any(grid) or np.any(gridg):
         #     grid[grid == 0] = np.finfo(float).eps
