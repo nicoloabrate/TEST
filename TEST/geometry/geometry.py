@@ -217,7 +217,7 @@ class Slab:
                 else:
                     ngrid = np.arange(self.layers[iLay], self.layers[iLay+1]+dx[iLay]/2,
                                       dx[iLay])
-                    nnz_dig = abs(round(np.log10(abs(dx[iLay]))))
+                    nnz_dig = count_decimals(dx[iLay])
                     ngrid = ngrid.round(decimals=nnz_dig)
                     N[iLay] = len(ngrid)
 
@@ -232,7 +232,7 @@ class Slab:
 
             if len(np.unique(grid)) < len(grid):
                 grid = np.unique(grid)
-                N[iLay] = N[iLay]-1
+                N[iLay] = len(grid)
 
         # if np.any(grid) or np.any(gridg):
         #     grid[grid == 0] = np.finfo(float).eps
@@ -712,6 +712,15 @@ class Slab:
                         logging.info(f'Warning: Forcing decay constants consistency in {regname}')
 
         return nE, nPrec
+
+
+def count_decimals(dx):
+    s = str(dx)
+    if '.' in s:
+        return len(s.split('.')[1])
+    else:
+        return 0
+
 
 class GeometryError(Exception):
     pass
