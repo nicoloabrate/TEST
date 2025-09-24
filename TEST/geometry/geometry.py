@@ -96,8 +96,7 @@ class Slab:
 
             if self.energygrid[0] < self.energygrid[0]:
                 self.energygrid[np.argsort(-self.energygrid)]
-            # set number of mean free path
-            if isinstance(split, (int, float)):
+            if isinstance(split, (int, float, np.integer, np.floating)):
                 self._split = [split]*self.nLayers
             # elif isinstance(split, float):
             #     self._split = split*np.ones((self.nLayers), dtype=float)
@@ -151,6 +150,8 @@ class Slab:
                     minmfp[iLay] = min(self.regions[uniName].MeanFreePath)
                 else:
                     minmfp[iLay] = np.min(self.regions[uniName].DiffLength)
+
+                minmfp[iLay] = min( minmfp[iLay], self.layers[iLay+1] - self.layers[iLay] )
             # assign mesh, ghost mesh and N
             self.mesher(minmfp, spatial_scheme)
             self.Nxf = self.Nx[Nxf]  # fissile meshes
@@ -206,8 +207,13 @@ class Slab:
 
             # grid
             if uselinsp:
-                ngrid = np.linspace(self.layers[iLay], self.layers[iLay+1],
-                                    N[iLay])
+                # Ensure N[iLay] is always a scalar integer for np.linspace
+                Nval = N[iLay]
+                if isinstance(Nval, np.ndarray):
+                    Nval = int(Nval.item())
+                else:
+                    Nval = int(Nval)
+                ngrid = np.linspace(self.layers[iLay], self.layers[iLay+1], Nval)
             else:
                 if iLay == self.nLayers-1:
                     ngrid = np.arange(self.layers[iLay], self.layers[iLay+1]+dx[iLay]/2,
@@ -225,6 +231,7 @@ class Slab:
                     ngrid = ngrid.round(decimals=nnz_dig)
                     N[iLay] = len(ngrid)
 
+            ngrid = np.asarray(ngrid).reshape(-1)
             grid = np.concatenate((old_grid, ngrid))
             old_grid = grid
             # ghost grid
