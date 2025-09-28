@@ -147,7 +147,7 @@ def MarkCoeffs(PN, even=False):
     else:
         M = PN
 
-    if even is True and PN % 2 == 0:
+    if even and PN % 2 == 0:
         roots, weights = roots_legendre(PN)
     else:
         roots, weights = roots_legendre(PN+1)

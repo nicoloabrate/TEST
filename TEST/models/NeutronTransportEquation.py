@@ -114,9 +114,16 @@ class NTE():
 
         # --- divide by mesh width to ensure consistency
         if self.model == 'PN':
-            r, c = self.L.nonzero()
-            val = np.repeat(1.0/self.dx, self.L.getnnz(axis=1))
-            dx_mat = csr_matrix((val, (r,c)), shape=(self.L.shape))
+            # FIXME temporary patch for even N (BCs breaks csr fmt)
+            if N % 2 == 0:
+                tmp = self.L.tocoo()
+                r, c = tmp.row, tmp.col
+            else:
+                r, c = self.L.nonzero()
+
+            nnz_axis1 = self.L.getnnz(axis=0)
+            val = np.repeat(1.0/self.dx, nnz_axis1)
+            dx_mat = csr_matrix((val, (r, c)), shape=(self.L.shape))
             self.L = self.L.multiply(dx_mat)
 
             r, c = self.Linf.nonzero()
