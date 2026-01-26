@@ -46,9 +46,8 @@ class eigenproblem():
         self.operators = nte
         self.geometry = ge
 
-        if 2*nev+1 >= self.operators.S.shape[0]:
-            raise OSError('Too many eigenvalues required! 2*nev+1 should be \
-                          < operator rank')
+        if 2 * nev + 1 >= self.operators.S.shape[0]:
+            raise OSError('Too many eigenvalues required! 2*nev+1 must be < matrix rank')
         else:
             self.nev = nev
 
