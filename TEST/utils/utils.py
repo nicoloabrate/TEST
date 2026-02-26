@@ -9,6 +9,19 @@ Description: Utility to get default energy grid stored in
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
+import logging
+
+
+def get_file_logger(classname, logfile="TEST.log"):
+    logger = logging.getLogger(classname)
+    logger.setLevel(logging.INFO)
+    if not any(isinstance(h, logging.FileHandler) and h.baseFilename.endswith(logfile) for h in logger.handlers):
+        fh = logging.FileHandler(logfile)
+        fh.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+    return logger
 
 
 def get_energy_grid(grid_name):
@@ -48,9 +61,6 @@ def eplot(egrid, spectrum, ax=None, title=None, figname=None, imag=False,
     None.
 
     """
-    if len(spectrum) < len(egrid):
-        spectrum = np.insert(spectrum, [0], spectrum[0])
-
     if logx and logy:
         loglog = True
     else:
@@ -59,6 +69,9 @@ def eplot(egrid, spectrum, ax=None, title=None, figname=None, imag=False,
     if lethargynorm:
         u = np.log(egrid[0]/egrid)
         spectrum = spectrum/np.diff(u)
+
+    if len(spectrum) < len(egrid):
+        spectrum = np.insert(spectrum, [0], spectrum[0])
 
     ax = ax or plt.gca()
 
