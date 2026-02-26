@@ -15,11 +15,11 @@ from serpentTools import read
 from serpentTools.settings import rc as rcst
 from copy import deepcopy as copy
 from matplotlib import rc
-from TEST.utils import get_energy_grid
+from TEST.utils import get_energy_grid, get_file_logger
 import logging
 import shutil
 
-logger = logging.getLogger(__name__)
+logger = get_file_logger(__name__)
 
 # matplotlib settings
 usetex = True if shutil.which('latex') else False
@@ -410,7 +410,7 @@ class Material():
         ax = ax or plt.gca()
         xs = self.__dict__[what]
         whatlabel = xslabels[what]
-        if 'S' in what:
+        if 'S0' in what:
             if dep_group:
                 xs = xs[dep_group, :]
                 whatlabel = f'{xslabels[what]} from g={dep_group}'
@@ -426,7 +426,7 @@ class Material():
             if 'Chi' in what:
                 xs = xs/xs.dot(-np.diff(E))
 
-        if 'S' in what:
+        if 'S0' in what:
             uom = units['S']
         else:
             uom = units[what]
@@ -779,7 +779,10 @@ class Material():
 
         if not hasattr(self, "inv_vel"):
             if not hasattr(self, "fine_energygrid"):
-                avgE = 1/2*(E[:-1]+E[1:])*1.602176634E-13  # J
+                if len(E) > 2:
+                    avgE = 1/2*(E[:-1]+E[1:])*1.602176634E-13  # J
+                else:
+                    avgE = 1/2*(E[0]+E[1])*1.602176634E-13 
                 v = np.sqrt(2*avgE/1.674927351e-27)
                 self.inv_vel = 1/(v*100)  # s/cm
                 logger.warning(f"'inv_vel' defined from the average kinetic energy in group g for {self.UniName}.")
@@ -798,7 +801,7 @@ class Material():
                 else:
                     # assuming isotropic scattering
                     self.Sigma_transp = self.Sigma_tot
-                    logger.info(f"'Sigma_transp' defined from available 'Diffcoef' for {self.UniName}.")
+                    logger.info(f"'Sigma_transp' defined assuming isotropic scattering from available 'Sigma_tot' for {self.UniName}.")
 
         if not hasattr(self, 'Diffcoef'):
             self.Diffcoef = 1/(3*self.Sigma_transp)
@@ -892,8 +895,13 @@ class Material():
                                 self.chi_del[g, r] = (self.chi_tot[g] - self.chi_pro[g]*(1-self.beta[g, :].sum()))/self.beta[g, :].sum()
 
             else:
-                if not hasattr(self, "chi_tot"):
+                if not hasattr(self, "chi_tot"): 
                     raise OSError(f"'chi_tot' is missing from data {self.UniName}")
+                else:
+                    if not hasattr(self, "chi_pro"):
+                        self.chi_pro = self.chi_tot[:]
+                    if not hasattr(self, "chi_del"):
+                        self.chi_del = self.chi_tot[:]
 
         else:
             self.NPF = 0
@@ -1164,6 +1172,7 @@ class Material():
         """Assess whether the material is fissile"""
         return self.Sigma_fiss.max() > 0 and self.nu_fiss.max() > 0
 
+
 class Mix(Material):
     """Create regions mixing other materials."""
 
@@ -1330,3 +1339,8 @@ class Mix(Material):
 
 class MaterialError(Exception):
     pass
+
+
+def print_material_log(logfile="material_info.log"):
+    with open(logfile) as f:
+        print(f.read())
