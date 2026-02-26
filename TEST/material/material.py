@@ -1216,8 +1216,8 @@ class Mix(Material):
 
         idx = 0
         materials = dict(zip(universes, densities))
-        fissprod = np.zeros((nE, ))
-        totfiss = np.zeros((nE, ))
+        fissprod = 0.0
+        totfiss_g = np.zeros((nE, ))
         matobj = {}
         for k, v in materials.items():
             if datapath is not None:
@@ -1227,8 +1227,16 @@ class Mix(Material):
 
             mat = Material(uniName=k, energygrid=energygrid, datapath=kpath,
                            egridname=egridname)
+
+            mat.add_missing_xs()
+
             matobj[k] = mat
-            # density multiplication and summation
+
+            mat_fissprod = mat.nu_fiss.dot(mat.Sigma_fiss)
+            fissprod += mat_fissprod * densities[idx]
+            totfiss_g += mat.Sigma_fiss * densities[idx]
+
+            # weighting by density
             for s in mat.__dict__.keys():
                 if s in mix_xs:
                     if s == 'inv_vel':
@@ -1238,21 +1246,21 @@ class Mix(Material):
                             weight = densities[idx]
 
                         if idx == 0:
-                            self.__dict__[s] = mat.__dict__[s]*weight
+                            self.__dict__[s] = mat.__dict__[s] * weight
                         else:
-                            self.__dict__[s] += mat.__dict__[s]*weight
+                            self.__dict__[s] += mat.__dict__[s] * weight
 
                     else:
                         if idx == 0:
-                            self.__dict__[s] = densities[idx]*mat.__dict__[s]
+                            self.__dict__[s] = densities[idx] * mat.__dict__[s]
                         else:
-                            self.__dict__[s] += densities[idx]*mat.__dict__[s]
+                            self.__dict__[s] += densities[idx] * mat.__dict__[s]
                 elif s in mix_xsf:
                     if s in ['nu_fiss', 'fiss_energy']:
                         if idx == 0:
-                            self.__dict__[s] = mat.__dict__[s]*mat.Sigma_fiss*densities[idx]
+                            self.__dict__[s] = mat.__dict__[s] * totfiss_g
                         else:
-                            self.__dict__[s] += mat.__dict__[s]*mat.Sigma_fiss*densities[idx]
+                            self.__dict__[s] += mat.__dict__[s] * totfiss_g
                     else:   # chi_pro and chi_tot
                         if s == 'chi_del':
                             if mat.NPF > 0:
@@ -1261,21 +1269,19 @@ class Mix(Material):
                                         if r == 0:
                                             self.__dict__[s] = np.zeros((len(energygrid)-1, mat.NPF))
 
-                                        self.__dict__[s][:, r] = mat.__dict__[s][:, r]*mat.nu_fiss*mat.Sigma_fiss*densities[idx]
+                                        self.__dict__[s][:, r] = mat.__dict__[s][:, r] * mat_fissprod * densities[idx]
 
                                     else:
-                                        self.__dict__[s][:, r] += mat.__dict__[s][:, r]*mat.nu_fiss*mat.Sigma_fiss*densities[idx]
+                                        self.__dict__[s][:, r] += mat.__dict__[s][:, r] * mat_fissprod * densities[idx]
 
                             else:
-                                self.__dict__[s] = np.zeros((len(energygrid)-1, ))
+                                if idx == 0:
+                                    self.__dict__[s] = np.zeros((len(energygrid)-1, ))
                         else:
                             if idx == 0:
-                                self.__dict__[s] = mat.__dict__[s]*mat.nu_fiss*mat.Sigma_fiss*densities[idx]
+                                self.__dict__[s] = mat.__dict__[s] * mat_fissprod * densities[idx]
                             else:
-                                self.__dict__[s] += mat.__dict__[s]*mat.nu_fiss*mat.Sigma_fiss*densities[idx]
-
-            fissprod += mat.nu_fiss*mat.Sigma_fiss*densities[idx]
-            totfiss += mat.Sigma_fiss*densities[idx]
+                                self.__dict__[s] += mat.__dict__[s] * mat_fissprod * densities[idx]
 
             # FIXME define a consistent definition for the homogenised beta and lambda
             if 'beta' in mat.__dict__.keys():
@@ -1290,20 +1296,19 @@ class Mix(Material):
         for key in mix_xsf:
             # normalise group constants
             if key in ['nu_fiss', 'fiss_energy']:
-                tmp = np.divide(self.__dict__[key], totfiss, where=totfiss!=0)
+                tmp = np.divide(self.__dict__[key], totfiss_g, where=totfiss_g!=0)
                 self.__dict__[key] = tmp
             if key in ['chi_tot', 'chi_pro', 'chi_del']:
                 if key != "chi_del":
-                    tmp = np.divide(self.__dict__[key], fissprod, where=fissprod!=0)
-                    self.__dict__[key] = tmp
+                    chi = np.divide(self.__dict__[key], fissprod, where=fissprod!=0)
+                    self.__dict__[key] = chi
                 else:
                     if len(self.chi_del.shape) > 1:
                         for r in range(self.chi_del.shape[1]):
-                            tmp = np.divide(self.chi_del[:, r], fissprod, where=fissprod!=0)
-                            self.chi_del[:, r] = tmp
+                            chi_del_r = np.divide(self.chi_del[:, r], fissprod, where=fissprod!=0)
+                            self.chi_del[:, r] = chi_del_r
                     else:
                         tmp = np.divide(self.__dict__[key], fissprod, where=fissprod!=0)
-
 
         if mixname is None:
             mixname = '_'.join(universes)
