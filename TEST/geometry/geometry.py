@@ -136,6 +136,8 @@ class Slab:
                                     break
                         elif isinstance(datapath, str):
                             path = datapath
+                        elif isinstance(datapath, Path):
+                            path = str(datapath)
                         else:
                             raise OSError(f'{type(datapath)} not valid fo datapath')
 
