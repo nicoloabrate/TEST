@@ -32,6 +32,9 @@ class Slab:
                  energygrid=None, AngOrd=None, spatial_scheme=None,
                  datapath=None, h5file=None, verbose=True, fixdata=False, L_anis=1):
 
+        if layers is None:
+            raise GeometryError('Slab geometry must be defined by providing layers coordinates!')
+
         if h5file:
             if isinstance(h5file, dict):
                 for k, v in h5file.items():
@@ -720,7 +723,7 @@ class Slab:
                 else:
                     if not np.allclose(lambdas, self.regions[regname].__dict__['lambda']):
                         self.regions[regname].__dict__['lambda'] = lambdas
-                        logging.info(f'Warning: Forcing decay constants consistency in {regname}')
+                        logging.info(f'Forcing decay constants consistency in {regname}')
 
         return nE, nPrec
 
