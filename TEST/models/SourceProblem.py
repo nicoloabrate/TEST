@@ -19,7 +19,7 @@ from inspect import signature
 
 class sourceproblem():
 
-    def __init__(self, nte, which, ge, source):
+    def __init__(self, nte=None, setup=None, geometry=None, source=None, A=None):
         """
         Define the source problem to be solved.
 
@@ -27,7 +27,7 @@ class sourceproblem():
         ----------
         nte : object
             Neutron Transport Equation object containing the discretised operators.
-        which : str
+        setup : str or dict
             Type of source problem to be solved (static, time-dependent)
         ge : object
             Geometry object.
@@ -47,14 +47,14 @@ class sourceproblem():
 
         """
         # --- problem settings
-        self.nS = nte.nS
-        self.nE = nte.nE
-        self.nA = nte.nA
-        self.BC = nte.BC
-        self.problem = which
+        self.nS = geometry.nS
+        self.nE = geometry.nE
+        self.nA = geometry.nA
+        self.BC = geometry.BC
+        self.problem = "fixed_source"
         self.model = nte.model
         self.operators = nte
-        self.geometry = ge
+        self.geometry = geometry
         ss = self.geometry.spatial_scheme
         # --- compute source dimensions
         if self.model == 'PN':
@@ -72,7 +72,7 @@ class sourceproblem():
         # --- source definition
         if isinstance(source, (list, np.ndarray)):  # user-defined source (array)
             if len(source) != dim:
-                raise OSError('Source dimension mismatch! Size should be {}'.format(dim))
+                raise OSError(f'Source dimension mismatch! Size should be {dim}')
             f = source
         elif isinstance(source, types.FunctionType):  # user-defined source (func)
             f = np.zeros((dim,))
@@ -95,7 +95,7 @@ class sourceproblem():
                 if 'energygrid' in self.geometry.__dict__.keys():
                     E = self.geometry.energygrid[g:g+2]
                 elif self.nE == 1:
-                    E = np.array([1E-11 , 20])
+                    E = np.array([20, 1E-11])
                 else:
                     raise OSError('"energygrid" is needed for more than two groups!')
                 # check angular dependence
@@ -116,7 +116,7 @@ class sourceproblem():
                         iS = iS+1
                 elif self.model == 'PN':
                     iS = g*(Ne*self.nS+No*(self.nS-1))
-                    coeff = 1 if isotropic is False else 1/2
+                    iso_coeff = 1 if isotropic is False else 1/2
                     for moment in range(self.nA+1):
                         xp = x if moment % 2 == 0 else xs
                         # compute source moments
@@ -126,13 +126,13 @@ class sourceproblem():
                                 v, err = quad(mysource, -1, 1)
                                 if err > 1E-5:
                                     print('Source projection failed! Integration error={}'.format(err))
-                                f[iS] = v*np.diff(E)*coeff
+                                f[iS] = v * abs(np.diff(E)) * iso_coeff
                             else:
                                 mysource = lambda mu, E: sourceproblem.mysrc(source, xv, mu, E)*eval_legendre(moment, mu)
                                 # integrate on energy and angle
                                 src_val = mysource(0, E)
                                 f[iS], err = dblquad(mysource, E[1], E[0], -1, 1)
-                                f[iS] = f[iS]*coeff
+                                f[iS] = f[iS] * coeff
                                 if err > 1E-5:
                                     print('Source projection failed! Integration error={}'.format(err))
 
@@ -186,10 +186,17 @@ class sourceproblem():
         self.source = f
         # --- call transport problem
         try:
-            prob = getattr(self, which)
-            prob()
+            if setup == 'custom':
+                if A is None:
+                    raise OSError('A operator must be provided for setup_custom!')
+                else:
+                    self.setup_custom(A)
+            else:
+                source_problem = getattr(self, f"setup_{setup}")
+                source_problem()
+
         except AttributeError:
-            raise OSError('{} problem not available!'.format(which))
+            raise OSError(f'{setup} problem not available!')
 
     def mysrc(source, x, mu, E):
         """
@@ -226,6 +233,7 @@ class sourceproblem():
 
         return source(*args)
 
+    @staticmethod
     def nonsingular(A):
         A = A.todense()
         shapecheck = A.shape[0] == A.shape[1]
@@ -233,32 +241,20 @@ class sourceproblem():
         isinvertible = shapecheck and rankcheck
         return isinvertible
 
-    def static_no_fiss(self):
+    def setup_custom(self, A):
         """
-        Cast operators into the static form of the transport equation excluding 
-        the fission multiplication. This method is intended to work for the power method.
+        Provide custom combination of the operators of the transport equation. 
+        This method is intended to work for the power method.
 
         Returns
         -------
         None.
 
         """
-        op = self.operators
-        # define static transport operators
-        if self.BC is False:  # kappa infinite
-            if self.model != 'Diffusion':
-                self.A = op.Linf + op.R - op.S # no leakage, infinite medium
-            else:
-                R = op.F0 + op.C + op.S0
-                self.A = R - op.S   # no leakage, infinite medium
-            self.nev = 1
-        else:
-            R = op.F0 + op.C + op.S0
-            self.A = op.L + R - op.S  # destruction operator
-
+        self.A = A
         self.which = 'static'
 
-    def static(self):
+    def setup_static(self):
         """
         Cast operators into the static form of the transport equation.
 
@@ -282,7 +278,7 @@ class sourceproblem():
 
         self.which = 'static'
 
-    def prompt(self):
+    def setup_prompt(self):
         """
         Cast operators into the prompt time form of the transport equation.
 
@@ -301,7 +297,7 @@ class sourceproblem():
         self.A = A
         self.which = 'prompt'
 
-    def delayed(self):
+    def setup_delayed(self):
         """
         Cast operators into the delayed time form of the transport equation.
 
@@ -384,11 +380,9 @@ class sourceproblem():
         phi = spsolve(self.A, self.source[:, np.newaxis])
         self.solution = PhaseSpace(self.geometry, {'solution': phi, 'problem': self.problem},
                                     self.operators, source=True)
-        # else:
-        #     print('The transport operator is singular!')
 
     def integrate_source(self):
-        Q = self.source
+        print("TO DO")
         # TODO: compute integral of the source to normalise it automatically, if needed
 
     def spy(self, what, markersize=2):

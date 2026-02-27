@@ -1994,7 +1994,7 @@ class PhaseSpace:
         else:
             nEv = mode
 
-        if self.problem == "static":
+        if self.problem == "fixed_source":
             normalisation = False
         if normalisation:
             which = "phasespace" if not normalisation else normalisation
@@ -2010,10 +2010,10 @@ class PhaseSpace:
                             mode=mode, family=family, precursors=precursors,
                             nEv=nEv, )
 
-        if self.problem != "static":
+        if self.problem != "fixed_source":
             e = self._geteig(nEv)
 
-        if self.problem == "static":
+        if self.problem == "fixed_source":
             return y
         elif e.size == 1:
             if eig:
@@ -2065,7 +2065,7 @@ class PhaseSpace:
         elif nA == 0 and moment == 1:
             D = self.geometry.getxs('Diffcoef')
 
-        if self.problem in ["static", "delayed", "prompt"]:  # source problem
+        if self.problem in ["fixed_source", "custom", "static", "delayed", "prompt"]:  # source problem
             vect = self.flux
         else:  # eigenvalue problem
             if nEv is not None:  # take eigenvector in nEv-th column
