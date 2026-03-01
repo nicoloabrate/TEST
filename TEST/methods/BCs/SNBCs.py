@@ -71,3 +71,4 @@ def setBCs(op, geometry):
         # else:
         #     raise OSError('{} model not available for spatial variable!'.format(op.spatial_scheme))
 
+        return op
