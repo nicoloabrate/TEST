@@ -194,6 +194,8 @@ class eigenproblem():
                 conv_eigvals = np.asarray(vals)
             myeigpair = {'eigenvalues': conv_eigvals,
                          'eigenvectors' : eigvect,
+                         'A': A,
+                         'B': B,
                          'problem': self.which}
             self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
                                        normalisation=None, **kwargs)
@@ -219,14 +221,23 @@ class eigenproblem():
 
         return res
 
-    def power_iteration(self, guess=None, tol=1E-12, history=True,
-                        sigma=None, n_iter_max=1000, normalisation=None):
+    def power_method(self, A, B, guess=None, eig_guess=None, tol=1E-12,
+                     history=True, sigma=None, n_iter_max=1000,
+                     PM_norm="robust",
+                     normalisation=None, n_stable_required=5):
         """Perform the power iteration method for solving eigenvalue problems.
 
         Parameters
         ----------
+        A : scipy.sparse matrix
+            Left-hand side operator matrix.
+        B : scipy.sparse matrix
+            Right-hand side operator matrix.
         guess : np.array, optional
             initial flux guess, by default None
+        eig_guess : float, optional
+            initial physical eigenvalue guess. If a shift is used, this value
+            is converted internally to the shifted spectrum, by default None
         tol : numerical tolerance, optional
             numerical tolerance accepted on the eigenvector. The solution
             on the eigenvalue is 100*tol. If negative, 
@@ -242,6 +253,8 @@ class eigenproblem():
         normalisation : str, optional
             type of normalisation for the eigenvalue, not implemented. 
             By default None
+        n_stable_required : int, optional
+            number of stable iterations required to stop the power method, by default 5
 
         Returns
         -------
@@ -257,24 +270,67 @@ class eigenproblem():
         err_eigv, float
             Numerical error on the eigenvalue
 
-        his_eig, list
+        hist_eig, list
             List of the eigenvalues at each iteration.
         """
-
+        n = A.shape[0]
         if guess is None:
-            n = self.operators.F.shape[0]
-            S0 = np.ones((n,))
-            Q = self.operators.F*S0
+            phi_guess = np.ones((n,))
         else:
-            Q = guess
+            phi_guess = np.asarray(guess).reshape(-1).copy()
+
+        if phi_guess.size != n:
+            raise ValueError(f"guess has size {phi_guess.size}, expected {n}.")
+
+        # apply shift-and-invert transformation if requested
+        if sigma is None:
+            A_eff = A
+            shifted = False
+        else:
+            A_eff = A - sigma * B
+            shifted = True
+
+        def to_physical_eigenvalue(eig):
+            if shifted:
+                return 1.0 / (sigma + 1.0 / eig)
+            return eig
+
+        if eig_guess is None:
+            eig_old = 1
+        else:
+            eig_guess = np.asarray(eig_guess).reshape(-1)
+            if eig_guess.size != 1:
+                raise ValueError("eig_guess must be a scalar value.")
+            eig_guess = eig_guess[0]
+            if shifted:
+                if np.isclose(eig_guess, 0.0):
+                    raise ValueError("eig_guess cannot be zero with a shift.")
+                denom = 1.0 / eig_guess - sigma
+                if np.isclose(denom, 0.0):
+                    raise ValueError("eig_guess is singular for the selected shift.")
+                eig_old = 1.0 / denom
+            else:
+                eig_old = eig_guess
+
+        # Initial production vector associated with the flux guess.
+        Q_old = np.asarray(B @ phi_guess).reshape(-1)
+
+        # Source used in the first fixed-source solve:
+        # A_eff phi_new = B phi_guess / eig_old.
+        source_new = Q_old / eig_old
 
         # --- initialisation
         err_vect = 1
         err_eigv = 1
-        err_hist = 1
-        eig_old = 1
+        eig_res_old = to_physical_eigenvalue(eig_old)
+        n_stable = 0
+        res = np.zeros(A.shape[0], dtype=complex if np.iscomplexobj(Q_old) else float)
+
         if history:
-            his_eig = [eig_old]
+            hist_eig = [eig_res_old]
+            hist_err_eigv = [err_eigv]
+            hist_err_vect = [err_vect]
+            hist_res = [res]
 
         if tol < 0:
             tol = -tol
@@ -283,53 +339,98 @@ class eigenproblem():
             conv_hist = False
 
         # build source problems
-        src_new = sourceproblem(self.operators, 'static_no_fiss', self.geometry, Q)
-        src_old = sourceproblem(self.operators, 'static_no_fiss', self.geometry, Q)
-
-        src_old.solve()
-
-        src_old.solution.flux = src_old.source
+        src_new = sourceproblem(self.operators, 'custom', self.geometry, source_new, A=A_eff)
         n_iter = 0
         condition = True
 
         while condition:
             # solve the source-driven problem
             src_new.solve()
-            Q_new = self.operators.F*src_new.solution.flux
-            Q_new_braket = src_new.solution.braket(Q_new)
 
-            Q_old = src_old.solution.flux
-            Q_old_braket = src_old.solution.braket(Q_old)
+            phi_new = np.asarray(src_new.solution.flux).reshape(-1)
+            Q_new = np.asarray(B @ phi_new).reshape(-1)
 
-            eig_new = eig_old * Q_new_braket / Q_old_braket
+            if PM_norm == "robust":
+                Q_new_Q_old = src_new.solution.braket(Q_old, Q_new)
+                Q_old_Q_old = src_new.solution.braket(Q_old, Q_old)
+            else:
+                Q_new_Q_old = src_new.solution.braket(Q_new)
+                Q_old_Q_old = src_new.solution.braket(Q_old)
 
-            if history:
-                his_eig.append(eig_new)
-                err_his = (his_eig[n_iter] - his_eig[n_iter-1])/his_eig[n_iter]
+            if abs(Q_old_Q_old) > 1.0e-300:
+                alpha_Q = Q_new_Q_old / Q_old_Q_old
+                err_Q_projective = (np.linalg.norm(Q_new - alpha_Q * Q_old) / max(np.linalg.norm(Q_new), 1.0e-300))
+            else:
+                alpha_Q = np.nan
+                err_Q_projective = np.nan
+
+            err_Q_raw = (
+                np.linalg.norm(Q_new - Q_old)
+                / max(np.linalg.norm(Q_new), 1.0e-300)
+            )
+
+            alpha_Q = Q_new_Q_old / Q_old_Q_old
+            eig_new = eig_old * alpha_Q
+
+            if shifted:
+                inv_eig = sigma + 1.0 / eig_new
+                eig_res = 1.0 / inv_eig
+            else:
+                eig_res = eig_new
 
             # update error
-            err_eigv = 1E5*(eig_new - eig_old)
-            err_vect = np.linalg.norm(Q_new - Q_old) / np.linalg.norm(Q_new)
+            err_eigv = abs(eig_res - eig_res_old) / max(abs(eig_res), 1e-300)
+            err_vect = np.linalg.norm(Q_new - Q_old) / max(np.linalg.norm(Q_new), 1e-300)
+
+            lhs = B @ src_new.solution.flux
+            rhs = eig_res * (A @ src_new.solution.flux)
+            res = np.asarray(lhs - rhs).reshape(-1)
+
+            if history:
+
+                y = eig_res
+
+                hist_eig.append(y)
+                hist_err_eigv.append( err_eigv )
+                hist_err_vect.append( err_vect )
+                hist_res.append(res)
+
+            if err_vect < tol and err_eigv < tol*1E2:
+                n_stable += 1
+            else:
+                n_stable = 0
 
             # update source and eigenvalue
-            src_old.solution.flux = self.operators.F*src_new.solution.flux
-            src_new.source = self.operators.F*src_new.solution.flux/eig_new
+            Q_old = Q_new.copy()
+            src_new.source = Q_new / eig_new
+
             eig_old = eig_new
+            eig_res_old = eig_res
 
             if conv_hist:
-                condition = (err_hist > tol)
+                condition = (n_iter < n_iter_max and (hist_err_vect[n_iter] > tol and hist_err_eigv[n_iter] > tol*1E2) )
             else:
-                condition = (n_iter <= n_iter_max and (err_vect > tol or err_eigv > tol*1E2))
+                condition = (n_iter < n_iter_max and n_stable < n_stable_required)
 
             n_iter += 1
 
+        if n_iter > n_iter_max:
+            print(f"Maximum number of iterations in power method (n_iter_max={n_iter_max}) reached!")
+
         phi = src_new.solution.flux
 
-        if history:
-            return phi[:, np.newaxis], np.array([eig_new]), err_eigv, err_vect, his_eig
-        else:
+        if shifted:
+            mu_new = eig_new
+            x_new = sigma + 1.0 / mu_new
+            eig_out = 1.0 / x_new
 
-            return phi[:, np.newaxis], np.array([eig_new]), err_eigv, err_vect
+        else:
+            eig_out = eig_new
+
+        if history:
+            return phi[:, np.newaxis], np.array([eig_out]), err_eigv, err_vect, res, hist_eig, hist_err_eigv, hist_err_vect, hist_res
+        else:
+            return phi[:, np.newaxis], np.array([eig_out]), err_eigv, err_vect, res
 
     def fundamentalconverged(self):
         try:
@@ -581,11 +682,14 @@ class eigenproblem():
 
     def solve(self, algo='SLEPc', verbose=False,tol=1E-14, monitor=False,
               normalisation='peaktotalflux', shift=None, which=None, history=False,
-              guess=None, n_iter_max=1000, **kwargs):
+              n_stable_required=5, PM_norm='robust',
+              guess=None, eig_guess=None, n_iter_max=1000, **kwargs):
 
         A = self.A
         B = self.B
         res = None
+        if eig_guess is None and 'eigenvalue_guess' in kwargs:
+            eig_guess = kwargs.pop('eigenvalue_guess')
         if which:
             if which not in _targetdict.keys():
                 raise OSError('Target spectrum cannot be {}. Available' \
@@ -634,6 +738,8 @@ class eigenproblem():
             # create native phase space
             myeigpair = {'eigenvalues': eigvals[0:self.nev],
                          'eigenvectors': eigvect,
+                         'A': A,
+                         'B': B,
                          'problem': self.which}
             self.solution = PhaseSpace(self.geometry, myeigpair,
                                        self.operators, normalisation=True,
@@ -663,14 +769,18 @@ class eigenproblem():
             # create native phase space
             myeigpair = {'eigenvalues': eigvals[0:self.nev],
                          'eigenvectors' : eigvect,
-                         'problem': self.which}
+                         'problem': self.which,
+                         'A': A,
+                         'B': B,
+                         }
+                        
             self.solution = PhaseSpace(self.geometry, myeigpair, self.operators,
                                        normalisation=True, whichnorm=normalisation,
                                        **kwargs)
 
         elif algo == 'power':
 
-            if self.which in ['alpha', 'delta', 'zeta', 'omega', 'theta']:
+            if self.which in ['alpha', 'delta', 'omega', 'theta']:
                 # TODO FIXME
                 raise OSError(f'{algo} algorithm not implemented for {self.which} eigenvalue problem!')
                 # FIXME TODO 
@@ -678,12 +788,27 @@ class eigenproblem():
 
             start = t.time()
             if history:
-                eigvect, eigvals, err_eigv, err_vect, his_eig = self.power_iteration(guess=guess, history=history, 
-                                                                                     n_iter_max=n_iter_max)
-                self.history = np.asarray(his_eig)
-                self.n_iter = self.history.size
+                power_result = self.power_method(A, B, guess=guess, eig_guess=eig_guess,
+                                                tol=tol, history=history, PM_norm=PM_norm,
+                                                n_stable_required=n_stable_required,
+                                                n_iter_max=n_iter_max, sigma=shift)
+                (
+                    eigvect,
+                    eigvals,
+                    err_eigv,
+                    err_vect,
+                    res,
+                    hist_eig,
+                    hist_err_eigv,
+                    hist_err_vect,
+                    hist_res,
+                ) = power_result
             else:
-                eigvect, eigvals, err_eigv, err_vect = self.power_iteration(guess=guess, history=history)
+                eigvect, eigvals, err_eigv, err_vect, res = self.power_method(A, B, guess=guess,
+                                                                             eig_guess=eig_guess,
+                                                                             tol=tol, PM_norm=PM_norm,
+                                                                             history=history,
+                                                                             sigma=shift,)
 
             end = t.time()
             self.nev = len(eigvals)
@@ -691,7 +816,26 @@ class eigenproblem():
             # create native phase space
             myeigpair = {'eigenvalues': eigvals,
                          'eigenvectors': eigvect,
+                         'A': A,
+                         'B': B,
+                         'err_eigv': err_eigv,
+                         'err_vect': err_vect,
+                         'residual': res,
                          'problem': self.which}
+            if history:
+                hist_items = {
+                        'n_iter': len(hist_eig),
+                        'history': True,
+                        'hist_eig': hist_eig,
+                        'hist_err_eigv': hist_err_eigv,
+                        'hist_err_vect': hist_err_vect,
+                        'hist_res': hist_res,
+                            }
+                for k, v in hist_items.items():
+                    myeigpair[k] = v
+            else:
+                myeigpair['history'] = False
+
             self.solution = PhaseSpace(self.geometry, myeigpair,
                                        self.operators, normalisation=True,
                                        whichnorm=normalisation, **kwargs)
