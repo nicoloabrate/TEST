@@ -12,7 +12,7 @@ from scipy.special import eval_legendre, roots_legendre
 from sympy import Symbol, legendre, integrate
 
 warnings.simplefilter('ignore')
-
+vacuum_BCs = ['markeven', 'Markeven', 'markEven', 'MarkEven', 'mark', 'Mark', 'marshak', 'Marshak']
 
 def setBCs(op, geometry):
     """
@@ -45,78 +45,134 @@ def setBCs(op, geometry):
     # copy leakage operator to new variable
     for bc in BCs:
 
+        if bc in vacuum_BCs:
+            bc_type = 'vacuum'
+        elif bc == 'periodic':
+            bc_type = 'periodic'
+        else:
+            raise BC_error(f"Unknown BC type '{bc_type}'")
         # FIXME: actually only the same bc can be handled on two boundaries
         # TODO: check boundary conditions consistency (if different can be imposed)
 
-        if bc in ['markeven', 'Markeven', 'markEven', 'MarkEven']:
-            A = MarkCoeffs(N, even=True)
+        if bc_type == 'vacuum':
 
-        elif bc in ['mark', 'Mark']:
-            A = MarkCoeffs(N)
+            if bc in ['markeven', 'Markeven', 'markEven', 'MarkEven']:
+                A = MarkCoeffs(N, even=True)
 
-        elif bc in ['marshak', 'Marshak']:
-            A = MarshakCoeffs(N)
+            elif bc in ['mark', 'Mark']:
+                A = MarkCoeffs(N)
+
+            elif bc in ['marshak', 'Marshak']:
+                A = MarshakCoeffs(N)
+
+            A = _getcoeffs(A)
+
+            m, n = A.shape
+
+            # FIXME
+            A[0:m//2, :] *= -2 # /geometry.dx[0]
+            A[m//2:m, :] *= 2 # /geometry.dx[-1]
 
         else:
-            raise OSError('Unknown boundary condition %s!' % bc)
+            n = N 
 
-        A = _getcoeffs(A)
-        m, n = A.shape
-
-        # FIXME
-        A[0:m//2, :] *= -2 # /geometry.dx[0]
-        A[m//2:m, :] *= 2 # /geometry.dx[-1]
+        # set non-diagonal entries (even moments)
+        No = ( N + 1 ) // 2 if N % 2 != 0 else N // 2
+        Ne = N + 1 - No
+        if bc_type == 'vacuum':
+            jj = np.arange(0, n)
+            iEv = jj * ( 2 * M - 1 )
+        else:
+            jj = np.arange(0, n)
+            kk = np.arange(0, n + 1)
+            iEv = kk * ( 2 * M - 1 )
+            iOd = iEv + M
+            iMG = np.arange(0, op.nE) * ( No * ( M - 1) + Ne * M )
 
         for gro in range(0, op.nE):
 
             count = 0
+            n_even = 0
+            n_odd = 0
 
-            for moment in range(0, n):
-
+            for moment in range(0, n + 1):
+                # define indeces to span matrices
                 Neq = 2*moment  # only even moments need BCs
-                No = (N+1)//2 if N % 2 != 0 else N//2
-                Ne = N+1-No
-                ip = moment*(2*M-1)  #
-                idg = (No*(M-1)+Ne*M)*gro
-                ig = gro*(No*(M-1)+Ne*M)
+                ip = moment * ( 2 * M - 1 )  #
+                ig = gro * ( No * ( M - 1) + Ne * M )
 
-                if moment >= 1:  # *2 for one-side f.d.
-                    # right boundary, lower diag
-                    op.L[ip+idg, ip-(M-1)+idg] *= 2
-                    # left boundary, lower diag
-                    op.L[ip+M-1+idg, ip-1+idg] *= 2
-
-                if moment < n-1 or N % 2 != 0:  # no last and odd eq.
-                    # right boundary, upper diag
-                    op.L[ip+idg, ip+M+idg] *= 2
-                    # left boundary, upper diag
-                    op.L[ip+M-1+idg, ip+M-1+M-1+idg] *= 2
-
-                # set non-diagonal entries (even moments)
-                jj = np.arange(0, n)
-                iEv = jj*(2*M-1)
-
-                if moment == 0:  # 1st row, eqs 1 and 2 (Upper)
-                    # right boundary, lower diag
-                    op.L[ig, ig+iEv] = (Neq+1)/(2*Neq+1)*A[0, jj]  # angle>0
-                    op.dx[ig] = geometry.dx[0]
-                    # left boundary, lower diag
-                    op.L[M+ig-1, ig+iEv+M-1] = (Neq+1)/(2*Neq+1)*A[m//2, jj]  # angle<0
-                    op.dx[M+ig-1] = geometry.dx[-1]
-
+                if moment % 2 == 0:
+                    n_even += 1
                 else:
-                    # sum coeffs in previous row (Lower)
-                    op.L[ip+idg, ig+iEv] = Neq/(2*Neq+1)*A[count, jj]  # angle>0
-                    op.dx[ip+idg] = geometry.dx[0]
+                    n_odd += 1
 
-                    op.L[ip+M-1+idg, ig+iEv+M-1] = Neq/(2*Neq+1)*A[count+m//2, jj]  # angle<0
-                    op.dx[ip+M-1+idg] = geometry.dx[-1]
+                if bc_type == 'vacuum':
+                    if moment < n:
+                        if moment >= 1:  # *2 for one-side f.d.
+                            # right boundary, lower diag
+                            op.L[ip+ig, ip-(M-1)+ig] *= 2
+                            # left boundary, lower diag
+                            op.L[ip+M-1+ig, ip-1+ig] *= 2
 
-                    if moment < n-1 or N % 2 != 0:
-                        op.L[ip+idg, ig+iEv] = op.L[ip+idg, ig+iEv]+(Neq+1)/(2*Neq+1)*A[count+1, jj]
-                        op.dx[ip+idg] = geometry.dx[0]
-                        op.L[ip+M-1+idg, ig+iEv+M-1] = op.L[ip+M-1+idg, ig+iEv+M-1]+(Neq+1)/(2*Neq+1)*A[count+m//2+1, jj]
-                        op.dx[ip+M-1+idg] = geometry.dx[-1]
+                        if moment < n-1 or N % 2 != 0:  # no last and odd eq.
+                            # right boundary, upper diag
+                            op.L[ip+ig, ip+M+ig] *= 2
+                            # left boundary, upper diag
+                            op.L[ip+M-1+ig, ip+M-1+M-1+ig] *= 2
+
+                        if moment == 0:  # 1st row, eqs 1 and 2 (Upper)
+                            # right boundary, lower diag
+                            op.L[ig, ig+iEv] = (Neq+1)/(2*Neq+1)*A[0, jj]  # angle>0
+                            op.dx[ig] = geometry.dx[0]
+                            # left boundary, lower diag
+                            op.L[M+ig-1, ig+iEv+M-1] = (Neq+1)/(2*Neq+1)*A[m//2, jj]  # angle<0
+                            op.dx[M+ig-1] = geometry.dx[-1]
+
+                        else:
+                            # sum coeffs in previous row (Lower)
+                            op.L[ip+ig, ig+iEv] = Neq/(2*Neq+1)*A[count, jj]  # angle>0
+                            op.dx[ip+ig] = geometry.dx[0]
+
+                            op.L[ip+M-1+ig, ig+iEv+M-1] = Neq/(2*Neq+1)*A[count+m//2, jj]  # angle<0
+                            op.dx[ip+M-1+ig] = geometry.dx[-1]
+
+                            if moment < n-1 or N % 2 != 0:
+                                op.L[ip+ig, ig+iEv] = op.L[ip+ig, ig+iEv]+(Neq+1)/(2*Neq+1)*A[count+1, jj]
+                                op.dx[ip+ig] = geometry.dx[0]
+                                op.L[ip+M-1+ig, ig+iEv+M-1] = op.L[ip+M-1+ig, ig+iEv+M-1]+(Neq+1)/(2*Neq+1)*A[count+m//2+1, jj]
+                                op.dx[ip+M-1+ig] = geometry.dx[-1]
+
+                elif bc_type == 'periodic':
+                    if moment == 0:
+                        # right boundary
+                        op.L[ig, ig + 2*(M-1)] = - op.L[ig, ig + M]
+                        # left boundary
+                        op.L[ig + iEv[n_even-1] - 1 + M, ig + 2*(M-1)] = 0
+                        op.L[ig + iEv[n_even-1] - 1 + M, ig] = 1
+                        op.L[ig + iEv[n_even-1] -1 + M , ig + M - 1] = -1
+                        for op_attr in ['C', 'S0', 'F0', 'F', 'S', 'Fp', 'Fd', 'T']:
+                            if hasattr(op, op_attr):
+                                op.__dict__[op_attr][ig + iEv[n_even-1] - 1 + M, iMG + M - 1] = 0
+
+                    else:
+                        if moment % 2 == 0: # even eqs.
+                            if moment < n:
+                                idx_lst = [-1, 0]
+                                op.L[ig + iEv[n_even-1] - 1 + M, ig + iEv[n_even-1:n_even+1] - 1] = 0
+                            else:
+                                idx_lst = [-1]
+                                op.L[ig + iEv[n_even-1] - 1 + M, ig + iEv[n_even-1] - 1] = 0
+
+                            for i in idx_lst:
+                                # right boundary
+                                op.L[ig + iEv[n_even-1], ig + iOd[n_odd + i] + M - 2] = - op.L[ig + iEv[n_even-1], ig + iOd[n_odd + i]]
+                                # left boundary
+                                op.L[ig + iEv[n_even-1] - 1 + M, ig + iEv[n_even-1]] = 1
+                                op.L[ig + iEv[n_even-1] - 1 + M, ig + iEv[n_even-1] - 1 + M] = -1
+                            # left boundary
+                            for op_attr in ['C', 'S0', 'F0', 'F', 'S', 'Fp', 'Fd', 'T']:
+                                if hasattr(op, op_attr):
+                                    op.__dict__[op_attr][ig + iEv[n_even-1] - 1 + M, iMG + iEv[n_even-1] + M - 1] = 0
 
                 count = count + 1*(moment > 0)
     return op
