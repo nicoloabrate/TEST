@@ -73,6 +73,14 @@ class PhaseSpace:
                 else:
                     eigvals = solution["eigenvalues"]
                     eigvect = solution["eigenvectors"]
+
+                    if 'history' in solution.keys():
+                        self.hist_eig = solution["hist_eig"]
+                        self.hist_err_eigv = solution['hist_err_eigv']
+                        self.hist_err_vect = solution['hist_err_vect']
+                        self.hist_res = solution['hist_res']
+                        self.n_iter = solution['n_iter']
+
                     nev = len(eigvals)
                     self.problem = solution["problem"]
 
@@ -94,38 +102,79 @@ class PhaseSpace:
 
                     self.eigvals = eigvals
                     self.eigvect = ev
-                    # place fundamental at first position
+
+                    # place fundamental eigenpairs at the first positions
                     try:
-                        eig0, ev0 = self.getfundamental()
-                        if eig0.size == 1:
-                            eig0 = np.array([[eig0]])
-                        idx = []
+                        eig0, _ = self.getfundamental()
+
+                        # Always work with a flat one-dimensional array.
+                        eig0 = np.atleast_1d(eig0).reshape(-1)
+
+                        fundamental_idx = []
+                        already_used = set()
+
                         for e0 in eig0:
-                            idx.append(np.argwhere(eigvals == e0)[0][0])
+                            # Locate the eigenvalue in the currently stored spectrum.
+                            candidates = np.flatnonzero(
+                                np.isclose(
+                                    self.eigvals,
+                                    e0,
+                                    rtol=1.0e-10,
+                                    atol=1.0e-12
+                                )
+                            )
 
-                        offset = 0
-                        for ipos in idx:
-                            if ipos != 0:
-                                tmp = self.eigvect[:,ipos].copy()
-                                tmpe = self.eigvals[ipos].copy()
-                                if ipos > offset:
-                                    self.eigvect[:, offset+1:ipos+1] = self.eigvect[:, offset:ipos]
-                                    self.eigvals[offset+1:ipos+1] = self.eigvals[offset:ipos]
-                                else:
-                                    self.eigvect[:, ipos+1:offset+1] = self.eigvect[:, ipos:offset]
-                                    self.eigvals[ipos+1:offset+1] = self.eigvals[ipos:offset]
-                                self.eigvect[:, offset] = tmp
-                                self.eigvals[offset] = tmpe
+                            # Do not associate the same array position more than once.
+                            candidates = [
+                                int(i) for i in candidates
+                                if int(i) not in already_used
+                            ]
 
-                                offset += 1
+                            if len(candidates) == 0:
+                                raise PhaseSpaceError(
+                                    "Unable to associate fundamental eigenvalue "
+                                    f"{e0!r} with a stored eigenpair."
+                                )
 
+                            selected_idx = candidates[0]
+                            fundamental_idx.append(selected_idx)
+                            already_used.add(selected_idx)
+
+                        # Preserve the existing order of every non-fundamental eigenpair.
+                        remaining_idx = [
+                            i for i in range(len(self.eigvals))
+                            if i not in already_used
+                        ]
+
+                        # Build one permutation and apply it once to both arrays.
+                        permutation = np.asarray(
+                            fundamental_idx + remaining_idx,
+                            dtype=int
+                        )
+
+                        self.eigvals = self.eigvals[permutation]
+                        self.eigvect = self.eigvect[:, permutation]
 
                     except PhaseSpaceError as err:
                         if "No fundamental eigenvalue detected!" in str(err):
-                            pass
                             print(str(err))
                         else:
-                            raise PhaseSpaceError(err)
+                            raise
+
+                    # Sanity check only when the matrices defining the eigenproblem
+                    # have explicitly been provided.
+                    if (
+                        'eigenproblem_A' in solution
+                        and 'eigenproblem_B' in solution
+                    ):
+                        self._sanity_check_eigenpairs(
+                            A=solution['eigenproblem_A'],
+                            B=solution['eigenproblem_B'],
+                            rtol=1.0e-7,
+                            atol=1.0e-12,
+                            raise_on_failure=True,
+                            verbose=True,
+                        )
 
                     if normalisation:
                         self.normalisation(which=whichnorm, **kwargs)
@@ -133,6 +182,102 @@ class PhaseSpace:
                 msg = "Type {} cannot be handled by phase" "space!".format(
                         type(solution))
                 raise OSError(msg)
+
+    def _sanity_check_eigenpairs(self, A, B, operators, rtol=1.0e-7, atol=1.0e-12, 
+                                raise_on_failure=True, verbose=False):
+        """
+        Check that each stored eigenvalue is associated with the correct
+        eigenvector column.
+
+        For a generalized zeta problem, the checked equation is
+
+            B v = lambda A v.
+
+        For a standard eigenproblem, the checked equation is
+
+            A v = lambda v.
+        """
+
+        if operators is None:
+            raise PhaseSpaceError(
+                "Cannot check eigenpairs because operators is None."
+            )
+
+        A = operators.A
+        B = getattr(operators, "B", None)
+
+        nvals = len(self.eigvals)
+        nvects = self.eigvect.shape[1]
+
+        if nvals != nvects:
+            raise PhaseSpaceError(
+                "Eigenvalue/eigenvector count mismatch: "
+                f"{nvals} eigenvalues but {nvects} eigenvector columns."
+            )
+
+        residuals = np.empty(nvals, dtype=float)
+
+        for i in range(nvals):
+            eigval = self.eigvals[i]
+            v = np.asarray(self.eigvect[:, i]).reshape(-1)
+
+            if not np.all(np.isfinite(v)):
+                residuals[i] = np.inf
+                continue
+
+            if np.linalg.norm(v) == 0:
+                residuals[i] = np.inf
+                continue
+
+            Av = np.asarray(A @ v).reshape(-1)
+
+            if B is None:
+                lhs = Av
+                rhs = eigval * v
+            else:
+                lhs = np.asarray(B @ v).reshape(-1)
+                rhs = eigval * Av
+
+            residual = lhs - rhs
+
+            scale = max(
+                np.linalg.norm(lhs),
+                np.linalg.norm(rhs),
+                atol
+            )
+
+            residuals[i] = np.linalg.norm(residual) / scale
+
+            if verbose:
+                print(
+                    f"Eigenpair {i}: "
+                    f"lambda={eigval!r}, "
+                    f"relative residual={residuals[i]:.3e}"
+                )
+
+        failed = np.flatnonzero(
+            ~np.isfinite(residuals) | (residuals > rtol)
+        )
+
+        if failed.size > 0:
+            details = "\n".join(
+                f"  pair {i}: lambda={self.eigvals[i]!r}, "
+                f"relative residual={residuals[i]:.3e}"
+                for i in failed
+            )
+
+            message = (
+                "Inconsistent eigenvalue/eigenvector association detected.\n"
+                f"Tolerance: {rtol:.3e}\n"
+                f"{details}"
+            )
+
+            if raise_on_failure:
+                raise PhaseSpaceError(message)
+
+            print("WARNING:", message)
+
+        return residuals
 
     def braket(self, v1, v2=None, phasespacevolume=None, unpack=True, **kwargs):
         """
