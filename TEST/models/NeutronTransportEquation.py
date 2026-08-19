@@ -15,7 +15,7 @@ import numpy as np
 
 class NTE():
 
-    def __init__(self, ge, model, steady, N=None, use_nxn=True, BC=True,
+    def __init__(self, ge=None, model=None, steady=True, N=None, use_nxn=True, BC=True,
                  fmt='csr', prompt=False, allope=False, adjoint=False):
 
         self.model = model
@@ -121,9 +121,11 @@ class NTE():
             else:
                 r, c = self.L.nonzero()
 
-            nnz_axis1 = self.L.getnnz(axis=0)
-            val = np.repeat(1.0/self.dx, nnz_axis1)
+            # nnz_axis1 = self.L.getnnz(axis=0)
+            # val = np.repeat(1.0/self.dx, nnz_axis1)
+            val = 1.0 / self.dx[c]
             dx_mat = csr_matrix((val, (r, c)), shape=(self.L.shape))
+            self.dx_mat = dx_mat
             self.L = self.L.multiply(dx_mat)
 
             r, c = self.Linf.nonzero()
