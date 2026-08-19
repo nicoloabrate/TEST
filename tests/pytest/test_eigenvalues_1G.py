@@ -215,7 +215,7 @@ def test_Modak_alpha_higher_1G(N, ref, tol, algo):
 
 if __name__ == '__main__':
 
-    algo='SLEPc'
+    algo='eigs'
     N = 7
     ref = [-2.53782E-02, -1.03353E-01, -2.38497E-01, -4.43506E-01]
     tol = [5, 50, 50, 100]

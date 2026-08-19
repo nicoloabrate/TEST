@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 from TEST.geometry import Slab
 from TEST.models.NeutronTransportEquation import NTE
-import TEST.models.AdjointTransportEquation as ATE
+import TEST.models.ImportanceTransportEquation as ATE
 from TEST.models.EigenProblem import eigenproblem
 from TEST.methods.GPT import GPT
 import matplotlib.pyplot as plt

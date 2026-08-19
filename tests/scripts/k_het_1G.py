@@ -13,7 +13,7 @@ import numpy as np
 from TEST.geometry import Slab
 from TEST.models.NeutronTransportEquation import NTE
 from TEST.models.EigenProblem import eigenproblem
-from TEST.models.GeneralizedEigenTheory import GET
+from TEST.models.GeneralizedEigenvalueTheory import GET
 import matplotlib.pyplot as plt
 
 nev = 4
