@@ -271,6 +271,214 @@ class Slab:
                 N[0] = 1
                 self.nS = int(sum(N))
 
+
+    @staticmethod
+    def _inspect_format_value(value, max_items=8, max_string=120):
+        """Return a compact, readable representation of an attribute."""
+        if isinstance(value, np.ndarray):
+            preview = value.ravel()[:max_items]
+            suffix = " ..." if value.size > max_items else ""
+            return (f"ndarray(shape={value.shape}, dtype={value.dtype}, "
+                    f"preview={preview}{suffix})")
+
+        if isinstance(value, (list, tuple)):
+            preview = list(value[:max_items])
+            suffix = " ..." if len(value) > max_items else ""
+            return f"{type(value).__name__}(len={len(value)}, preview={preview}{suffix})"
+
+        if isinstance(value, dict):
+            keys = list(value.keys())
+            preview = keys[:max_items]
+            suffix = " ..." if len(keys) > max_items else ""
+            return f"{type(value).__name__}(len={len(value)}, keys={preview}{suffix})"
+
+        text = repr(value)
+        if len(text) > max_string:
+            text = text[:max_string - 3] + "..."
+        return text
+
+    def inspect(self, include_private=False, max_items=8, max_string=120):
+        """
+        Print all Slab attributes in a compact and ordered way.
+
+        Parameters
+        ----------
+        include_private : bool, optional
+            If True, also print attributes whose name starts with ``_``.
+            By default False.
+        max_items : int, optional
+            Maximum number of array/list/dict entries shown in previews.
+            By default 8.
+        max_string : int, optional
+            Maximum length for scalar/string representations.
+            By default 120.
+
+        Returns
+        -------
+        None.
+        """
+        attrs = {
+            key: value for key, value in self.__dict__.items()
+            if include_private or not key.startswith("_")
+        }
+
+        title = f"{self.__class__.__name__} object"
+        print(title)
+        print("=" * len(title))
+
+        if not attrs:
+            print("No attributes found.")
+            return
+
+        width = max(len(key) for key in attrs)
+        for key in sorted(attrs):
+            value = attrs[key]
+            value_type = type(value).__name__
+            value_repr = self._inspect_format_value(
+                value, max_items=max_items, max_string=max_string
+            )
+            print(f"{key:<{width}} : {value_type:<15} {value_repr}")
+
+    @staticmethod
+    def _compare_values(left, right, rtol=1e-7, atol=0.0, equal_nan=True):
+        """Compare two values, with NumPy-aware handling."""
+        if isinstance(left, np.ndarray) or isinstance(right, np.ndarray):
+            try:
+                left_arr = np.asarray(left)
+                right_arr = np.asarray(right)
+            except Exception:
+                return False
+
+            if left_arr.shape != right_arr.shape:
+                return False
+
+            if np.issubdtype(left_arr.dtype, np.number) and np.issubdtype(right_arr.dtype, np.number):
+                return np.allclose(left_arr, right_arr, rtol=rtol, atol=atol, equal_nan=equal_nan)
+
+            return np.array_equal(left_arr, right_arr, equal_nan=equal_nan)
+
+        if isinstance(left, dict) and isinstance(right, dict):
+            if set(left.keys()) != set(right.keys()):
+                return False
+            return all(
+                Slab._compare_values(left[key], right[key], rtol=rtol, atol=atol, equal_nan=equal_nan)
+                for key in left
+            )
+
+        if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
+            if type(left) is not type(right) or len(left) != len(right):
+                return False
+            return all(
+                Slab._compare_values(lval, rval, rtol=rtol, atol=atol, equal_nan=equal_nan)
+                for lval, rval in zip(left, right)
+            )
+
+        if hasattr(left, "compare") and hasattr(right, "__dict__"):
+            try:
+                return bool(left.compare(right, rtol=rtol, atol=atol, verbose=False))
+            except TypeError:
+                pass
+            except Exception:
+                pass
+
+        if isinstance(left, (float, int, np.floating, np.integer)) and isinstance(right, (float, int, np.floating, np.integer)):
+            return bool(np.isclose(left, right, rtol=rtol, atol=atol, equal_nan=equal_nan))
+
+        try:
+            return left == right
+        except Exception:
+            return False
+
+    def compare(self, other, rtol=1e-7, atol=0.0, equal_nan=True,
+                include_private=False, verbose=True, max_items=8):
+        """
+        Compare this Slab object with another Slab object attribute by attribute.
+
+        Parameters
+        ----------
+        other : Slab
+            Object to compare against this instance.
+        rtol : float, optional
+            Relative tolerance used for numerical comparisons. By default 1e-7.
+        atol : float, optional
+            Absolute tolerance used for numerical comparisons. By default 0.0.
+        equal_nan : bool, optional
+            If True, NaN values in corresponding positions are treated as equal.
+            By default True.
+        include_private : bool, optional
+            If True, also compare attributes whose name starts with ``_``.
+            By default False.
+        verbose : bool, optional
+            If True, print a report of equal/different fields. By default True.
+        max_items : int, optional
+            Maximum number of preview elements printed for differing values.
+            By default 8.
+
+        Returns
+        -------
+        bool
+            True if the two objects are equal within the requested tolerances,
+            False otherwise.
+        """
+        if not isinstance(other, self.__class__):
+            raise TypeError(
+                f"other must be an instance of {self.__class__.__name__}, "
+                f"not {type(other).__name__}"
+            )
+
+        left_attrs = {
+            key: value for key, value in self.__dict__.items()
+            if include_private or not key.startswith("_")
+        }
+        right_attrs = {
+            key: value for key, value in other.__dict__.items()
+            if include_private or not key.startswith("_")
+        }
+
+        left_keys = set(left_attrs)
+        right_keys = set(right_attrs)
+        common_keys = sorted(left_keys & right_keys)
+        only_left = sorted(left_keys - right_keys)
+        only_right = sorted(right_keys - left_keys)
+
+        different = []
+        for key in common_keys:
+            if not self._compare_values(left_attrs[key], right_attrs[key],
+                                        rtol=rtol, atol=atol, equal_nan=equal_nan):
+                different.append(key)
+
+        are_equal = not only_left and not only_right and not different
+
+        if verbose:
+            title = f"Comparison: {self.__class__.__name__}"
+            print(title)
+            print("=" * len(title))
+
+            if are_equal:
+                print("Objects are equal within the selected tolerances.")
+                return True
+
+            if only_left:
+                print("Attributes only in first object:")
+                for key in only_left:
+                    print(f"  - {key}")
+
+            if only_right:
+                print("Attributes only in second object:")
+                for key in only_right:
+                    print(f"  - {key}")
+
+            if different:
+                print("Differing attributes:")
+                width = max(len(key) for key in different)
+                for key in different:
+                    left_value = self._inspect_format_value(left_attrs[key], max_items=max_items)
+                    right_value = self._inspect_format_value(right_attrs[key], max_items=max_items)
+                    print(f"  - {key:<{width}} | self:  {left_value}")
+                    print(f"    {'':<{width}} | other: {right_value}")
+
+        return are_equal
+
     def plotmesh(self, ax=None, yVals=None, xlabel=None):
         """Plot mesh grid."""
         if yVals is None:

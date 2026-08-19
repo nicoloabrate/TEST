@@ -905,11 +905,11 @@ class Material():
 
         else:
             self.NPF = 0
-            self.beta = np.zeros((self.nE, ))
-            self.beta_tot = np.zeros((self.nE, ))
+            self.beta = np.zeros((self.NPF, ))
+            self.beta_tot = np.zeros((1, ))
             self.__dict__["lambda"] = np.asarray([0.0])
             self.__dict__["lambda_avg"] = np.asarray([0.0])
-            self.nu_fiss_del = np.zeros((self.nE, ))
+            self.nu_fiss_del = np.zeros((self.NPF, self.nE, ))
             self.chi_tot = np.zeros((self.nE, ))
             self.chi_del = np.zeros((self.nE, ))
             self.chi_pro = np.zeros((self.nE, ))
@@ -1340,6 +1340,169 @@ class Mix(Material):
         self.add_missing_xs()
 
         self.repair_xs()
+
+
+    def inspect(self, show_values=True, max_items=8):
+        """Print a compact, ordered summary of all instance attributes.
+
+        Parameters
+        ----------
+        show_values : bool, optional
+            If True, print a compact preview of each attribute value.
+            The default is True.
+        max_items : int, optional
+            Maximum number of array/list/tuple elements shown in the preview.
+            The default is 8.
+
+        Returns
+        -------
+        None.
+        """
+        def _format_value(value):
+            if isinstance(value, np.ndarray):
+                flat = value.ravel()
+                preview = np.array2string(
+                    flat[:max_items],
+                    precision=6,
+                    threshold=max_items,
+                    separator=', '
+                )
+                if flat.size > max_items:
+                    preview = preview[:-1] + ', ...]'
+                return preview
+
+            if isinstance(value, (list, tuple)):
+                preview_items = list(value[:max_items])
+                suffix = ', ...' if len(value) > max_items else ''
+                return f"{type(value).__name__}({preview_items}{suffix})"
+
+            if isinstance(value, dict):
+                items = list(value.items())[:max_items]
+                suffix = ', ...' if len(value) > max_items else ''
+                return f"dict({items}{suffix})"
+
+            return repr(value)
+
+        title = f"{self.__class__.__name__} object"
+        if hasattr(self, 'UniName'):
+            title += f" - {self.UniName}"
+
+        print(title)
+        print('-' * len(title))
+
+        for key in sorted(self.__dict__):
+            value = self.__dict__[key]
+
+            if isinstance(value, np.ndarray):
+                info = f"ndarray, shape={value.shape}, dtype={value.dtype}"
+            else:
+                info = type(value).__name__
+
+            line = f"{key:<20} : {info}"
+            if show_values:
+                line += f" | {_format_value(value)}"
+
+            print(line)
+
+    def compare(self, other, rtol=1e-7, atol=0.0, equal_nan=True, verbose=True):
+        """Compare this material against another instance of the same class.
+
+        Parameters
+        ----------
+        other : Material
+            Object to compare against this object.
+        rtol : float, optional
+            Relative tolerance used for numerical arrays/scalars.
+            The default is 1e-7.
+        atol : float, optional
+            Absolute tolerance used for numerical arrays/scalars.
+            The default is 0.0.
+        equal_nan : bool, optional
+            If True, NaNs in the same positions are considered equal.
+            The default is True.
+        verbose : bool, optional
+            If True, print the fields that differ.
+            The default is True.
+
+        Returns
+        -------
+        bool
+            True if the two objects are equal within the selected tolerances,
+            False otherwise.
+        """
+        if not isinstance(other, self.__class__):
+            raise TypeError(
+                f"other must be an instance of {self.__class__.__name__}, "
+                f"not {type(other).__name__}"
+            )
+
+        def _numeric_scalar(value):
+            return isinstance(value, (int, float, complex, np.number))
+
+        def _values_equal(left, right):
+            if isinstance(left, np.ndarray) or isinstance(right, np.ndarray):
+                try:
+                    left_arr = np.asarray(left)
+                    right_arr = np.asarray(right)
+                except Exception:
+                    return False, 'cannot convert to ndarray'
+
+                if left_arr.shape != right_arr.shape:
+                    return False, f"shape differs: {left_arr.shape} != {right_arr.shape}"
+
+                if np.issubdtype(left_arr.dtype, np.number) and np.issubdtype(right_arr.dtype, np.number):
+                    ok = np.allclose(left_arr, right_arr, rtol=rtol, atol=atol, equal_nan=equal_nan)
+                    if ok:
+                        return True, ''
+                    diff = np.abs(left_arr - right_arr)
+                    if diff.size == 0:
+                        return False, 'values differ'
+                    idx = np.unravel_index(np.nanargmax(diff), diff.shape)
+                    return False, (
+                        f"values differ; max abs diff={diff[idx]:.6e} at index {idx}: "
+                        f"{left_arr[idx]!r} != {right_arr[idx]!r}"
+                    )
+
+                ok = np.array_equal(left_arr, right_arr, equal_nan=equal_nan)
+                return ok, '' if ok else 'array values differ'
+
+            if _numeric_scalar(left) and _numeric_scalar(right):
+                ok = np.isclose(left, right, rtol=rtol, atol=atol, equal_nan=equal_nan)
+                return bool(ok), '' if ok else f"{left!r} != {right!r}"
+
+            ok = left == right
+            return bool(ok), '' if ok else f"{left!r} != {right!r}"
+
+        self_keys = set(self.__dict__)
+        other_keys = set(other.__dict__)
+        only_self = sorted(self_keys - other_keys)
+        only_other = sorted(other_keys - self_keys)
+        common = sorted(self_keys & other_keys)
+
+        differences = []
+
+        for key in only_self:
+            differences.append((key, 'missing in other object'))
+        for key in only_other:
+            differences.append((key, 'missing in self object'))
+
+        for key in common:
+            left = self.__dict__[key]
+            right = other.__dict__[key]
+            same, reason = _values_equal(left, right)
+            if not same:
+                differences.append((key, reason))
+
+        if verbose:
+            if differences:
+                print(f"Objects differ in {len(differences)} field(s):")
+                for key, reason in differences:
+                    print(f"- {key}: {reason}")
+            else:
+                print("Objects are equal.")
+
+        return len(differences) == 0
+
 
 
 class MaterialError(Exception):
